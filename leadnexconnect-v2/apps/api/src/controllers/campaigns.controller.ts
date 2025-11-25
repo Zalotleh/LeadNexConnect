@@ -1,8 +1,13 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
 import { campaigns, leads, emails } from '@leadnex/database';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
+import { apolloService } from '../services/lead-generation/apollo.service';
+import { googlePlacesService } from '../services/lead-generation/google-places.service';
+import { enrichmentPipelineService } from '../services/crm/enrichment-pipeline.service';
+import { emailGeneratorService } from '../services/outreach/email-generator.service';
+import { emailQueueService } from '../services/outreach/email-queue.service';
 
 export class CampaignsController {
   /**
@@ -172,24 +177,46 @@ export class CampaignsController {
     try {
       const { id } = req.params;
 
-      const updated = await db
-        .update(campaigns)
-        .set({ status: 'active', startDate: new Date(), lastRunAt: new Date() })
+      // Get campaign details
+      const campaignResult = await db
+        .select()
+        .from(campaigns)
         .where(eq(campaigns.id, id))
-        .returning();
+        .limit(1);
 
-      if (!updated[0]) {
+      if (!campaignResult[0]) {
         return res.status(404).json({
           success: false,
           error: { message: 'Campaign not found' },
         });
       }
 
-      logger.info('[CampaignsController] Campaign started', { id });
+      const campaign = campaignResult[0];
+
+      // Update campaign status to active
+      await db
+        .update(campaigns)
+        .set({ status: 'active', startDate: new Date(), lastRunAt: new Date() })
+        .where(eq(campaigns.id, id));
+
+      logger.info('[CampaignsController] Campaign started', { id, name: campaign.name });
+
+      // Start lead generation and outreach in background
+      this.executeCampaign(id, campaign).catch(error => {
+        logger.error('[CampaignsController] Error executing campaign', {
+          campaignId: id,
+          error: error.message,
+        });
+      });
 
       res.json({
         success: true,
-        data: updated[0],
+        data: {
+          ...campaign,
+          status: 'active',
+          startDate: new Date(),
+        },
+        message: 'Campaign started successfully. Lead generation and outreach running in background.',
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error starting campaign', {
@@ -200,6 +227,196 @@ export class CampaignsController {
         error: { message: error.message },
       });
     }
+  }
+
+  /**
+   * Execute campaign: Generate leads and send emails
+   */
+  private async executeCampaign(campaignId: string, campaign: any) {
+    try {
+      logger.info('[CampaignsController] Executing campaign', {
+        campaignId,
+        name: campaign.name,
+      });
+
+      const rawLeads: any[] = [];
+      const leadsPerSource = Math.ceil((campaign.leadsPerDay || 50) / this.countActiveSources(campaign));
+
+      // 1. Generate leads from enabled sources
+      if (campaign.usesApollo) {
+        try {
+          logger.info('[CampaignsController] Fetching leads from Apollo.io');
+          const apolloLeads = await apolloService.searchLeads({
+            industry: campaign.industry,
+            country: campaign.targetCountries?.[0] || 'United States',
+            maxResults: Math.min(leadsPerSource, 100), // Apollo has daily limits
+          });
+          rawLeads.push(...apolloLeads.map(lead => ({ ...lead, source: 'apollo' })));
+          logger.info(`[CampaignsController] Fetched ${apolloLeads.length} leads from Apollo`);
+        } catch (error: any) {
+          logger.error('[CampaignsController] Error fetching from Apollo', { error: error.message });
+        }
+      }
+
+      if (campaign.usesGooglePlaces) {
+        try {
+          logger.info('[CampaignsController] Fetching leads from Google Places');
+          const placesLeads = await googlePlacesService.searchLeads({
+            industry: campaign.industry,
+            city: campaign.targetCities?.[0] || campaign.targetCountries?.[0] || 'United States',
+            maxResults: leadsPerSource,
+          });
+          rawLeads.push(...placesLeads.map(lead => ({ ...lead, source: 'google_places' })));
+          logger.info(`[CampaignsController] Fetched ${placesLeads.length} leads from Google Places`);
+        } catch (error: any) {
+          logger.error('[CampaignsController] Error fetching from Google Places', { error: error.message });
+        }
+      }
+
+      if (rawLeads.length === 0) {
+        logger.warn('[CampaignsController] No leads generated from any source');
+        return;
+      }
+
+      // 2. Enrich leads through pipeline
+      logger.info(`[CampaignsController] Enriching ${rawLeads.length} leads`);
+      const enrichmentResults = await enrichmentPipelineService.enrichBatch(rawLeads);
+      
+      // Extract successfully enriched lead IDs
+      const successfulLeadIds = enrichmentResults
+        .filter(result => result.success && result.leadId && !result.isDuplicate)
+        .map(result => result.leadId!);
+      
+      logger.info(`[CampaignsController] ${successfulLeadIds.length} leads enriched successfully`);
+
+      if (successfulLeadIds.length === 0) {
+        logger.warn('[CampaignsController] No leads passed enrichment pipeline');
+        return;
+      }
+
+      // 3. Fetch the enriched leads from database
+      const qualifiedLeads = await db
+        .select()
+        .from(leads)
+        .where(and(
+          eq(leads.id, successfulLeadIds[0]),
+          gte(leads.qualityScore, 40)
+        ));
+      
+      // Fetch all qualified leads (workaround for 'in' operator)
+      const allQualifiedLeads = [];
+      for (const leadId of successfulLeadIds) {
+        const leadResults = await db
+          .select()
+          .from(leads)
+          .where(and(
+            eq(leads.id, leadId),
+            gte(leads.qualityScore, 40)
+          ));
+        if (leadResults.length > 0) {
+          allQualifiedLeads.push(leadResults[0]);
+        }
+      }
+
+      logger.info(`[CampaignsController] ${allQualifiedLeads.length} qualified leads (score >= 40)`);
+
+      if (allQualifiedLeads.length === 0) {
+        logger.warn('[CampaignsController] No qualified leads after filtering');
+        await db
+          .update(campaigns)
+          .set({ leadsGenerated: (campaign.leadsGenerated || 0) + successfulLeadIds.length })
+          .where(eq(campaigns.id, campaignId));
+        return;
+      }
+
+      // 4. Generate and queue emails for qualified leads
+      let emailsQueued = 0;
+      
+      for (const lead of allQualifiedLeads) {
+        try {
+          // Skip if no email
+          if (!lead.email) {
+            logger.warn('[CampaignsController] Lead has no email', { leadId: lead.id });
+            continue;
+          }
+
+          // Generate personalized email
+          const emailContent = await emailGeneratorService.generateEmail({
+            industry: lead.industry,
+            companyName: lead.companyName,
+            contactName: lead.contactName || undefined,
+            city: lead.city || undefined,
+            country: lead.country || undefined,
+            followUpStage: 'initial',
+          });
+
+          // Queue email for sending
+          await emailQueueService.addEmail({
+            leadId: lead.id,
+            campaignId: campaignId,
+            to: lead.email,
+            subject: emailContent.subject,
+            bodyText: emailContent.bodyText,
+            bodyHtml: emailContent.bodyHtml,
+            followUpStage: 'initial',
+            metadata: {
+              companyName: lead.companyName,
+              industry: lead.industry,
+            },
+          });
+
+          emailsQueued++;
+
+          // Small delay to avoid overwhelming the queue
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error: any) {
+          logger.error('[CampaignsController] Error queuing email for lead', {
+            leadId: lead.id,
+            error: error.message,
+          });
+        }
+      }
+
+      // 5. Update campaign metrics
+      await db
+        .update(campaigns)
+        .set({
+          leadsGenerated: (campaign.leadsGenerated || 0) + allQualifiedLeads.length,
+          emailsSent: (campaign.emailsSent || 0) + emailsQueued,
+          lastRunAt: new Date(),
+        })
+        .where(eq(campaigns.id, campaignId));
+
+      logger.info('[CampaignsController] Campaign execution completed', {
+        campaignId,
+        leadsGenerated: allQualifiedLeads.length,
+        emailsQueued,
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Fatal error executing campaign', {
+        campaignId,
+        error: error.message,
+        stack: error.stack,
+      });
+      
+      // Update campaign status to error
+      await db
+        .update(campaigns)
+        .set({ status: 'paused' })
+        .where(eq(campaigns.id, campaignId));
+    }
+  }
+
+  /**
+   * Count active lead sources for a campaign
+   */
+  private countActiveSources(campaign: any): number {
+    let count = 0;
+    if (campaign.usesApollo) count++;
+    if (campaign.usesGooglePlaces) count++;
+    if (campaign.usesPeopleDL) count++;
+    if (campaign.usesLinkedin) count++;
+    return Math.max(count, 1); // At least 1 to avoid division by zero
   }
 
   /**

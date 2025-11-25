@@ -1,7 +1,227 @@
 import Layout from '@/components/Layout'
-import { Plus, Play, Pause, Mail } from 'lucide-react'
+import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
+import api from '@/services/api'
+
+interface CampaignFormData {
+  name: string
+  description: string
+  industry: string
+  targetCountries: string[]
+  targetCities: string[]
+  companySize: string
+  leadsPerDay: number
+  usesLinkedin: boolean
+  usesApollo: boolean
+  usesPeopleDL: boolean
+  usesGooglePlaces: boolean
+  emailTemplateId: string
+  followUpEnabled: boolean
+  followUp1DelayDays: number
+  followUp2DelayDays: number
+  scheduleType: 'manual' | 'daily'
+  scheduleTime: string
+}
+
+interface Campaign {
+  id: string
+  name: string
+  description?: string
+  industry?: string
+  status: string
+  scheduleType?: string
+  leadsGenerated: number
+  emailsSent: number
+  emailsOpened: number
+  emailsClicked: number
+  responsesReceived: number
+  createdAt: string
+}
 
 export default function Campaigns() {
+  const [showModal, setShowModal] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1)
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  
+  const [formData, setFormData] = useState<CampaignFormData>({
+    name: '',
+    description: '',
+    industry: '',
+    targetCountries: [],
+    targetCities: [],
+    companySize: '',
+    leadsPerDay: 50,
+    usesLinkedin: false,
+    usesApollo: true,
+    usesPeopleDL: false,
+    usesGooglePlaces: true,
+    emailTemplateId: '',
+    followUpEnabled: true,
+    followUp1DelayDays: 3,
+    followUp2DelayDays: 5,
+    scheduleType: 'manual',
+    scheduleTime: '09:00',
+  })
+
+  const industries = [
+    'Restaurant', 'Hotel', 'Retail', 'Healthcare', 'Technology',
+    'Construction', 'Real Estate', 'Education', 'Finance', 'Other'
+  ]
+
+  const countries = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'France', 'Other']
+  const companySizes = ['1-10', '11-50', '51-200', '201-500', '500+']
+
+  useEffect(() => {
+    fetchCampaigns()
+  }, [])
+
+  const fetchCampaigns = async () => {
+    try {
+      setLoading(true)
+      const response = await api.get('/campaigns')
+      setCampaigns(response.data.data || [])
+    } catch (error: any) {
+      toast.error('Failed to load campaigns')
+      console.error(error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCreateCampaign = () => {
+    setShowModal(true)
+    setCurrentStep(1)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setCurrentStep(1)
+    // Reset form
+    setFormData({
+      name: '',
+      description: '',
+      industry: '',
+      targetCountries: [],
+      targetCities: [],
+      companySize: '',
+      leadsPerDay: 50,
+      usesLinkedin: false,
+      usesApollo: true,
+      usesPeopleDL: false,
+      usesGooglePlaces: true,
+      emailTemplateId: '',
+      followUpEnabled: true,
+      followUp1DelayDays: 3,
+      followUp2DelayDays: 5,
+      scheduleType: 'manual',
+      scheduleTime: '09:00',
+    })
+  }
+
+  const handleNext = () => {
+    if (currentStep === 1 && !formData.name) {
+      toast.error('Campaign name is required')
+      return
+    }
+    if (currentStep === 2 && !formData.industry) {
+      toast.error('Industry is required')
+      return
+    }
+    if (currentStep === 3 && !formData.usesLinkedin && !formData.usesApollo && !formData.usesPeopleDL && !formData.usesGooglePlaces) {
+      toast.error('Select at least one lead source')
+      return
+    }
+    setCurrentStep(currentStep + 1)
+  }
+
+  const handleBack = () => {
+    setCurrentStep(currentStep - 1)
+  }
+
+  const handleSubmit = async () => {
+    try {
+      setSubmitting(true)
+      const response = await api.post('/campaigns', formData)
+      toast.success('Campaign created successfully!')
+      setCampaigns([response.data.data, ...campaigns])
+      handleCloseModal()
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to create campaign')
+      console.error(error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleStartCampaign = async (campaignId: string) => {
+    try {
+      await api.post(`/campaigns/${campaignId}/start`)
+      toast.success('Campaign started!')
+      fetchCampaigns()
+    } catch (error: any) {
+      toast.error('Failed to start campaign')
+      console.error(error)
+    }
+  }
+
+  const handlePauseCampaign = async (campaignId: string) => {
+    try {
+      await api.post(`/campaigns/${campaignId}/pause`)
+      toast.success('Campaign paused!')
+      fetchCampaigns()
+    } catch (error: any) {
+      toast.error('Failed to pause campaign')
+      console.error(error)
+    }
+  }
+
+  const handleDeleteCampaign = async (campaignId: string) => {
+    if (!confirm('Are you sure you want to delete this campaign?')) {
+      return
+    }
+    
+    try {
+      await api.delete(`/campaigns/${campaignId}`)
+      toast.success('Campaign deleted!')
+      fetchCampaigns()
+    } catch (error: any) {
+      toast.error('Failed to delete campaign')
+      console.error(error)
+    }
+  }
+
+  const calculateOpenRate = (campaign: Campaign) => {
+    if (campaign.emailsSent === 0) return 0
+    return Math.round((campaign.emailsOpened / campaign.emailsSent) * 100)
+  }
+
+  const calculateClickRate = (campaign: Campaign) => {
+    if (campaign.emailsSent === 0) return 0
+    return Math.round((campaign.emailsClicked / campaign.emailsSent) * 100)
+  }
+
+  const calculateResponseRate = (campaign: Campaign) => {
+    if (campaign.emailsSent === 0) return 0
+    return Math.round((campaign.responsesReceived / campaign.emailsSent) * 100)
+  }
+
+  const totalStats = campaigns.reduce((acc, campaign) => ({
+    leads: acc.leads + campaign.leadsGenerated,
+    emails: acc.emails + campaign.emailsSent,
+    opens: acc.opens + campaign.emailsOpened,
+    clicks: acc.clicks + campaign.emailsClicked,
+  }), { leads: 0, emails: 0, opens: 0, clicks: 0 })
+
+  const toggleArrayValue = (array: string[], value: string) => {
+    if (array.includes(value)) {
+      return array.filter(item => item !== value)
+    }
+    return [...array, value]
+  }
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -10,23 +230,558 @@ export default function Campaigns() {
             <h1 className="text-3xl font-bold text-gray-900">Campaigns</h1>
             <p className="text-gray-600 mt-2">Manage your email campaigns</p>
           </div>
-          <button className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
+          <button 
+            onClick={handleCreateCampaign}
+            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+          >
             <Plus className="w-4 h-4 inline mr-2" />
             New Campaign
           </button>
         </div>
 
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="flex flex-col items-center justify-center h-96 text-center">
-            <Mail className="w-16 h-16 text-gray-300 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No campaigns yet</h3>
-            <p className="text-gray-600 mb-6">Create your first email campaign to start reaching out to leads</p>
-            <button className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
-              <Plus className="w-4 h-4 inline mr-2" />
-              Create Your First Campaign
-            </button>
+        {/* Overview Stats */}
+        {campaigns.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Leads</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalStats.leads}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {campaigns.filter(c => c.status === 'active').length} active campaigns
+                  </p>
+                </div>
+                <Users className="w-8 h-8 text-blue-500" />
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Emails Sent</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalStats.emails}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {totalStats.emails > 0 ? Math.round((totalStats.opens / totalStats.emails) * 100) : 0}% open rate
+                  </p>
+                </div>
+                <Send className="w-8 h-8 text-green-500" />
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Emails Opened</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalStats.opens}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {totalStats.opens > 0 ? Math.round((totalStats.clicks / totalStats.opens) * 100) : 0}% clicked
+                  </p>
+                </div>
+                <Eye className="w-8 h-8 text-purple-500" />
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Link Clicks</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalStats.clicks}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {totalStats.emails > 0 ? Math.round((totalStats.clicks / totalStats.emails) * 100) : 0}% CTR
+                  </p>
+                </div>
+                <MousePointer className="w-8 h-8 text-orange-500" />
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Campaign List */}
+        {loading ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <p className="text-gray-600">Loading campaigns...</p>
+          </div>
+        ) : campaigns.length === 0 ? (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="flex flex-col items-center justify-center h-96 text-center">
+              <Mail className="w-16 h-16 text-gray-300 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No campaigns yet</h3>
+              <p className="text-gray-600 mb-6">Create your first email campaign to start reaching out to leads</p>
+              <button 
+                onClick={handleCreateCampaign}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+              >
+                <Plus className="w-4 h-4 inline mr-2" />
+                Create Your First Campaign
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {campaigns.map((campaign) => (
+              <div key={campaign.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow">
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-semibold text-gray-900">{campaign.name}</h3>
+                        <span className={`px-2 py-1 text-xs font-medium rounded ${
+                          campaign.status === 'active' ? 'bg-green-100 text-green-800' :
+                          campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {campaign.status}
+                        </span>
+                      </div>
+                      {campaign.description && (
+                        <p className="text-gray-600 text-sm mb-2">{campaign.description}</p>
+                      )}
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        {campaign.industry && (
+                          <span className="flex items-center gap-1">
+                            <TrendingUp className="w-4 h-4" />
+                            {campaign.industry}
+                          </span>
+                        )}
+                        {campaign.scheduleType && (
+                          <span className="capitalize">
+                            {campaign.scheduleType === 'daily' ? '🕒 Daily' : '👆 Manual'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {campaign.status === 'active' ? (
+                        <button
+                          onClick={() => handlePauseCampaign(campaign.id)}
+                          className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 flex items-center gap-1"
+                          title="Pause Campaign"
+                        >
+                          <Pause className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStartCampaign(campaign.id)}
+                          className="px-3 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-1"
+                          title="Start Campaign"
+                        >
+                          <Play className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteCampaign(campaign.id)}
+                        className="px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 flex items-center gap-1"
+                        title="Delete Campaign"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Campaign Metrics */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-4 border-t">
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Leads Generated</p>
+                      <p className="text-xl font-bold text-gray-900">{campaign.leadsGenerated}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Emails Sent</p>
+                      <p className="text-xl font-bold text-gray-900">{campaign.emailsSent}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Opens</p>
+                      <p className="text-xl font-bold text-gray-900">{campaign.emailsOpened}</p>
+                      <p className="text-xs text-green-600 font-medium">
+                        {calculateOpenRate(campaign)}% rate
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Clicks</p>
+                      <p className="text-xl font-bold text-gray-900">{campaign.emailsClicked}</p>
+                      <p className="text-xs text-blue-600 font-medium">
+                        {calculateClickRate(campaign)}% rate
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Responses</p>
+                      <p className="text-xl font-bold text-gray-900">{campaign.responsesReceived}</p>
+                      <p className="text-xs text-purple-600 font-medium">
+                        {calculateResponseRate(campaign)}% rate
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Performance Bars */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>Open Rate</span>
+                          <span>{calculateOpenRate(campaign)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-green-500 h-2 rounded-full transition-all"
+                            style={{ width: `${Math.min(calculateOpenRate(campaign), 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>Click Rate</span>
+                          <span>{calculateClickRate(campaign)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-500 h-2 rounded-full transition-all"
+                            style={{ width: `${Math.min(calculateClickRate(campaign), 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Campaign Creation Modal */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Create Campaign</h2>
+                  <p className="text-sm text-gray-600 mt-1">Step {currentStep} of 4</p>
+                </div>
+                <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="px-6 py-4 border-b">
+                <div className="flex items-center justify-between">
+                  {[1, 2, 3, 4].map((step) => (
+                    <div key={step} className="flex items-center">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        step < currentStep ? 'bg-green-600 text-white' :
+                        step === currentStep ? 'bg-primary-600 text-white' :
+                        'bg-gray-200 text-gray-600'
+                      }`}>
+                        {step < currentStep ? <Check className="w-5 h-5" /> : step}
+                      </div>
+                      {step < 4 && (
+                        <div className={`w-12 md:w-24 h-1 ${
+                          step < currentStep ? 'bg-green-600' : 'bg-gray-200'
+                        }`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span className="text-xs text-gray-600">Basic Info</span>
+                  <span className="text-xs text-gray-600">Targeting</span>
+                  <span className="text-xs text-gray-600">Sources</span>
+                  <span className="text-xs text-gray-600">Schedule</span>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                {/* Step 1: Basic Info */}
+                {currentStep === 1 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Campaign Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        placeholder="e.g., Restaurant Outreach Q4 2024"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Description
+                      </label>
+                      <textarea
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        rows={3}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        placeholder="Describe your campaign goals..."
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Targeting */}
+                {currentStep === 2 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Industry *
+                      </label>
+                      <select
+                        value={formData.industry}
+                        onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      >
+                        <option value="">Select industry</option>
+                        {industries.map((industry) => (
+                          <option key={industry} value={industry}>{industry}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Target Countries
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {countries.map((country) => (
+                          <label key={country} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={formData.targetCountries.includes(country)}
+                              onChange={() => setFormData({
+                                ...formData,
+                                targetCountries: toggleArrayValue(formData.targetCountries, country)
+                              })}
+                              className="rounded text-primary-600"
+                            />
+                            <span className="text-sm text-gray-700">{country}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Company Size
+                      </label>
+                      <select
+                        value={formData.companySize}
+                        onChange={(e) => setFormData({ ...formData, companySize: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      >
+                        <option value="">Any size</option>
+                        {companySizes.map((size) => (
+                          <option key={size} value={size}>{size} employees</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Leads Per Day
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.leadsPerDay}
+                        onChange={(e) => setFormData({ ...formData, leadsPerDay: parseInt(e.target.value) || 0 })}
+                        min="1"
+                        max="500"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Lead Sources */}
+                {currentStep === 3 && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600 mb-4">
+                      Select the sources to generate leads from. You can choose multiple sources.
+                    </p>
+                    
+                    <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.usesApollo}
+                        onChange={(e) => setFormData({ ...formData, usesApollo: e.target.checked })}
+                        className="mt-1 rounded text-primary-600"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">Apollo.io</p>
+                        <p className="text-sm text-gray-600">B2B contact database with 275M+ contacts</p>
+                        <p className="text-xs text-gray-500 mt-1">100 leads/day limit</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.usesGooglePlaces}
+                        onChange={(e) => setFormData({ ...formData, usesGooglePlaces: e.target.checked })}
+                        className="mt-1 rounded text-primary-600"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">Google Places</p>
+                        <p className="text-sm text-gray-600">Local businesses from Google Maps</p>
+                        <p className="text-xs text-gray-500 mt-1">Unlimited</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.usesPeopleDL}
+                        onChange={(e) => setFormData({ ...formData, usesPeopleDL: e.target.checked })}
+                        className="mt-1 rounded text-primary-600"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">People Data Labs</p>
+                        <p className="text-sm text-gray-600">Contact enrichment and email finding</p>
+                        <p className="text-xs text-gray-500 mt-1">1,000 credits/month</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg hover:border-primary-500 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.usesLinkedin}
+                        onChange={(e) => setFormData({ ...formData, usesLinkedin: e.target.checked })}
+                        className="mt-1 rounded text-primary-600"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">LinkedIn CSV Import</p>
+                        <p className="text-sm text-gray-600">Import from Sales Navigator exports</p>
+                        <p className="text-xs text-gray-500 mt-1">Manual upload required</p>
+                      </div>
+                    </label>
+                  </div>
+                )}
+
+                {/* Step 4: Schedule & Settings */}
+                {currentStep === 4 && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Schedule Type
+                      </label>
+                      <div className="space-y-2">
+                        <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary-500">
+                          <input
+                            type="radio"
+                            checked={formData.scheduleType === 'manual'}
+                            onChange={() => setFormData({ ...formData, scheduleType: 'manual' })}
+                            className="text-primary-600"
+                          />
+                          <div>
+                            <p className="font-medium text-gray-900">Manual</p>
+                            <p className="text-sm text-gray-600">Start campaign manually when ready</p>
+                          </div>
+                        </label>
+                        <label className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary-500">
+                          <input
+                            type="radio"
+                            checked={formData.scheduleType === 'daily'}
+                            onChange={() => setFormData({ ...formData, scheduleType: 'daily' })}
+                            className="text-primary-600"
+                          />
+                          <div>
+                            <p className="font-medium text-gray-900">Daily Automation</p>
+                            <p className="text-sm text-gray-600">Run automatically every day</p>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    {formData.scheduleType === 'daily' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Daily Run Time
+                        </label>
+                        <input
+                          type="time"
+                          value={formData.scheduleTime}
+                          onChange={(e) => setFormData({ ...formData, scheduleTime: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        />
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t">
+                      <label className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={formData.followUpEnabled}
+                          onChange={(e) => setFormData({ ...formData, followUpEnabled: e.target.checked })}
+                          className="rounded text-primary-600"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Enable Follow-ups</span>
+                      </label>
+                    </div>
+
+                    {formData.followUpEnabled && (
+                      <div className="grid grid-cols-2 gap-4 ml-6">
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-2">
+                            Follow-up 1 (days)
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.followUp1DelayDays}
+                            onChange={(e) => setFormData({ ...formData, followUp1DelayDays: parseInt(e.target.value) || 0 })}
+                            min="1"
+                            max="30"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-700 mb-2">
+                            Follow-up 2 (days)
+                          </label>
+                          <input
+                            type="number"
+                            value={formData.followUp2DelayDays}
+                            onChange={(e) => setFormData({ ...formData, followUp2DelayDays: parseInt(e.target.value) || 0 })}
+                            min="1"
+                            max="30"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between p-6 border-t">
+                <button
+                  onClick={currentStep === 1 ? handleCloseModal : handleBack}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  <ChevronLeft className="w-4 h-4 inline mr-1" />
+                  {currentStep === 1 ? 'Cancel' : 'Back'}
+                </button>
+                
+                {currentStep < 4 ? (
+                  <button
+                    onClick={handleNext}
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4 inline ml-1" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {submitting ? 'Creating...' : 'Create Campaign'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   )

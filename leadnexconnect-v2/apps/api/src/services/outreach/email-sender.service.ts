@@ -1,22 +1,168 @@
 import nodemailer from 'nodemailer';
 import { logger } from '../../utils/logger';
-import { db } from '@leadnex/database';
+import { db, settings } from '@leadnex/database';
 import { emails, leads } from '@leadnex/database';
 import { eq } from 'drizzle-orm';
 
-export class EmailSenderService {
-  private transporter: nodemailer.Transporter;
+interface SMTPConfig {
+  provider: 'smtp2go' | 'sendgrid' | 'gmail' | 'wordpress' | 'generic';
+  host: string;
+  port: number;
+  secure: boolean;
+  auth: {
+    user: string;
+    pass: string;
+  };
+  fromName: string;
+  fromEmail: string;
+}
 
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+export class EmailSenderService {
+  private transporter: nodemailer.Transporter | null = null;
+  private currentConfig: SMTPConfig | null = null;
+
+  /**
+   * Get SMTP configuration from database settings or environment
+   */
+  private async getSMTPConfig(): Promise<SMTPConfig> {
+    try {
+      // Try to get from database settings first
+      const settingsResults = await db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, 'smtp_config'))
+        .limit(1);
+
+      if (settingsResults[0]?.value) {
+        const config = settingsResults[0].value as any;
+        logger.info('[EmailSender] Using SMTP config from database');
+        return this.buildSMTPConfig(config);
+      }
+    } catch (error: any) {
+      logger.warn('[EmailSender] Could not load SMTP from database, using env vars');
+    }
+
+    // Fallback to environment variables
+    return this.buildSMTPConfigFromEnv();
+  }
+
+  /**
+   * Build SMTP configuration based on provider
+   */
+  private buildSMTPConfig(config: any): SMTPConfig {
+    const provider = config.provider || 'generic';
+
+    // Provider-specific defaults
+    const providerDefaults: Record<string, Partial<SMTPConfig>> = {
+      smtp2go: {
+        host: 'mail.smtp2go.com',
+        port: 587,
+        secure: false,
       },
-    });
+      sendgrid: {
+        host: 'smtp.sendgrid.net',
+        port: 587,
+        secure: false,
+      },
+      gmail: {
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+      },
+      wordpress: {
+        host: config.host || 'localhost',
+        port: config.port || 587,
+        secure: config.secure || false,
+      },
+      generic: {
+        host: config.host,
+        port: config.port || 587,
+        secure: config.secure || false,
+      },
+    };
+
+    const defaults = providerDefaults[provider] || providerDefaults.generic;
+
+    return {
+      provider,
+      host: config.host || defaults.host!,
+      port: config.port || defaults.port!,
+      secure: config.secure !== undefined ? config.secure : defaults.secure!,
+      auth: {
+        user: config.user || config.auth?.user || '',
+        pass: config.pass || config.auth?.pass || '',
+      },
+      fromName: config.fromName || 'BookNex Solutions',
+      fromEmail: config.fromEmail || config.user || config.auth?.user || '',
+    };
+  }
+
+  /**
+   * Build SMTP configuration from environment variables
+   */
+  private buildSMTPConfigFromEnv(): SMTPConfig {
+    const provider = (process.env.SMTP_PROVIDER || 'generic') as any;
+
+    return {
+      provider,
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS || '',
+      },
+      fromName: process.env.FROM_NAME || 'BookNex Solutions',
+      fromEmail: process.env.FROM_EMAIL || process.env.SMTP_USER || '',
+    };
+  }
+
+  /**
+   * Initialize or update transporter with current config
+   */
+  private async initializeTransporter(): Promise<void> {
+    const config = await this.getSMTPConfig();
+
+    // Only recreate if config changed
+    if (
+      !this.transporter ||
+      JSON.stringify(config) !== JSON.stringify(this.currentConfig)
+    ) {
+      logger.info('[EmailSender] Initializing SMTP transporter', {
+        provider: config.provider,
+        host: config.host,
+        port: config.port,
+      });
+
+      this.transporter = nodemailer.createTransport({
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        auth: {
+          user: config.auth.user,
+          pass: config.auth.pass,
+        },
+        // Additional options for reliability
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100,
+        rateDelta: 1000,
+        rateLimit: 5,
+      });
+
+      this.currentConfig = config;
+
+      // Verify connection
+      try {
+        await this.transporter.verify();
+        logger.info('[EmailSender] SMTP connection verified');
+      } catch (error: any) {
+        logger.error('[EmailSender] SMTP connection failed', {
+          error: error.message,
+        });
+        throw new Error(`SMTP connection failed: ${error.message}`);
+      }
+    }
   }
 
   /**
@@ -31,6 +177,13 @@ export class EmailSenderService {
     followUpStage: string;
   }): Promise<void> {
     try {
+      // Initialize transporter if needed
+      await this.initializeTransporter();
+
+      if (!this.transporter || !this.currentConfig) {
+        throw new Error('SMTP transporter not initialized');
+      }
+
       // Get lead info
       const lead = await db
         .select()
@@ -45,15 +198,26 @@ export class EmailSenderService {
       logger.info('[EmailSender] Sending email', {
         to: lead[0].email,
         subject: params.subject,
+        provider: this.currentConfig.provider,
       });
+
+      // Add tracking pixel for open tracking
+      const trackingPixel = `<img src="${process.env.API_BASE_URL}/api/emails/track/open/${params.leadId}" width="1" height="1" alt="" />`;
+      const bodyHtmlWithTracking = params.bodyHtml 
+        ? `${params.bodyHtml}${trackingPixel}`
+        : `${params.bodyText.replace(/\n/g, '<br>')}${trackingPixel}`;
 
       // Send email
       const info = await this.transporter.sendMail({
-        from: `"${process.env.FROM_NAME || 'BookNex Solutions'}" <${process.env.SMTP_USER}>`,
+        from: `"${this.currentConfig.fromName}" <${this.currentConfig.fromEmail}>`,
         to: lead[0].email,
         subject: params.subject,
         text: params.bodyText,
-        html: params.bodyHtml || params.bodyText,
+        html: bodyHtmlWithTracking,
+        headers: {
+          'X-Campaign-ID': params.campaignId || '',
+          'X-Lead-ID': params.leadId,
+        },
       });
 
       // Record email in database
@@ -88,8 +252,154 @@ export class EmailSenderService {
       logger.error('[EmailSender] Error sending email', {
         error: error.message,
       });
+
+      // Record failed email
+      try {
+        await db.insert(emails).values({
+          leadId: params.leadId,
+          campaignId: params.campaignId,
+          subject: params.subject,
+          bodyText: params.bodyText,
+          bodyHtml: params.bodyHtml,
+          followUpStage: params.followUpStage,
+          status: 'failed',
+          errorMessage: error.message,
+        });
+      } catch (dbError) {
+        logger.error('[EmailSender] Failed to record email error', {
+          error: dbError,
+        });
+      }
+
       throw error;
     }
+  }
+
+  /**
+   * Test SMTP connection with current or provided config
+   */
+  async testConnection(testConfig?: Partial<SMTPConfig>): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    try {
+      let configToTest: SMTPConfig;
+
+      if (testConfig) {
+        configToTest = this.buildSMTPConfig(testConfig);
+      } else {
+        configToTest = await this.getSMTPConfig();
+      }
+
+      logger.info('[EmailSender] Testing SMTP connection', {
+        provider: configToTest.provider,
+        host: configToTest.host,
+      });
+
+      const testTransporter = nodemailer.createTransport({
+        host: configToTest.host,
+        port: configToTest.port,
+        secure: configToTest.secure,
+        auth: {
+          user: configToTest.auth.user,
+          pass: configToTest.auth.pass,
+        },
+      });
+
+      await testTransporter.verify();
+
+      logger.info('[EmailSender] SMTP connection test successful');
+
+      return {
+        success: true,
+        message: 'SMTP connection successful',
+      };
+    } catch (error: any) {
+      logger.error('[EmailSender] SMTP connection test failed', {
+        error: error.message,
+      });
+
+      return {
+        success: false,
+        message: `Connection failed: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Update SMTP configuration
+   */
+  async updateSMTPConfig(config: Partial<SMTPConfig>): Promise<void> {
+    try {
+      logger.info('[EmailSender] Updating SMTP configuration');
+
+      // Save to database
+      await db
+        .insert(settings)
+        .values({
+          key: 'smtp_config',
+          value: config,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: settings.key,
+          set: {
+            value: config,
+            updatedAt: new Date(),
+          },
+        });
+
+      // Reset transporter to force reload
+      this.transporter = null;
+      this.currentConfig = null;
+
+      logger.info('[EmailSender] SMTP configuration updated');
+    } catch (error: any) {
+      logger.error('[EmailSender] Error updating SMTP config', {
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get current SMTP configuration (without sensitive data)
+   */
+  async getCurrentConfig(): Promise<Partial<SMTPConfig>> {
+    const config = await this.getSMTPConfig();
+
+    return {
+      provider: config.provider,
+      host: config.host,
+      port: config.port,
+      secure: config.secure,
+      fromName: config.fromName,
+      fromEmail: config.fromEmail,
+      // Don't return auth credentials
+    };
+  }
+
+  /**
+   * Send test email
+   */
+  async sendTestEmail(to: string): Promise<void> {
+    await this.initializeTransporter();
+
+    if (!this.transporter || !this.currentConfig) {
+      throw new Error('SMTP transporter not initialized');
+    }
+
+    logger.info('[EmailSender] Sending test email', { to });
+
+    await this.transporter.sendMail({
+      from: `"${this.currentConfig.fromName}" <${this.currentConfig.fromEmail}>`,
+      to,
+      subject: 'Test Email from LeadNexConnect',
+      text: 'This is a test email to verify your SMTP configuration is working correctly.',
+      html: '<p>This is a test email to verify your SMTP configuration is working correctly.</p>',
+    });
+
+    logger.info('[EmailSender] Test email sent successfully');
   }
 }
 

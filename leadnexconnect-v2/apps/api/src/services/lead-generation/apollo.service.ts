@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { db, apiUsage } from '@leadnex/database';
 import { logger } from '../../utils/logger';
 import type { Lead, LeadSource } from '@leadnex/shared';
 
@@ -113,12 +114,24 @@ export class ApolloService {
           emailsSent: 0,
           emailsOpened: 0,
           emailsClicked: 0,
+          customFields: {
+            apolloId: person.id,
+            apolloData: {
+              firstName: person.first_name,
+              lastName: person.last_name,
+              title: person.title,
+              estimatedEmployees: person.organization?.estimated_num_employees,
+            },
+          },
           createdAt: new Date(),
           updatedAt: new Date(),
         };
 
         return lead as Lead;
       });
+
+      // Track API usage
+      await this.trackApiUsage(leads.length);
 
       logger.info('[Apollo] Successfully fetched leads', {
         count: leads.length,
@@ -174,6 +187,90 @@ export class ApolloService {
     } catch (error: any) {
       logger.error('[Apollo] Error checking API usage', { error: error.message });
       throw error;
+    }
+  }
+
+  /**
+   * Track API usage in database
+   */
+  private async trackApiUsage(leadsFetched: number): Promise<void> {
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+      await db.insert(apiUsage).values({
+        service: 'apollo',
+        requestsMade: leadsFetched,
+        requestsLimit: 100, // Daily limit
+        periodStart: startOfDay,
+        periodEnd: endOfDay,
+        createdAt: new Date(),
+      });
+    } catch (error: any) {
+      logger.error('[Apollo] Error tracking API usage', {
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Enrich a single lead with additional data
+   */
+  async enrichLead(params: {
+    email?: string;
+    companyName?: string;
+    domain?: string;
+  }): Promise<any> {
+    try {
+      logger.info('[Apollo] Enriching lead', { params });
+
+      const enrichQuery: any = {
+        api_key: this.apiKey,
+      };
+
+      if (params.email) {
+        enrichQuery.email = params.email;
+      } else if (params.domain) {
+        enrichQuery.domain = params.domain;
+      } else {
+        throw new Error('Either email or domain is required for enrichment');
+      }
+
+      const response = await axios.post(
+        `${APOLLO_API_BASE}/people/match`,
+        enrichQuery,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 15000,
+        }
+      );
+
+      if (!response.data || !response.data.person) {
+        logger.warn('[Apollo] No enrichment data found');
+        return null;
+      }
+
+      const person = response.data.person;
+      return {
+        email: person.email,
+        phone: person.phone_numbers?.[0],
+        linkedin: person.linkedin_url,
+        jobTitle: person.title,
+        seniority: person.seniority,
+        department: person.functions,
+        companyName: person.organization?.name,
+        companyIndustry: person.organization?.industry,
+        companySize: person.organization?.estimated_num_employees,
+      };
+    } catch (error: any) {
+      logger.error('[Apollo] Error enriching lead', {
+        error: error.message,
+        response: error.response?.data,
+      });
+      return null;
     }
   }
 }

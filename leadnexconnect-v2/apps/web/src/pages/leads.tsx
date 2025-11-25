@@ -2,21 +2,132 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import leadsService, { Lead } from '@/services/leads.service'
-import { Plus, Filter, Download, Upload, Users } from 'lucide-react'
+import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+import api from '@/services/api'
 
 export default function Leads() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [showGenerateModal, setShowGenerateModal] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState('')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState({
+    industry: 'all',
+    minScore: 0,
+    maxScore: 100,
+    verificationStatus: 'all',
+    source: 'all',
+  })
+  
+  const [generateForm, setGenerateForm] = useState({
+    source: 'apollo' as 'apollo' | 'google_places' | 'peopledatalabs' | 'linkedin',
+    industry: '',
+    country: 'United States',
+    city: '',
+    maxResults: 50,
+  })
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['leads', statusFilter],
+    queryKey: ['leads', statusFilter, filters, searchQuery],
     queryFn: async () => {
-      const params = statusFilter !== 'all' ? { status: statusFilter } : {}
+      const params: any = {}
+      if (statusFilter !== 'all') params.status = statusFilter
+      if (filters.industry !== 'all') params.industry = filters.industry
+      if (filters.source !== 'all') params.source = filters.source
+      if (searchQuery) params.search = searchQuery
       return await leadsService.getAll(params)
     },
   })
 
   const leads: Lead[] = data?.data || []
+
+  // Client-side filtering for score (since API might not support score filtering)
+  const filteredLeads = leads.filter(lead => {
+    const score = lead.score || 0
+    if (score < filters.minScore || score > filters.maxScore) return false
+    // Verification filter can be added later when backend supports it
+    return true
+  })
+
+  const industries = [
+    'Restaurant', 'Hotel', 'Retail', 'Healthcare', 'Technology',
+    'Construction', 'Real Estate', 'Education', 'Finance', 'Manufacturing',
+    'Legal', 'Consulting', 'Marketing', 'Transportation', 'Other'
+  ]
+
+  const countries = [
+    'United States', 'Canada', 'United Kingdom', 'Australia', 
+    'Germany', 'France', 'Spain', 'Italy', 'Other'
+  ]
+
+  const handleGenerateLeads = async () => {
+    if (!generateForm.industry) {
+      toast.error('Please select an industry')
+      return
+    }
+
+    try {
+      setGenerating(true)
+      setGenerationProgress('Fetching leads from ' + generateForm.source + '...')
+
+      const endpoint = generateForm.source === 'apollo' 
+        ? '/scraping/apollo'
+        : generateForm.source === 'google_places'
+        ? '/scraping/google-places'
+        : generateForm.source === 'peopledatalabs'
+        ? '/scraping/peopledatalabs'
+        : '/scraping/linkedin-import'
+
+      const response = await api.post(endpoint, {
+        industry: generateForm.industry,
+        country: generateForm.country,
+        city: generateForm.city,
+        maxResults: generateForm.maxResults,
+      })
+
+      setGenerationProgress('Enriching leads...')
+      
+      // Wait a bit for enrichment to complete
+      await new Promise(resolve => setTimeout(resolve, 2000))
+
+      const savedCount = response.data.data?.saved || response.data.data?.count || 0
+      const duplicatesCount = response.data.data?.duplicates || 0
+      
+      let message = `Generated ${savedCount} leads successfully!`
+      if (duplicatesCount > 0) {
+        message += ` (${duplicatesCount} duplicates skipped)`
+      }
+
+      toast.success(message)
+      setShowGenerateModal(false)
+      refetch()
+      
+      // Reset form
+      setGenerateForm({
+        source: 'apollo',
+        industry: '',
+        country: 'United States',
+        city: '',
+        maxResults: 50,
+      })
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to generate leads')
+      console.error(error)
+    } finally {
+      setGenerating(false)
+      setGenerationProgress('')
+    }
+  }
+
+  const handleExport = async () => {
+    try {
+      toast.success('Export functionality coming soon!')
+    } catch (error) {
+      toast.error('Failed to export leads')
+    }
+  }
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -24,6 +135,8 @@ export default function Leads() {
       contacted: 'bg-yellow-100 text-yellow-800',
       qualified: 'bg-green-100 text-green-800',
       unqualified: 'bg-gray-100 text-gray-800',
+      responded: 'bg-purple-100 text-purple-800',
+      interested: 'bg-teal-100 text-teal-800',
     }
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
@@ -38,41 +151,209 @@ export default function Leads() {
             <p className="text-gray-600 mt-2">Manage and track your leads</p>
           </div>
           <div className="flex items-center space-x-3">
+            <button 
+              onClick={() => setShowGenerateModal(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+            >
+              <Zap className="w-4 h-4 inline mr-2" />
+              Generate Leads
+            </button>
             <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
               <Upload className="w-4 h-4 inline mr-2" />
-              Import
+              Import CSV
             </button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button 
+              onClick={handleExport}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
               <Download className="w-4 h-4 inline mr-2" />
               Export
-            </button>
-            <button className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add Lead
             </button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center space-x-4">
-            <Filter className="w-5 h-5 text-gray-400" />
-            <div className="flex items-center space-x-2">
-              {['all', 'new', 'contacted', 'qualified', 'unqualified'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    statusFilter === status
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Total Leads</p>
+                <p className="text-2xl font-bold text-gray-900">{leads.length}</p>
+              </div>
+              <Users className="w-8 h-8 text-blue-500" />
             </div>
           </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">New</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {leads.filter(l => l.status === 'new').length}
+                </p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-blue-600 font-bold">N</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Contacted</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {leads.filter(l => l.status === 'contacted').length}
+                </p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                <span className="text-yellow-600 font-bold">C</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Qualified</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {leads.filter(l => l.status === 'qualified' || l.status === 'interested').length}
+                </p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <span className="text-green-600 font-bold">Q</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow p-4 space-y-4">
+          {/* Search Bar and Status Filters */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by company name, email, or contact..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                showAdvancedFilters
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Advanced Filters
+            </button>
+          </div>
+
+          {/* Status Filter Buttons */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 mr-2">Status:</span>
+            {['all', 'new', 'contacted', 'qualified', 'responded', 'interested', 'unqualified'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  statusFilter === status
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Advanced Filters Panel */}
+          {showAdvancedFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Industry
+                </label>
+                <select
+                  value={filters.industry}
+                  onChange={(e) => setFilters({ ...filters, industry: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="all">All Industries</option>
+                  {industries.map((industry) => (
+                    <option key={industry} value={industry}>{industry}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lead Source
+                </label>
+                <select
+                  value={filters.source}
+                  onChange={(e) => setFilters({ ...filters, source: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="all">All Sources</option>
+                  <option value="apollo">Apollo.io</option>
+                  <option value="google_places">Google Places</option>
+                  <option value="peopledatalabs">People Data Labs</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="manual_import">Manual Import</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Min Score ({filters.minScore})
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={filters.minScore}
+                  onChange={(e) => setFilters({ ...filters, minScore: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Max Score ({filters.maxScore})
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={filters.maxScore}
+                  onChange={(e) => setFilters({ ...filters, maxScore: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="md:col-span-4 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setFilters({
+                      industry: 'all',
+                      minScore: 0,
+                      maxScore: 100,
+                      verificationStatus: 'all',
+                      source: 'all',
+                    })
+                    setSearchQuery('')
+                    setStatusFilter('all')
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Leads Table */}
@@ -81,18 +362,31 @@ export default function Leads() {
             <div className="flex items-center justify-center h-96">
               <div className="text-lg text-gray-500">Loading leads...</div>
             </div>
-          ) : leads.length === 0 ? (
+          ) : filteredLeads.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-96 text-center">
               <Users className="w-16 h-16 text-gray-300 mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No leads found</h3>
-              <p className="text-gray-600 mb-6">Get started by importing or adding your first lead</p>
-              <button className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
-                <Plus className="w-4 h-4 inline mr-2" />
-                Add Your First Lead
+              <p className="text-gray-600 mb-6">
+                {searchQuery || filters.industry !== 'all' || filters.source !== 'all'
+                  ? 'Try adjusting your filters'
+                  : 'Get started by importing or generating your first leads'}
+              </p>
+              <button 
+                onClick={() => setShowGenerateModal(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+              >
+                <Zap className="w-4 h-4 inline mr-2" />
+                Generate Leads
               </button>
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
+            <>
+              <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <p className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{filteredLeads.length}</span> of <span className="font-medium">{leads.length}</span> leads
+                </p>
+              </div>
+              <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -116,7 +410,7 @@ export default function Leads() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {leads.map((lead) => (
+                {filteredLeads.map((lead) => (
                   <tr key={lead.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{lead.companyName}</div>
@@ -157,8 +451,221 @@ export default function Leads() {
                 ))}
               </tbody>
             </table>
+            </>
           )}
         </div>
+
+        {/* Lead Generation Modal */}
+        {showGenerateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Generate Leads</h2>
+                  <p className="text-sm text-gray-600 mt-1">Select source and configure filters</p>
+                </div>
+                <button 
+                  onClick={() => setShowGenerateModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={generating}
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6">
+                {/* Source Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Lead Source *
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      generateForm.source === 'apollo' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        checked={generateForm.source === 'apollo'}
+                        onChange={() => setGenerateForm({ ...generateForm, source: 'apollo' })}
+                        className="mt-1"
+                        disabled={generating}
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">Apollo.io</p>
+                        <p className="text-sm text-gray-600">B2B contact database</p>
+                        <p className="text-xs text-gray-500 mt-1">100 leads/day limit</p>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      generateForm.source === 'google_places' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        checked={generateForm.source === 'google_places'}
+                        onChange={() => setGenerateForm({ ...generateForm, source: 'google_places' })}
+                        className="mt-1"
+                        disabled={generating}
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">Google Places</p>
+                        <p className="text-sm text-gray-600">Local businesses</p>
+                        <p className="text-xs text-gray-500 mt-1">Unlimited</p>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      generateForm.source === 'peopledatalabs' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        checked={generateForm.source === 'peopledatalabs'}
+                        onChange={() => setGenerateForm({ ...generateForm, source: 'peopledatalabs' })}
+                        className="mt-1"
+                        disabled={generating}
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">People Data Labs</p>
+                        <p className="text-sm text-gray-600">Contact enrichment</p>
+                        <p className="text-xs text-gray-500 mt-1">1,000 credits/month</p>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                      generateForm.source === 'linkedin' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        checked={generateForm.source === 'linkedin'}
+                        onChange={() => setGenerateForm({ ...generateForm, source: 'linkedin' })}
+                        className="mt-1"
+                        disabled={generating}
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">LinkedIn CSV</p>
+                        <p className="text-sm text-gray-600">Sales Navigator</p>
+                        <p className="text-xs text-gray-500 mt-1">Manual upload</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Industry Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Industry *
+                  </label>
+                  <select
+                    value={generateForm.industry}
+                    onChange={(e) => setGenerateForm({ ...generateForm, industry: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    disabled={generating}
+                  >
+                    <option value="">Select industry</option>
+                    {industries.map((industry) => (
+                      <option key={industry} value={industry}>{industry}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Location Filters */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Country
+                    </label>
+                    <select
+                      value={generateForm.country}
+                      onChange={(e) => setGenerateForm({ ...generateForm, country: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      disabled={generating}
+                    >
+                      {countries.map((country) => (
+                        <option key={country} value={country}>{country}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      City (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={generateForm.city}
+                      onChange={(e) => setGenerateForm({ ...generateForm, city: e.target.value })}
+                      placeholder="e.g., New York"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      disabled={generating}
+                    />
+                  </div>
+                </div>
+
+                {/* Max Results */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Maximum Results
+                  </label>
+                  <input
+                    type="number"
+                    value={generateForm.maxResults}
+                    onChange={(e) => setGenerateForm({ ...generateForm, maxResults: parseInt(e.target.value) || 0 })}
+                    min="1"
+                    max="500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    disabled={generating}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Note: Actual results may be lower based on API limits and data availability
+                  </p>
+                </div>
+
+                {/* Progress Indicator */}
+                {generating && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3">
+                      <Loader className="w-5 h-5 text-blue-600 animate-spin" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">Generating leads...</p>
+                        <p className="text-xs text-blue-700 mt-1">{generationProgress}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between p-6 border-t">
+                <button
+                  onClick={() => setShowGenerateModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  disabled={generating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerateLeads}
+                  disabled={generating || !generateForm.industry}
+                  className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generating ? (
+                    <>
+                      <Loader className="w-4 h-4 inline mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 inline mr-2" />
+                      Generate Leads
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   )

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { db, apiUsage } from '@leadnex/database';
 import { logger } from '../../utils/logger';
 import type { Lead, LeadSource } from '@leadnex/shared';
 
@@ -112,6 +113,9 @@ export class GooglePlacesService {
         industry: params.industry,
       });
 
+      // Track API usage
+      await this.trackApiUsage(leads.length);
+
       return leads;
     } catch (error: any) {
       logger.error('[GooglePlaces] Error searching leads', {
@@ -145,6 +149,29 @@ export class GooglePlacesService {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Track API usage in database
+   */
+  private async trackApiUsage(leadsFetched: number): Promise<void> {
+    try {
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+      await db.insert(apiUsage).values({
+        service: 'google_places',
+        requestsMade: leadsFetched,
+        periodStart: startOfDay,
+        periodEnd: endOfDay,
+        createdAt: new Date(),
+      });
+    } catch (error: any) {
+      logger.error('[GooglePlaces] Error tracking API usage', {
+        error: error.message,
+      });
+    }
   }
 }
 

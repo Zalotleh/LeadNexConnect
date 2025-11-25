@@ -6,6 +6,10 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { rateLimit } from 'express-rate-limit';
 import { logger } from './utils/logger';
+import { emailQueueService } from './services/outreach/email-queue.service';
+import { dailyLeadGenerationJob } from './jobs/daily-lead-generation.job';
+import { dailyOutreachJob } from './jobs/daily-outreach.job';
+import { followUpCheckerJob } from './jobs/follow-up-checker.job';
 
 // Import routes
 import leadsRoutes from './routes/leads.routes';
@@ -103,10 +107,41 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logger.info(`🚀 LeadNexConnect API server running on port ${PORT}`);
   logger.info(`📍 Environment: ${NODE_ENV}`);
   logger.info(`🔗 Frontend URL: ${process.env.FRONTEND_URL}`);
+  
+  // Initialize email queue
+  try {
+    logger.info('📧 Starting email queue processing...');
+    emailQueueService.startProcessing(5); // Process 5 emails concurrently
+    
+    const stats = await emailQueueService.getStats();
+    logger.info('📊 Email queue initialized', {
+      waiting: stats.waiting,
+      active: stats.active,
+      completed: stats.completed,
+      failed: stats.failed,
+    });
+  } catch (error: any) {
+    logger.error('❌ Failed to initialize email queue', {
+      error: error.message,
+    });
+  }
+
+  // Start cron jobs
+  try {
+    logger.info('⏰ Starting cron jobs...');
+    dailyLeadGenerationJob.start();
+    dailyOutreachJob.start();
+    followUpCheckerJob.start();
+    logger.info('✅ All cron jobs started successfully');
+  } catch (error: any) {
+    logger.error('❌ Failed to start cron jobs', {
+      error: error.message,
+    });
+  }
   
   if (NODE_ENV === 'development') {
     logger.info(`📖 API Docs: http://localhost:${PORT}/health`);
@@ -114,14 +149,31 @@ app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received: closing HTTP server');
+const gracefulShutdown = async () => {
+  logger.info('Shutting down gracefully...');
+  
+  try {
+    // Stop cron jobs
+    dailyLeadGenerationJob.stop();
+    dailyOutreachJob.stop();
+    followUpCheckerJob.stop();
+    logger.info('Cron jobs stopped');
+  } catch (error: any) {
+    logger.error('Error stopping cron jobs', { error: error.message });
+  }
+  
+  try {
+    // Close email queue
+    await emailQueueService.close();
+    logger.info('Email queue closed');
+  } catch (error: any) {
+    logger.error('Error closing email queue', { error: error.message });
+  }
+  
   process.exit(0);
-});
+};
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received: closing HTTP server');
-  process.exit(0);
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 export default app;
