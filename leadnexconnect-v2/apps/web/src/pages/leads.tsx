@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import leadsService, { Lead } from '@/services/leads.service'
-import { Plus, Filter, Download, Upload } from 'lucide-react'
+import { Plus, Filter, Download, Upload, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Leads() {

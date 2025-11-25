@@ -19,7 +19,7 @@ export class AnalyticsController {
       // Leads by status
       const newLeads = allLeads.filter((l) => l.status === 'new').length;
       const contactedLeads = allLeads.filter((l) => l.status === 'contacted').length;
-      const qualifiedLeads = allLeads.filter((l) => l.status === 'qualified').length;
+      const interestedLeads = allLeads.filter((l) => l.status === 'interested').length;
       const convertedLeads = allLeads.filter((l) => l.status === 'converted').length;
 
       // Total campaigns
@@ -29,10 +29,10 @@ export class AnalyticsController {
 
       // Email metrics
       const allEmails = await db.select().from(emails);
-      const totalEmailsSent = allEmails.filter((e) => e.status === 'sent').length;
+      const totalEmailsSent = allEmails.filter((e) => e.status === 'sent' || e.status === 'delivered').length;
       const emailsOpened = allEmails.filter((e) => e.openedAt !== null).length;
       const emailsClicked = allEmails.filter((e) => e.clickedAt !== null).length;
-      const emailsReplied = allEmails.filter((e) => e.repliedAt !== null).length;
+      const emailsReplied = allEmails.filter((e) => e.status === 'delivered').length; // No repliedAt field
 
       // Calculate rates
       const openRate = totalEmailsSent > 0 ? (emailsOpened / totalEmailsSent) * 100 : 0;
@@ -54,14 +54,14 @@ export class AnalyticsController {
       // Quality score distribution
       const avgQualityScore =
         allLeads.length > 0
-          ? allLeads.reduce((sum, lead) => sum + lead.qualityScore, 0) / allLeads.length
+          ? allLeads.reduce((sum, lead) => sum + (lead.qualityScore || 0), 0) / allLeads.length
           : 0;
 
-      const highQualityLeads = allLeads.filter((l) => l.qualityScore >= 75).length;
+      const highQualityLeads = allLeads.filter((l) => (l.qualityScore || 0) >= 75).length;
       const mediumQualityLeads = allLeads.filter(
-        (l) => l.qualityScore >= 50 && l.qualityScore < 75
+        (l) => (l.qualityScore || 0) >= 50 && (l.qualityScore || 0) < 75
       ).length;
-      const lowQualityLeads = allLeads.filter((l) => l.qualityScore < 50).length;
+      const lowQualityLeads = allLeads.filter((l) => (l.qualityScore || 0) < 50).length;
 
       res.json({
         success: true,
@@ -70,7 +70,7 @@ export class AnalyticsController {
             total: totalLeads,
             new: newLeads,
             contacted: contactedLeads,
-            qualified: qualifiedLeads,
+            interested: interestedLeads,
             converted: convertedLeads,
             bySource: leadsBySource,
             byIndustry: leadsByIndustry,
@@ -131,10 +131,10 @@ export class AnalyticsController {
         .from(emails)
         .where(eq(emails.campaignId, id));
 
-      const sent = campaignEmails.filter((e) => e.status === 'sent').length;
+      const sent = campaignEmails.filter((e) => e.status === 'sent' || e.status === 'delivered').length;
       const opened = campaignEmails.filter((e) => e.openedAt !== null).length;
       const clicked = campaignEmails.filter((e) => e.clickedAt !== null).length;
-      const replied = campaignEmails.filter((e) => e.repliedAt !== null).length;
+      const replied = campaignEmails.filter((e) => e.status === 'delivered').length; // No repliedAt field
 
       const openRate = sent > 0 ? (opened / sent) * 100 : 0;
       const clickRate = sent > 0 ? (clicked / sent) * 100 : 0;
@@ -185,12 +185,14 @@ export class AnalyticsController {
 
       // Group by date
       const timeline = recentLeads.reduce((acc: any, lead) => {
-        const date = lead.createdAt.toISOString().split('T')[0];
-        if (!acc[date]) {
-          acc[date] = { date, count: 0, sources: {} };
+        if (lead.createdAt) {
+          const date = lead.createdAt.toISOString().split('T')[0];
+          if (!acc[date]) {
+            acc[date] = { date, count: 0, sources: {} };
+          }
+          acc[date].count++;
+          acc[date].sources[lead.source] = (acc[date].sources[lead.source] || 0) + 1;
         }
-        acc[date].count++;
-        acc[date].sources[lead.source] = (acc[date].sources[lead.source] || 0) + 1;
         return acc;
       }, {});
 

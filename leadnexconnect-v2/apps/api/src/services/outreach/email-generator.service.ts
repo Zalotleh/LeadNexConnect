@@ -1,6 +1,6 @@
 import { db } from '@leadnex/database';
 import { emailTemplates } from '@leadnex/database';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 
 interface GenerateEmailParams {
@@ -54,9 +54,13 @@ export class EmailGeneratorService {
     const templates = await db
       .select()
       .from(emailTemplates)
-      .where(eq(emailTemplates.industry, industry))
-      .where(eq(emailTemplates.followUpStage, stage))
-      .where(eq(emailTemplates.isActive, true))
+      .where(
+        and(
+          eq(emailTemplates.industry, industry),
+          eq(emailTemplates.followUpStage, stage),
+          eq(emailTemplates.isActive, true)
+        )
+      )
       .limit(1);
 
     return templates[0] || null;

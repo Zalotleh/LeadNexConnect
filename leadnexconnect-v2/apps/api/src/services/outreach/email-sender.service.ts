@@ -70,14 +70,16 @@ export class EmailSenderService {
       });
 
       // Update lead status
-      await db
-        .update(leads)
-        .set({
-          status: 'contacted',
-          lastContactedAt: new Date(),
-          emailsSent: lead[0].emailsSent + 1,
-        })
-        .where(eq(leads.id, params.leadId));
+      if (lead[0]) {
+        await db
+          .update(leads)
+          .set({
+            status: 'contacted',
+            lastContactedAt: new Date(),
+            emailsSent: (lead[0].emailsSent || 0) + 1,
+          })
+          .where(eq(leads.id, params.leadId));
+      }
 
       logger.info('[EmailSender] Email sent successfully', {
         messageId: info.messageId,

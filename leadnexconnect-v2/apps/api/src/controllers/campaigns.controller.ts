@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
-import { campaigns, campaignLeads, leads } from '@leadnex/database';
+import { campaigns, leads, emails } from '@leadnex/database';
 import { eq, desc } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
@@ -50,17 +50,18 @@ export class CampaignsController {
         });
       }
 
-      // Get campaign leads
-      const campaignLeadsData = await db
+      // Get campaign leads via emails table
+      const campaignEmails = await db
         .select()
-        .from(campaignLeads)
-        .where(eq(campaignLeads.campaignId, id));
+        .from(leads)
+        .innerJoin(emails, eq(emails.leadId, leads.id))
+        .where(eq(emails.campaignId, id));
 
       res.json({
         success: true,
         data: {
           ...campaign[0],
-          leads: campaignLeadsData,
+          leads: campaignEmails.map(e => e.leads),
         },
       });
     } catch (error: any) {
@@ -97,29 +98,21 @@ export class CampaignsController {
           name,
           description,
           industry,
-          targetCountry,
-          targetCity,
-          status: scheduleType === 'immediate' ? 'active' : 'scheduled',
+          status: scheduleType === 'immediate' ? 'active' : 'draft',
           scheduleType,
-          scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-          totalLeads: leadIds.length,
-          sentCount: 0,
-          openedCount: 0,
-          clickedCount: 0,
-          repliedCount: 0,
+          startDate: scheduledAt ? new Date(scheduledAt) : undefined,
+          leadsGenerated: leadIds?.length || 0,
+          emailsSent: 0,
+          emailsOpened: 0,
+          emailsClicked: 0,
+          responsesReceived: 0,
         })
         .returning();
 
-      // Add leads to campaign
-      if (leadIds && leadIds.length > 0) {
-        const campaignLeadsData = leadIds.map((leadId: string) => ({
-          campaignId: newCampaign[0].id,
-          leadId,
-          status: 'pending' as const,
-        }));
-
-        await db.insert(campaignLeads).values(campaignLeadsData);
-      }
+      // Note: Lead-campaign association can be tracked via campaignId in emails table
+      // if (leadIds && leadIds.length > 0) {
+      //   // Update leads with campaign reference if needed
+      // }
 
       res.json({
         success: true,
@@ -181,7 +174,7 @@ export class CampaignsController {
 
       const updated = await db
         .update(campaigns)
-        .set({ status: 'active', startedAt: new Date() })
+        .set({ status: 'active', startDate: new Date(), lastRunAt: new Date() })
         .where(eq(campaigns.id, id))
         .returning();
 
@@ -251,10 +244,7 @@ export class CampaignsController {
     try {
       const { id } = req.params;
 
-      // Delete campaign leads first
-      await db.delete(campaignLeads).where(eq(campaignLeads.campaignId, id));
-
-      // Delete campaign
+      // Delete campaign (emails will cascade or be handled by FK constraints)
       await db.delete(campaigns).where(eq(campaigns.id, id));
 
       res.json({

@@ -103,10 +103,10 @@ export class EmailsController {
       // Generate email content
       const emailContent = await emailGeneratorService.generateEmail({
         companyName: lead[0].companyName,
-        contactName: lead[0].contactName,
+        contactName: lead[0].contactName || undefined,
         industry: lead[0].industry,
-        city: lead[0].city,
-        country: lead[0].country,
+        city: lead[0].city || undefined,
+        country: lead[0].country || undefined,
         followUpStage,
       });
 
@@ -162,7 +162,7 @@ export class EmailsController {
       if (lead[0]) {
         await db
           .update(leads)
-          .set({ emailsOpened: lead[0].emailsOpened + 1 })
+          .set({ emailsOpened: (lead[0].emailsOpened || 0) + 1 })
           .where(eq(leads.id, email[0].leadId));
       }
 
@@ -208,7 +208,7 @@ export class EmailsController {
       if (lead[0]) {
         await db
           .update(leads)
-          .set({ emailsClicked: lead[0].emailsClicked + 1 })
+          .set({ emailsClicked: (lead[0].emailsClicked || 0) + 1 })
           .where(eq(leads.id, email[0].leadId));
       }
 
