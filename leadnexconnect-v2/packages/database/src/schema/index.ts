@@ -8,6 +8,8 @@ import {
   boolean,
   jsonb,
   pgEnum,
+  decimal,
+  date,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -114,6 +116,30 @@ export const leads = pgTable('leads', {
   // LinkedIn Data
   linkedinUrl: varchar('linkedin_url', { length: 500 }),
   linkedinSalesNavData: jsonb('linkedin_sales_nav_data'),
+  
+  // NEW: Digital Presence Indicators
+  hasGoogleMapsListing: boolean('has_google_maps_listing').default(false),
+  googleRating: decimal('google_rating', { precision: 3, scale: 2 }),
+  googleReviewCount: integer('google_review_count').default(0),
+  
+  // NEW: Website Analysis
+  hasBookingKeywords: boolean('has_booking_keywords').default(false),
+  bookingKeywordScore: integer('booking_keyword_score').default(0),
+  currentBookingTool: varchar('current_booking_tool', { length: 100 }),
+  hasAppointmentForm: boolean('has_appointment_form').default(false),
+  hasOnlineBooking: boolean('has_online_booking').default(false),
+  hasMultiLocation: boolean('has_multi_location').default(false),
+  servicesCount: integer('services_count').default(0),
+  
+  // NEW: Qualification Signals
+  bookingPotential: varchar('booking_potential', { length: 20 }).default('medium'), // low, medium, high
+  digitalMaturityScore: integer('digital_maturity_score').default(0),
+  isDecisionMaker: boolean('is_decision_maker').default(false),
+  
+  // NEW: Business Intelligence
+  hasWeekendHours: boolean('has_weekend_hours'),
+  responseTime: varchar('response_time', { length: 50 }),
+  priceLevel: integer('price_level'), // From Google Places (1-4)
   
   // Timestamps
   createdAt: timestamp('created_at').defaultNow(),
@@ -299,9 +325,97 @@ export const activityLog = pgTable('activity_log', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// API Performance Tracking
+export const apiPerformance = pgTable('api_performance', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  apiSource: varchar('api_source', { length: 50 }).notNull(), // apollo, hunter, google_places, linkedin
+  
+  // Metrics
+  leadsGenerated: integer('leads_generated').default(0),
+  leadsConverted: integer('leads_converted').default(0),
+  emailsFound: integer('emails_found').default(0),
+  emailsVerified: integer('emails_verified').default(0),
+  
+  // Quality Metrics
+  avgLeadScore: decimal('avg_lead_score', { precision: 5, scale: 2 }),
+  hotLeadsPercent: decimal('hot_leads_percent', { precision: 5, scale: 2 }),
+  warmLeadsPercent: decimal('warm_leads_percent', { precision: 5, scale: 2 }),
+  
+  // Conversion Tracking
+  demosBooked: integer('demos_booked').default(0),
+  trialsStarted: integer('trials_started').default(0),
+  customersConverted: integer('customers_converted').default(0),
+  
+  // Cost Analysis
+  apiCallsUsed: integer('api_calls_used').default(0),
+  apiCallsLimit: integer('api_calls_limit'),
+  costPerLead: decimal('cost_per_lead', { precision: 10, scale: 2 }),
+  
+  // Time Period
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Lead Source ROI Tracking
+export const leadSourceRoi = pgTable('lead_source_roi', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  leadId: uuid('lead_id').notNull().references(() => leads.id, { onDelete: 'cascade' }),
+  source: varchar('source', { length: 50 }).notNull(),
+  
+  // Journey Tracking
+  firstContactAt: timestamp('first_contact_at'),
+  demoBookedAt: timestamp('demo_booked_at'),
+  trialStartedAt: timestamp('trial_started_at'),
+  convertedAt: timestamp('converted_at'),
+  
+  // Revenue
+  planType: varchar('plan_type', { length: 50 }), // basic, business, premium
+  mrr: decimal('mrr', { precision: 10, scale: 2 }),
+  lifetimeValue: decimal('lifetime_value', { precision: 10, scale: 2 }),
+  
+  // Attribution
+  attributedSource: varchar('attributed_source', { length: 50 }),
+  conversionTimeDays: integer('conversion_time_days'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Website Analysis Cache
+export const websiteAnalysisCache = pgTable('website_analysis_cache', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  domain: varchar('domain', { length: 255 }).notNull().unique(),
+  
+  // Analysis Results
+  hasBookingKeywords: boolean('has_booking_keywords'),
+  bookingKeywordScore: integer('booking_keyword_score'),
+  currentBookingTool: varchar('current_booking_tool', { length: 100 }),
+  hasAppointmentForm: boolean('has_appointment_form'),
+  hasCalendar: boolean('has_calendar'),
+  hasPricing: boolean('has_pricing'),
+  hasGallery: boolean('has_gallery'),
+  hasReviews: boolean('has_reviews'),
+  hasContactForm: boolean('has_contact_form'),
+  hasPhoneOnly: boolean('has_phone_only'),
+  multiLocation: boolean('multi_location'),
+  servicesCount: integer('services_count'),
+  languageSupport: varchar('language_support', { length: 255 }).array(),
+  
+  // Raw Data
+  analysisData: jsonb('analysis_data'),
+  
+  // Cache Control
+  lastAnalyzedAt: timestamp('last_analyzed_at').defaultNow(),
+  expiresAt: timestamp('expires_at'), // Cache for 30 days
+  
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // Relations
 export const leadsRelations = relations(leads, ({ many }) => ({
   emails: many(emails),
+  roiTracking: many(leadSourceRoi),
 }));
 
 export const campaignsRelations = relations(campaigns, ({ many }) => ({
@@ -316,5 +430,12 @@ export const emailsRelations = relations(emails, ({ one }) => ({
   campaign: one(campaigns, {
     fields: [emails.campaignId],
     references: [campaigns.id],
+  }),
+}));
+
+export const leadSourceRoiRelations = relations(leadSourceRoi, ({ one }) => ({
+  lead: one(leads, {
+    fields: [leadSourceRoi.leadId],
+    references: [leads.id],
   }),
 }));

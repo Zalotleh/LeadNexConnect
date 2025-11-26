@@ -57,6 +57,31 @@ export interface Lead {
   customFields?: Record<string, any>;
   linkedinUrl?: string;
   linkedinSalesNavData?: Record<string, any>;
+  
+  // Digital Presence Indicators
+  hasGoogleMapsListing?: boolean;
+  googleRating?: string;
+  googleReviewCount?: number;
+  
+  // Website Analysis
+  hasBookingKeywords?: boolean;
+  bookingKeywordScore?: number;
+  currentBookingTool?: string;
+  hasAppointmentForm?: boolean;
+  hasOnlineBooking?: boolean;
+  hasMultiLocation?: boolean;
+  servicesCount?: number;
+  
+  // Qualification Signals
+  bookingPotential?: 'high' | 'medium' | 'low';
+  digitalMaturityScore?: number;
+  isDecisionMaker?: boolean;
+  
+  // Business Intelligence
+  hasWeekendHours?: boolean;
+  responseTime?: string;
+  priceLevel?: number;
+  
   createdAt: Date;
   updatedAt: Date;
 }
