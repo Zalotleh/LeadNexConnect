@@ -4,11 +4,13 @@ import { eq, and, gte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
 import { emailQueueService } from '../services/outreach/email-queue.service';
+import { leadRoutingService } from '../services/outreach/lead-routing.service';
 
 /**
  * Daily Outreach Job
  * Runs every day at 9:00 AM
- * Sends initial emails to new leads with quality score >= 60
+ * Sends initial emails to new leads using smart routing
+ * Prioritizes hot leads (score >= 80), then warm leads (score >= 60)
  */
 export class DailyOutreachJob {
   private cronJob: cron.ScheduledTask | null = null;
@@ -86,9 +88,7 @@ export class DailyOutreachJob {
   private async sendOutreachForCampaign(campaign: any) {
     logger.info(`[DailyOutreach] Processing campaign: ${campaign.name}`);
 
-    // Find new leads with good quality scores that haven't been contacted
-    // Note: This is a simplified query. In production, you'd want to track
-    // campaign-lead relationships more explicitly
+    // Prioritize hot leads (80+), then warm leads (60-79)
     const newLeads = await db
       .select()
       .from(leads)
@@ -103,27 +103,40 @@ export class DailyOutreachJob {
       return;
     }
 
-    logger.info(`[DailyOutreach] Found ${newLeads.length} leads to contact`);
+    // Sort by quality score (hot leads first)
+    const sortedLeads = newLeads.sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
+
+    logger.info(`[DailyOutreach] Found ${sortedLeads.length} leads to contact`);
 
     let emailsQueued = 0;
+    const tierCounts = { hot: 0, warm: 0, cold: 0 };
 
-    // Generate and queue emails
-    for (const lead of newLeads) {
+    // Generate and queue emails with smart routing
+    for (const lead of sortedLeads) {
       try {
         // Skip if no email
         if (!lead.email) {
           continue;
         }
 
-        // Generate personalized email
-        const emailContent = await emailGeneratorService.generateEmail({
-          industry: lead.industry,
-          companyName: lead.companyName,
+        // Use smart routing to determine campaign strategy
+        const leadData: any = {
+          ...lead,
+          website: lead.website || undefined,
+          email: lead.email || undefined,
+          phone: lead.phone || undefined,
           contactName: lead.contactName || undefined,
-          city: lead.city || undefined,
-          country: lead.country || undefined,
-          followUpStage: 'initial',
-        });
+        };
+        const routingDecision = leadRoutingService.routeLead(leadData);
+        
+        // Track tier
+        const score = lead.qualityScore || 0;
+        if (score >= 80) tierCounts.hot++;
+        else if (score >= 60) tierCounts.warm++;
+        else tierCounts.cold++;
+
+        // Get email content from routing decision
+        const emailContent = leadRoutingService.getEmailContent(leadData, routingDecision);
 
         // Queue email for sending
         await emailQueueService.addEmail({
@@ -131,12 +144,16 @@ export class DailyOutreachJob {
           campaignId: campaign.id,
           to: lead.email,
           subject: emailContent.subject,
-          bodyText: emailContent.bodyText,
-          bodyHtml: emailContent.bodyHtml,
+          bodyText: emailContent.body,
+          bodyHtml: emailContent.body.replace(/\n/g, '<br>'),
           followUpStage: 'initial',
           metadata: {
             companyName: lead.companyName,
             industry: lead.industry,
+            campaign: routingDecision.campaign,
+            template: routingDecision.template,
+            priority: routingDecision.priority,
+            reasoning: routingDecision.reasoning,
           },
         });
 
@@ -153,8 +170,9 @@ export class DailyOutreachJob {
 
         emailsQueued++;
 
-        // Small delay between emails
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Small delay between emails (prioritized leads get sent faster)
+        const delay = score >= 80 ? 100 : score >= 60 ? 200 : 300;
+        await new Promise(resolve => setTimeout(resolve, delay));
       } catch (error: any) {
         logger.error('[DailyOutreach] Error queuing email for lead', {
           leadId: lead.id,
@@ -172,8 +190,9 @@ export class DailyOutreachJob {
       .where(eq(campaigns.id, campaign.id));
 
     logger.info(`[DailyOutreach] Campaign ${campaign.name} completed`, {
-      leadsProcessed: newLeads.length,
+      leadsProcessed: sortedLeads.length,
       emailsQueued,
+      tiers: tierCounts,
     });
   }
 }

@@ -5,11 +5,14 @@ import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
 import { enrichmentPipelineService } from '../services/crm/enrichment-pipeline.service';
+import { leadScoringV2Service } from '../services/crm/lead-scoring-v2.service';
+import { websiteAnalysisService } from '../services/analysis/website-analysis.service';
+import { apiPerformanceService } from '../services/tracking/api-performance.service';
 
 /**
  * Daily Lead Generation Job
  * Runs every day at 9:00 AM
- * Generates leads for all active campaigns
+ * Generates leads for all active campaigns with enhanced scoring and analysis
  */
 export class DailyLeadGenerationJob {
   private cronJob: cron.ScheduledTask | null = null;
@@ -105,6 +108,7 @@ export class DailyLeadGenerationJob {
     const targetCount = campaign.leadsPerDay || 50;
     const activeSources = this.countActiveSources(campaign);
     const leadsPerSource = Math.ceil(targetCount / activeSources);
+    const apiMetrics: { [key: string]: { leads: number; calls: number } } = {};
 
     // Generate leads from Apollo.io
     if (campaign.usesApollo) {
@@ -115,6 +119,7 @@ export class DailyLeadGenerationJob {
           maxResults: Math.min(leadsPerSource, 100),
         });
         rawLeads.push(...apolloLeads.map((lead: any) => ({ ...lead, source: 'apollo' })));
+        apiMetrics.apollo = { leads: apolloLeads.length, calls: Math.ceil(apolloLeads.length / 10) };
         logger.info(`[DailyLeadGeneration] Fetched ${apolloLeads.length} leads from Apollo`);
       } catch (error: any) {
         logger.error('[DailyLeadGeneration] Error fetching from Apollo', {
@@ -133,6 +138,7 @@ export class DailyLeadGenerationJob {
           maxResults: leadsPerSource,
         });
         rawLeads.push(...placesLeads.map((lead: any) => ({ ...lead, source: 'google_places' })));
+        apiMetrics.google_places = { leads: placesLeads.length, calls: placesLeads.length };
         logger.info(`[DailyLeadGeneration] Fetched ${placesLeads.length} leads from Google Places`);
       } catch (error: any) {
         logger.error('[DailyLeadGeneration] Error fetching from Google Places', {
@@ -147,12 +153,72 @@ export class DailyLeadGenerationJob {
       return;
     }
 
+    // Analyze websites for leads with website data
+    logger.info(`[DailyLeadGeneration] Analyzing websites for ${rawLeads.length} leads`);
+    for (const lead of rawLeads) {
+      if (lead.website) {
+        try {
+          const analysis = await websiteAnalysisService.analyzeWebsite(lead.website);
+          if (analysis) {
+            lead.hasBookingKeywords = analysis.hasBookingKeywords;
+            lead.bookingKeywordScore = analysis.bookingKeywordScore;
+            lead.currentBookingTool = analysis.currentBookingTool;
+            lead.hasAppointmentForm = analysis.hasAppointmentForm;
+            lead.hasOnlineBooking = analysis.hasCalendar;
+            lead.hasMultiLocation = analysis.multiLocation;
+            lead.servicesCount = analysis.servicesCount;
+          }
+        } catch (error: any) {
+          logger.error('[DailyLeadGeneration] Website analysis failed', {
+            website: lead.website,
+            error: error.message,
+          });
+        }
+      }
+    }
+
+    // Apply enhanced scoring
+    logger.info(`[DailyLeadGeneration] Applying V2 scoring to ${rawLeads.length} leads`);
+    const scoredLeads = rawLeads.map(lead => {
+      const qualityScore = leadScoringV2Service.calculateScore(lead);
+      const digitalMaturityScore = leadScoringV2Service.calculateDigitalMaturity(lead);
+      const bookingPotential = leadScoringV2Service.calculateBookingPotential(lead);
+      
+      return {
+        ...lead,
+        qualityScore,
+        digitalMaturityScore,
+        bookingPotential,
+      };
+    });
+
     // Enrich leads
-    logger.info(`[DailyLeadGeneration] Enriching ${rawLeads.length} leads`);
-    const enrichmentResults = await enrichmentPipelineService.enrichBatch(rawLeads);
+    logger.info(`[DailyLeadGeneration] Enriching ${scoredLeads.length} leads`);
+    const enrichmentResults = await enrichmentPipelineService.enrichBatch(scoredLeads);
 
     const successCount = enrichmentResults.filter(r => r.success && !r.isDuplicate).length;
     const duplicateCount = enrichmentResults.filter(r => r.isDuplicate).length;
+    
+    // Track API performance
+    for (const [source, metrics] of Object.entries(apiMetrics)) {
+      try {
+        await apiPerformanceService.logAPIUsage({
+          apiSource: source,
+          leadsGenerated: metrics.leads,
+          apiCallsUsed: metrics.calls,
+        });
+      } catch (error: any) {
+        logger.error('[DailyLeadGeneration] Failed to log API performance', {
+          source,
+          error: error.message,
+        });
+      }
+    }
+
+    // Calculate tier breakdown
+    const hotLeads = scoredLeads.filter(l => l.qualityScore >= 80).length;
+    const warmLeads = scoredLeads.filter(l => l.qualityScore >= 60 && l.qualityScore < 80).length;
+    const coldLeads = scoredLeads.filter(l => l.qualityScore < 60).length;
 
     // Update campaign metrics
     await db
@@ -167,6 +233,7 @@ export class DailyLeadGenerationJob {
       rawLeads: rawLeads.length,
       enriched: successCount,
       duplicates: duplicateCount,
+      tiers: { hot: hotLeads, warm: warmLeads, cold: coldLeads },
     });
   }
 
