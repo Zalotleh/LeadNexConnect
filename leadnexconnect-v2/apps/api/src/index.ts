@@ -18,6 +18,7 @@ import emailsRoutes from './routes/emails.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import scrapingRoutes from './routes/scraping.routes';
 import settingsRoutes from './routes/settings.routes';
+import apiPerformanceRoutes from './routes/api-performance.routes';
 
 // Load environment variables
 dotenv.config();
@@ -75,6 +76,7 @@ app.use('/api/emails', emailsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/scraping', scrapingRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/performance', apiPerformanceRoutes);
 
 // 404 handler
 app.use((req, res) => {
