@@ -3,11 +3,7 @@ import { emailTemplates } from '@leadnex/database';
 import { eq, and } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 import Anthropic from '@anthropic-ai/sdk';
-
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || '',
-});
+import { settingsService } from '../settings.service';
 
 interface GenerateEmailParams {
   companyName: string;
@@ -34,10 +30,16 @@ export class EmailGeneratorService {
     try {
       logger.info('[EmailGenerator] Generating email with AI', { params });
 
-      if (!process.env.ANTHROPIC_API_KEY) {
+      const apiKey = await settingsService.get('anthropicApiKey', process.env.ANTHROPIC_API_KEY || '');
+      if (!apiKey) {
         logger.warn('[EmailGenerator] Anthropic API key not configured, falling back to template');
         return this.generateEmail(params);
       }
+
+      // Initialize Anthropic client with API key
+      const anthropic = new Anthropic({
+        apiKey,
+      });
 
       // Build context for Claude
       const prompt = this.buildAIPrompt(params);

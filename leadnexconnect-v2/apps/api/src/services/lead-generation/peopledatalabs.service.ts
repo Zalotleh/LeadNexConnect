@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { db, apiUsage } from '@leadnex/database';
 import { logger } from '../../utils/logger';
+import { settingsService } from '../settings.service';
 
 const PDL_API_BASE = 'https://api.peopledatalabs.com/v5';
 
@@ -19,10 +20,8 @@ interface PDLCompanyParams {
 }
 
 export class PeopleDataLabsService {
-  private apiKey: string;
-
-  constructor() {
-    this.apiKey = process.env.PEOPLEDATALABS_API_KEY || '';
+  private async getApiKey(): Promise<string | null> {
+    return await settingsService.get('peopleDataLabsApiKey', process.env.PEOPLEDATALABS_API_KEY || '');
   }
 
   /**
@@ -39,7 +38,8 @@ export class PeopleDataLabsService {
     found: boolean;
   }> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         logger.warn('[PDL] API key not configured');
         return { found: false };
       }
@@ -47,7 +47,7 @@ export class PeopleDataLabsService {
       logger.info('[PDL] Enriching contact', { params });
 
       const queryParams: any = {
-        api_key: this.apiKey,
+        api_key: apiKey,
         pretty: true,
       };
 
@@ -119,7 +119,8 @@ export class PeopleDataLabsService {
     found: boolean;
   }> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         logger.warn('[PDL] API key not configured');
         return { found: false };
       }
@@ -127,7 +128,7 @@ export class PeopleDataLabsService {
       logger.info('[PDL] Enriching company', { params });
 
       const queryParams: any = {
-        api_key: this.apiKey,
+        api_key: apiKey,
         pretty: true,
       };
 
@@ -197,7 +198,8 @@ export class PeopleDataLabsService {
     found: boolean;
   }> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         logger.warn('[PDL] API key not configured');
         return { found: false };
       }
@@ -205,7 +207,7 @@ export class PeopleDataLabsService {
       logger.info('[PDL] Finding email', { params });
 
       const queryParams: any = {
-        api_key: this.apiKey,
+        api_key: apiKey,
         first_name: params.firstName,
         last_name: params.lastName,
         pretty: true,
@@ -259,7 +261,8 @@ export class PeopleDataLabsService {
    */
   async bulkEnrich(contacts: PDLEnrichParams[]): Promise<any[]> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         logger.warn('[PDL] API key not configured');
         return [];
       }
@@ -280,7 +283,7 @@ export class PeopleDataLabsService {
         },
         {
           headers: {
-            'X-API-Key': this.apiKey,
+            'X-API-Key': apiKey,
             'Content-Type': 'application/json',
           },
           timeout: 30000,
@@ -354,7 +357,8 @@ export class PeopleDataLabsService {
    */
   async getRemainingCredits(): Promise<number> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         return 0;
       }
 

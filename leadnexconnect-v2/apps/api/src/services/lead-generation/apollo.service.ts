@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { db, apiUsage } from '@leadnex/database';
 import { logger } from '../../utils/logger';
+import { settingsService } from '../settings.service';
 import type { Lead, LeadSource } from '@leadnex/shared';
 
 const APOLLO_API_BASE = 'https://api.apollo.io/v1';
-const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
 
 interface ApolloSearchParams {
   industry: string;
@@ -34,13 +34,12 @@ interface ApolloContact {
 }
 
 export class ApolloService {
-  private apiKey: string;
-
-  constructor() {
-    if (!APOLLO_API_KEY) {
-      throw new Error('APOLLO_API_KEY is not set in environment variables');
+  private async getApiKey(): Promise<string> {
+    const apiKey = await settingsService.get('apolloApiKey', process.env.APOLLO_API_KEY);
+    if (!apiKey) {
+      throw new Error('APOLLO_API_KEY is not configured. Please set it in Settings or .env file');
     }
-    this.apiKey = APOLLO_API_KEY;
+    return apiKey;
   }
 
   /**
@@ -48,10 +47,11 @@ export class ApolloService {
    */
   async searchLeads(params: ApolloSearchParams): Promise<Lead[]> {
     try {
+      const apiKey = await this.getApiKey();
       logger.info('[Apollo] Searching for leads', { params });
 
       const searchQuery: any = {
-        api_key: this.apiKey,
+        api_key: apiKey,
         q_organization_keyword_tags: [params.industry],
         per_page: Math.min(params.maxResults || 10, 100),
         page: 1,
@@ -223,10 +223,11 @@ export class ApolloService {
     domain?: string;
   }): Promise<any> {
     try {
+      const apiKey = await this.getApiKey();
       logger.info('[Apollo] Enriching lead', { params });
 
       const enrichQuery: any = {
-        api_key: this.apiKey,
+        api_key: apiKey,
       };
 
       if (params.email) {

@@ -2,9 +2,9 @@ import axios from 'axios';
 import { db, apiUsage } from '@leadnex/database';
 import { logger } from '../../utils/logger';
 import type { Lead, LeadSource } from '@leadnex/shared';
+import { settingsService } from '../settings.service';
 
 const GOOGLE_PLACES_API_BASE = 'https://maps.googleapis.com/maps/api/place';
-const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
 interface PlacesSearchParams {
   industry: string;
@@ -14,13 +14,8 @@ interface PlacesSearchParams {
 }
 
 export class GooglePlacesService {
-  private apiKey: string;
-
-  constructor() {
-    if (!GOOGLE_API_KEY) {
-      throw new Error('GOOGLE_PLACES_API_KEY is not set');
-    }
-    this.apiKey = GOOGLE_API_KEY;
+  private async getApiKey(): Promise<string | null> {
+    return await settingsService.get('googlePlacesApiKey', process.env.GOOGLE_PLACES_API_KEY || '');
   }
 
   /**
@@ -28,6 +23,12 @@ export class GooglePlacesService {
    */
   async searchLeads(params: PlacesSearchParams): Promise<Lead[]> {
     try {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
+        logger.warn('[GooglePlaces] API key not configured');
+        return [];
+      }
+
       logger.info('[GooglePlaces] Searching for leads', { params });
 
       const query = this.buildSearchQuery(params);
@@ -41,7 +42,7 @@ export class GooglePlacesService {
         {
           params: {
             query: `${query} in ${location}`,
-            key: this.apiKey,
+            key: apiKey,
           },
         }
       );
@@ -64,7 +65,7 @@ export class GooglePlacesService {
               params: {
                 place_id: place.place_id,
                 fields: 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total',
-                key: this.apiKey,
+                key: apiKey,
               },
             }
           );

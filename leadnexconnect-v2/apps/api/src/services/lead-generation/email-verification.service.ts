@@ -3,6 +3,7 @@ import { db } from '@leadnex/database';
 import { leads, apiUsage } from '@leadnex/database';
 import { eq } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
+import { settingsService } from '../settings.service';
 
 const HUNTER_API_BASE = 'https://api.hunter.io/v2';
 
@@ -44,10 +45,8 @@ interface HunterEmailFinderResponse {
 }
 
 export class EmailVerificationService {
-  private apiKey: string;
-
-  constructor() {
-    this.apiKey = process.env.HUNTER_API_KEY || '';
+  private async getApiKey(): Promise<string | null> {
+    return await settingsService.get('hunterApiKey', process.env.HUNTER_API_KEY || '');
   }
 
   /**
@@ -60,7 +59,8 @@ export class EmailVerificationService {
     details?: any;
   }> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         logger.warn('[EmailVerification] Hunter.io API key not configured');
         return { isValid: false, status: 'unknown', score: 0 };
       }
@@ -75,7 +75,7 @@ export class EmailVerificationService {
         {
           params: {
             email,
-            api_key: this.apiKey,
+            api_key: apiKey,
           },
           timeout: 10000,
         }
@@ -138,7 +138,8 @@ export class EmailVerificationService {
     position?: string;
   }> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         logger.warn('[EmailVerification] Hunter.io API key not configured');
         return { email: null, score: 0 };
       }
@@ -155,7 +156,7 @@ export class EmailVerificationService {
             domain: params.domain,
             first_name: params.firstName,
             last_name: params.lastName,
-            api_key: this.apiKey,
+            api_key: apiKey,
           },
           timeout: 10000,
         }
@@ -273,13 +274,14 @@ export class EmailVerificationService {
    */
   async getRemainingCredits(): Promise<number> {
     try {
-      if (!this.apiKey) {
+      const apiKey = await this.getApiKey();
+      if (!apiKey) {
         return 0;
       }
 
       const response = await axios.get(`${HUNTER_API_BASE}/account`, {
         params: {
-          api_key: this.apiKey,
+          api_key: apiKey,
         },
         timeout: 5000,
       });

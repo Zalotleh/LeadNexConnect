@@ -3,6 +3,7 @@ import { logger } from '../../utils/logger';
 import { db, settings } from '@leadnex/database';
 import { emails, leads } from '@leadnex/database';
 import { eq } from 'drizzle-orm';
+import { settingsService } from '../settings.service';
 
 interface SMTPConfig {
   provider: 'smtp2go' | 'sendgrid' | 'gmail' | 'wordpress' | 'generic';
@@ -100,20 +101,20 @@ export class EmailSenderService {
   /**
    * Build SMTP configuration from environment variables
    */
-  private buildSMTPConfigFromEnv(): SMTPConfig {
-    const provider = (process.env.SMTP_PROVIDER || 'generic') as any;
+  private async buildSMTPConfigFromEnv(): Promise<SMTPConfig> {
+    const provider = (await settingsService.get('smtpProvider', process.env.SMTP_PROVIDER || 'generic')) as any;
 
     return {
       provider,
-      host: process.env.SMTP_HOST || 'localhost',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
+      host: await settingsService.get('smtpHost', process.env.SMTP_HOST || 'localhost'),
+      port: parseInt(await settingsService.get('smtpPort', process.env.SMTP_PORT || '587')),
+      secure: (await settingsService.get('smtpSecure', process.env.SMTP_SECURE || 'false')) === 'true',
       auth: {
-        user: process.env.SMTP_USER || '',
-        pass: process.env.SMTP_PASS || '',
+        user: await settingsService.get('smtpUser', process.env.SMTP_USER || ''),
+        pass: await settingsService.get('smtpPass', process.env.SMTP_PASS || ''),
       },
-      fromName: process.env.FROM_NAME || 'BookNex Solutions',
-      fromEmail: process.env.FROM_EMAIL || process.env.SMTP_USER || '',
+      fromName: await settingsService.get('fromName', process.env.FROM_NAME || 'BookNex Solutions'),
+      fromEmail: await settingsService.get('fromEmail', process.env.FROM_EMAIL || process.env.SMTP_USER || ''),
     };
   }
 
