@@ -9,8 +9,28 @@ export interface Lead {
   website?: string
   industry?: string
   location?: string
+  city?: string
+  country?: string
   status: string
   score?: number
+  qualityScore?: number
+  digitalMaturityScore?: number
+  bookingPotential?: string
+  hasBookingKeywords?: boolean
+  bookingKeywordScore?: number
+  currentBookingTool?: string
+  hasAppointmentForm?: boolean
+  hasOnlineBooking?: boolean
+  hasMultiLocation?: boolean
+  servicesCount?: number
+  hasGoogleMapsListing?: boolean
+  googleRating?: number
+  googleReviewCount?: number
+  isDecisionMaker?: boolean
+  hasWeekendHours?: boolean
+  responseTime?: string
+  priceLevel?: string
+  source?: string
   createdAt: string
 }
 

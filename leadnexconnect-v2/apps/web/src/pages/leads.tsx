@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import leadsService, { Lead } from '@/services/leads.service'
-import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader } from 'lucide-react'
+import { leadsAPI } from '@/services/api'
+import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 
 export default function Leads() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [tierFilter, setTierFilter] = useState<string>('all')
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState('')
@@ -43,13 +45,28 @@ export default function Leads() {
 
   const leads: Lead[] = data?.data || []
 
-  // Client-side filtering for score (since API might not support score filtering)
+  // Client-side filtering for score and tier
   const filteredLeads = leads.filter(lead => {
-    const score = lead.score || 0
+    const score = lead.qualityScore || lead.score || 0
+    
+    // Score range filter
     if (score < filters.minScore || score > filters.maxScore) return false
-    // Verification filter can be added later when backend supports it
+    
+    // Tier filter
+    if (tierFilter !== 'all') {
+      if (tierFilter === 'hot' && score < 80) return false
+      if (tierFilter === 'warm' && (score < 60 || score >= 80)) return false
+      if (tierFilter === 'cold' && score >= 60) return false
+    }
+    
     return true
   })
+
+  const getTierBadge = (score: number) => {
+    if (score >= 80) return { label: 'HOT', className: 'bg-red-100 text-red-800' }
+    if (score >= 60) return { label: 'WARM', className: 'bg-yellow-100 text-yellow-800' }
+    return { label: 'COLD', className: 'bg-blue-100 text-blue-800' }
+  }
 
   const industries = [
     'Restaurant', 'Hotel', 'Retail', 'Healthcare', 'Technology',
@@ -173,7 +190,7 @@ export default function Leads() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -183,29 +200,57 @@ export default function Leads() {
               <Users className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
+          <div 
+            className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setTierFilter(tierFilter === 'hot' ? 'all' : 'hot')}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">New</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {leads.filter(l => l.status === 'new').length}
+                <p className="text-sm text-gray-600">Hot Leads</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {leads.filter(l => (l.qualityScore || l.score || 0) >= 80).length}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">Score 80+</p>
               </div>
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <span className="text-blue-600 font-bold">N</span>
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-red-600" />
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
+          <div 
+            className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setTierFilter(tierFilter === 'warm' ? 'all' : 'warm')}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Contacted</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {leads.filter(l => l.status === 'contacted').length}
+                <p className="text-sm text-gray-600">Warm Leads</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {leads.filter(l => {
+                    const score = l.qualityScore || l.score || 0
+                    return score >= 60 && score < 80
+                  }).length}
                 </p>
+                <p className="text-xs text-gray-500 mt-1">Score 60-79</p>
               </div>
               <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                <span className="text-yellow-600 font-bold">C</span>
+                <Target className="w-5 h-5 text-yellow-600" />
+              </div>
+            </div>
+          </div>
+          <div 
+            className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setTierFilter(tierFilter === 'cold' ? 'all' : 'cold')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Cold Leads</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {leads.filter(l => (l.qualityScore || l.score || 0) < 60).length}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Score &lt;60</p>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600" />
               </div>
             </div>
           </div>
@@ -402,6 +447,9 @@ export default function Leads() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Tier
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Score
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -410,11 +458,14 @@ export default function Leads() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLeads.map((lead) => (
+                {filteredLeads.map((lead) => {
+                  const score = lead.qualityScore || lead.score || 0
+                  const tierBadge = getTierBadge(score)
+                  return (
                   <tr key={lead.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{lead.companyName}</div>
-                      <div className="text-sm text-gray-500">{lead.website}</div>
+                      <div className="text-sm text-gray-500">{lead.website || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{lead.contactName}</div>
@@ -433,12 +484,21 @@ export default function Leads() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="text-sm font-medium text-gray-900">{lead.score || 0}</div>
-                        <div className="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                      <span
+                        className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${tierBadge.className}`}
+                      >
+                        {tierBadge.label}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <div className="text-sm font-medium text-gray-900">{score}/100</div>
+                        <div className="w-16 bg-gray-200 rounded-full h-2">
                           <div
-                            className="bg-primary-600 h-2 rounded-full"
-                            style={{ width: `${lead.score || 0}%` }}
+                            className={`h-2 rounded-full ${
+                              score >= 80 ? 'bg-red-500' : score >= 60 ? 'bg-yellow-500' : 'bg-blue-500'
+                            }`}
+                            style={{ width: `${score}%` }}
                           ></div>
                         </div>
                       </div>
@@ -448,7 +508,8 @@ export default function Leads() {
                       <button className="text-gray-600 hover:text-gray-900">Edit</button>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
             </>
