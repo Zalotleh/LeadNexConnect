@@ -87,37 +87,36 @@ export default function Leads() {
 
     try {
       setGenerating(true)
-      setGenerationProgress('Fetching leads from ' + generateForm.source + '...')
+      setGenerationProgress(`Generating leads from ${generateForm.source}...`)
 
-      const endpoint = generateForm.source === 'apollo' 
-        ? '/scraping/apollo'
-        : generateForm.source === 'google_places'
-        ? '/scraping/google-places'
-        : generateForm.source === 'peopledatalabs'
-        ? '/scraping/peopledatalabs'
-        : '/scraping/linkedin-import'
-
-      const response = await api.post(endpoint, {
+      // Use the new unified generation endpoint
+      const response = await leadsAPI.generateLeads({
         industry: generateForm.industry,
         country: generateForm.country,
         city: generateForm.city,
+        sources: [generateForm.source],
         maxResults: generateForm.maxResults,
       })
 
-      setGenerationProgress('Enriching leads...')
+      setGenerationProgress('Analyzing websites and scoring leads...')
       
-      // Wait a bit for enrichment to complete
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Wait for analysis to complete
+      await new Promise(resolve => setTimeout(resolve, 1500))
 
-      const savedCount = response.data.data?.saved || response.data.data?.count || 0
-      const duplicatesCount = response.data.data?.duplicates || 0
+      const data = response.data.data
+      const savedCount = data?.saved || data?.count || 0
+      const duplicatesCount = data?.duplicates || 0
+      const byTier = data?.byTier || { hot: 0, warm: 0, cold: 0 }
       
-      let message = `Generated ${savedCount} leads successfully!`
+      let message = `✅ Generated ${savedCount} leads!`
+      if (byTier.hot > 0 || byTier.warm > 0 || byTier.cold > 0) {
+        message += `\n🔥 ${byTier.hot} hot | ⚡ ${byTier.warm} warm | ❄️ ${byTier.cold} cold`
+      }
       if (duplicatesCount > 0) {
-        message += ` (${duplicatesCount} duplicates skipped)`
+        message += `\n(${duplicatesCount} duplicates skipped)`
       }
 
-      toast.success(message)
+      toast.success(message, { duration: 5000 })
       setShowGenerateModal(false)
       refetch()
       
