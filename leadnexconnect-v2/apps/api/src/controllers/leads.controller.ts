@@ -7,6 +7,9 @@ import { googlePlacesService } from '../services/lead-generation/google-places.s
 import { hunterService } from '../services/lead-generation/hunter.service';
 import { linkedInImportService } from '../services/lead-generation/linkedin-import.service';
 import { leadScoringService } from '../services/crm/lead-scoring.service';
+import { leadScoringV2Service } from '../services/crm/lead-scoring-v2.service';
+import { websiteAnalysisService } from '../services/analysis/website-analysis.service';
+import { apiPerformanceService } from '../services/tracking/api-performance.service';
 import { logger } from '../utils/logger';
 
 export class LeadsController {
@@ -101,19 +104,91 @@ export class LeadsController {
         allLeads.push(...placesLeads);
       }
 
-      // Deduplicate and score leads
+      logger.info('[LeadsController] Processing leads with enhancements', { 
+        total: allLeads.length 
+      });
+
+      // Deduplicate
       const deduped = await this.deduplicateLeads(allLeads);
-      const scored = deduped.map(lead => ({
-        ...lead,
-        qualityScore: leadScoringService.calculateScore(lead),
-      }));
+
+      // Analyze websites for enhanced qualification
+      for (const lead of deduped) {
+        if (lead.website) {
+          try {
+            const analysis = await websiteAnalysisService.analyzeWebsite(lead.website);
+            if (analysis) {
+              lead.hasBookingKeywords = analysis.hasBookingKeywords;
+              lead.bookingKeywordScore = analysis.bookingKeywordScore;
+              lead.currentBookingTool = analysis.currentBookingTool;
+              lead.hasAppointmentForm = analysis.hasAppointmentForm;
+              lead.hasOnlineBooking = analysis.hasBookingKeywords || !!analysis.currentBookingTool;
+              lead.hasMultiLocation = analysis.multiLocation;
+              lead.servicesCount = analysis.servicesCount;
+            }
+          } catch (error: any) {
+            logger.warn('[LeadsController] Website analysis failed', {
+              website: lead.website,
+              error: error.message,
+            });
+          }
+        }
+      }
+
+      // Calculate enhanced scores using V2 scoring
+      const scored = deduped.map(lead => {
+        const qualityScore = leadScoringV2Service.calculateScore(lead);
+        const digitalMaturityScore = leadScoringV2Service.calculateDigitalMaturity(lead);
+        const bookingPotential = leadScoringV2Service.calculateBookingPotential(lead);
+        
+        return {
+          ...lead,
+          qualityScore,
+          digitalMaturityScore,
+          bookingPotential,
+        };
+      });
 
       // Save to database
-      const saved = [];
+      const saved: any[] = [];
       for (const lead of scored) {
         const result = await db.insert(leads).values(lead).returning();
         saved.push(result[0]);
       }
+
+      // Track API performance
+      const sourceMetrics: Record<string, { leads: number; calls: number }> = {};
+      
+      sources.forEach((source: string) => {
+        const sourceLeads = saved.filter((l: any) => l.source === source);
+        sourceMetrics[source] = {
+          leads: sourceLeads.length,
+          calls: source === 'apollo' ? Math.min(maxResults, 10) : 
+                 source === 'google_places' ? Math.min(maxResults, 50) : 0,
+        };
+      });
+
+      // Log usage for each source
+      for (const [source, metrics] of Object.entries(sourceMetrics)) {
+        if (metrics.leads > 0) {
+          await apiPerformanceService.logAPIUsage({
+            apiSource: source,
+            leadsGenerated: metrics.leads,
+            apiCallsUsed: metrics.calls,
+          });
+        }
+      }
+
+      // Classify by tier
+      const hot = saved.filter((l: any) => l.qualityScore >= 80);
+      const warm = saved.filter((l: any) => l.qualityScore >= 60 && l.qualityScore < 80);
+      const cold = saved.filter((l: any) => l.qualityScore < 60);
+
+      logger.info('[LeadsController] Lead generation complete', {
+        total: saved.length,
+        hot: hot.length,
+        warm: warm.length,
+        cold: cold.length,
+      });
 
       res.json({
         success: true,
@@ -123,6 +198,12 @@ export class LeadsController {
             total: allLeads.length,
             newLeads: saved.length,
             duplicatesSkipped: allLeads.length - saved.length,
+            byTier: {
+              hot: hot.length,
+              warm: warm.length,
+              cold: cold.length,
+            },
+            bySource: this.countBySource(saved),
           },
         },
       });
@@ -272,6 +353,14 @@ export class LeadsController {
       seen.add(key);
       return true;
     });
+  }
+
+  private countBySource(leadsData: any[]): Record<string, number> {
+    const counts: Record<string, number> = {};
+    leadsData.forEach(lead => {
+      counts[lead.source] = (counts[lead.source] || 0) + 1;
+    });
+    return counts;
   }
 }
 
