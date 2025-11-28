@@ -242,12 +242,14 @@ export default function Leads() {
 
       toast.loading('Creating campaign...')
       
-      // Create campaign
+      // Create campaign with email template data inline
       const campaignResponse = await api.post('/campaigns', {
         name: createCampaignForm.name,
         description: createCampaignForm.description,
         campaignType: 'manual',
         status: 'draft',
+        emailSubject: createCampaignForm.emailSubject,
+        emailBody: createCampaignForm.emailBody,
       })
 
       const campaignId = campaignResponse.data.data.id
@@ -255,14 +257,6 @@ export default function Leads() {
       // Link selected leads to campaign
       await api.post(`/campaigns/${campaignId}/leads`, {
         leadIds: Array.from(selectedLeads),
-      })
-
-      // Create email template for campaign
-      await api.post('/email-templates', {
-        name: `${createCampaignForm.name} Template`,
-        subject: createCampaignForm.emailSubject,
-        bodyText: createCampaignForm.emailBody,
-        campaignId,
       })
 
       toast.dismiss()

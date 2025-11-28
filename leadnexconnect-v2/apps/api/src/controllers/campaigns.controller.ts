@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
-import { campaigns, leads, emails } from '@leadnex/database';
+import { campaigns, leads, emails, emailTemplates } from '@leadnex/database';
 import { eq, desc, and, gte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
@@ -100,6 +100,8 @@ export class CampaignsController {
         usesGooglePlaces,
         usesWebScraping,
         emailTemplateId,
+        emailSubject,
+        emailBody,
         followUpEnabled,
         followUp1DelayDays,
         followUp2DelayDays,
@@ -118,6 +120,26 @@ export class CampaignsController {
         industry,
         targetCountries: targetCountries || [targetCountry],
       });
+
+      // If manual campaign with email subject/body, create email template
+      let finalEmailTemplateId = emailTemplateId;
+      if (campaignType === 'manual' && emailSubject && emailBody) {
+        const emailTemplate = await db
+          .insert(emailTemplates)
+          .values({
+            name: `${name} Template`,
+            description: `Email template for ${name} campaign`,
+            subject: emailSubject,
+            bodyText: emailBody,
+            industry: industry || null,
+            followUpStage: 'initial',
+            isActive: true,
+          })
+          .returning();
+        
+        finalEmailTemplateId = emailTemplate[0].id;
+        logger.info('[CampaignsController] Created email template', { templateId: finalEmailTemplateId });
+      }
 
       // Prepare campaign data - only include emailTemplateId if it's a valid UUID
       const campaignData: any = {
@@ -149,8 +171,8 @@ export class CampaignsController {
       };
 
       // Only add emailTemplateId if it's provided and not empty
-      if (emailTemplateId && emailTemplateId.trim() !== '') {
-        campaignData.emailTemplateId = emailTemplateId;
+      if (finalEmailTemplateId && finalEmailTemplateId.trim() !== '') {
+        campaignData.emailTemplateId = finalEmailTemplateId;
       }
 
       // Create campaign
