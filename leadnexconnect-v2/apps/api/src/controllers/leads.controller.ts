@@ -25,6 +25,7 @@ export class LeadsController {
         country,
         status,
         source,
+        sourceType,
         minScore,
       } = req.query;
 
@@ -38,6 +39,7 @@ export class LeadsController {
       if (country) filters.push(eq(leads.country, country as string));
       if (status) filters.push(eq(leads.status, status as any));
       if (source) filters.push(eq(leads.source, source as string));
+      if (sourceType) filters.push(eq(leads.sourceType, sourceType as string));
       if (minScore) filters.push(gte(leads.qualityScore, parseInt(minScore as string)));
 
       if (filters.length > 0) {

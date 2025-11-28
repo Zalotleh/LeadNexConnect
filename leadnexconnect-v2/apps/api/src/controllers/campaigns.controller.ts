@@ -86,6 +86,7 @@ export class CampaignsController {
       const {
         name,
         description,
+        campaignType,
         industry,
         targetCountry,
         targetCountries,
@@ -106,10 +107,12 @@ export class CampaignsController {
         scheduleType,
         scheduleTime,
         scheduledAt,
+        status,
       } = req.body;
 
       logger.info('[CampaignsController] Creating campaign', { 
-        name, 
+        name,
+        campaignType: campaignType || 'automated',
         usesApollo, 
         usesGooglePlaces,
         industry,
@@ -120,6 +123,7 @@ export class CampaignsController {
       const campaignData: any = {
         name,
         description,
+        campaignType: campaignType || 'automated',
         industry,
         targetCountries: targetCountries || (targetCountry ? [targetCountry] : []),
         targetCities: targetCities || (targetCity ? [targetCity] : []),
@@ -133,7 +137,7 @@ export class CampaignsController {
         followUpEnabled: followUpEnabled !== undefined ? followUpEnabled : true,
         followUp1DelayDays: followUp1DelayDays || 3,
         followUp2DelayDays: followUp2DelayDays || 5,
-        status: scheduleType === 'immediate' ? 'active' : 'draft',
+        status: status || (scheduleType === 'immediate' ? 'active' : 'draft'),
         scheduleType: scheduleType || 'manual',
         scheduleTime,
         startDate: scheduledAt ? new Date(scheduledAt) : undefined,
@@ -166,6 +170,61 @@ export class CampaignsController {
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error creating campaign', {
+        error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * POST /api/campaigns/:id/leads - Link leads to a manual campaign
+   */
+  async addLeadsToCampaign(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { leadIds } = req.body;
+
+      if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'leadIds array is required' },
+        });
+      }
+
+      logger.info('[CampaignsController] Adding leads to campaign', {
+        campaignId: id,
+        leadCount: leadIds.length,
+      });
+
+      // Import campaignLeads from database
+      const { campaignLeads } = await import('@leadnex/database');
+
+      // Insert campaign-lead relationships
+      const relationships = leadIds.map(leadId => ({
+        campaignId: id,
+        leadId,
+      }));
+
+      await db.insert(campaignLeads).values(relationships);
+
+      // Update campaign leads count
+      await db
+        .update(campaigns)
+        .set({
+          leadsGenerated: leadIds.length,
+          updatedAt: new Date(),
+        })
+        .where(eq(campaigns.id, id));
+
+      res.json({
+        success: true,
+        message: `${leadIds.length} leads linked to campaign`,
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error adding leads to campaign', {
         error: error.message,
       });
       res.status(500).json({

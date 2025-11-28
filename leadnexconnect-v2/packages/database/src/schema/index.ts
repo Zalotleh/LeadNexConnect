@@ -94,6 +94,8 @@ export const leads = pgTable('leads', {
   
   // Lead Quality
   source: varchar('source', { length: 50 }).notNull(),
+  sourceType: varchar('source_type', { length: 50 }).default('automated'), // 'automated' or 'manual_import'
+  batchId: uuid('batch_id'), // References leadBatches for manual imports
   qualityScore: integer('quality_score').default(0),
   verificationStatus: verificationStatusEnum('verification_status').default('unverified'),
   
@@ -152,6 +154,7 @@ export const campaigns = pgTable('campaigns', {
   // Basic Info
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  campaignType: varchar('campaign_type', { length: 50 }).default('automated'), // 'automated' or 'manual'
   
   // Target Criteria
   industry: varchar('industry', { length: 100 }),
@@ -226,6 +229,20 @@ export const emails = pgTable('emails', {
   metadata: jsonb('metadata'),
   
   createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Campaign Leads (Many-to-Many relationship for manual campaigns)
+export const campaignLeads = pgTable('campaign_leads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  // References
+  campaignId: uuid('campaign_id').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
+  leadId: uuid('lead_id').notNull().references(() => leads.id, { onDelete: 'cascade' }),
+  
+  // Status
+  addedAt: timestamp('added_at').defaultNow(),
+  processed: boolean('processed').default(false),
+  processedAt: timestamp('processed_at'),
 });
 
 export const emailTemplates = pgTable('email_templates', {
@@ -412,14 +429,59 @@ export const websiteAnalysisCache = pgTable('website_analysis_cache', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Lead Batches (CSV Upload Tracking)
+export const leadBatches = pgTable('lead_batches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  // Batch Information
+  name: varchar('name', { length: 255 }).notNull(),
+  sourceFile: varchar('source_file', { length: 255 }),
+  uploadedBy: varchar('uploaded_by', { length: 255 }),
+  
+  // Metrics
+  totalLeads: integer('total_leads').default(0),
+  successfulImports: integer('successful_imports').default(0),
+  failedImports: integer('failed_imports').default(0),
+  duplicatesSkipped: integer('duplicates_skipped').default(0),
+  
+  // Metadata
+  importSettings: jsonb('import_settings'), // Stores enrichment flags, mapping config
+  notes: text('notes'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  completedAt: timestamp('completed_at'),
+});
+
 // Relations
-export const leadsRelations = relations(leads, ({ many }) => ({
+export const leadsRelations = relations(leads, ({ many, one }) => ({
   emails: many(emails),
   roiTracking: many(leadSourceRoi),
+  campaignLeads: many(campaignLeads),
+  batch: one(leadBatches, {
+    fields: [leads.batchId],
+    references: [leadBatches.id],
+  }),
+}));
+
+export const leadBatchesRelations = relations(leadBatches, ({ many }) => ({
+  leads: many(leads),
 }));
 
 export const campaignsRelations = relations(campaigns, ({ many }) => ({
   emails: many(emails),
+  campaignLeads: many(campaignLeads),
+}));
+
+export const campaignLeadsRelations = relations(campaignLeads, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [campaignLeads.campaignId],
+    references: [campaigns.id],
+  }),
+  lead: one(leads, {
+    fields: [campaignLeads.leadId],
+    references: [leads.id],
+  }),
 }));
 
 export const emailsRelations = relations(emails, ({ one }) => ({

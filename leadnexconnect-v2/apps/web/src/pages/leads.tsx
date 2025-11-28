@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import api from '@/services/api'
 
 export default function Leads() {
+  const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [tierFilter, setTierFilter] = useState<string>('all')
   const [showGenerateModal, setShowGenerateModal] = useState(false)
@@ -15,6 +16,8 @@ export default function Leads() {
   const [generationProgress, setGenerationProgress] = useState('')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+  const [showCreateCampaignModal, setShowCreateCampaignModal] = useState(false)
   const [filters, setFilters] = useState({
     industry: 'all',
     minScore: 0,
@@ -32,13 +35,18 @@ export default function Leads() {
   })
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['leads', statusFilter, filters, searchQuery],
+    queryKey: ['leads', statusFilter, filters, searchQuery, activeTab],
     queryFn: async () => {
       const params: any = {}
       if (statusFilter !== 'all') params.status = statusFilter
       if (filters.industry !== 'all') params.industry = filters.industry
       if (filters.source !== 'all') params.source = filters.source
       if (searchQuery) params.search = searchQuery
+      
+      // Filter by source type based on active tab
+      if (activeTab === 'imported') params.sourceType = 'manual_import'
+      if (activeTab === 'generated') params.sourceType = 'automated'
+      
       return await leadsService.getAll(params)
     },
   })
@@ -194,6 +202,84 @@ export default function Leads() {
     input.click();
   }
 
+  const handleSelectLead = (leadId: string) => {
+    const newSelected = new Set(selectedLeads)
+    if (newSelected.has(leadId)) {
+      newSelected.delete(leadId)
+    } else {
+      newSelected.add(leadId)
+    }
+    setSelectedLeads(newSelected)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedLeads.size === filteredLeads.length) {
+      setSelectedLeads(new Set())
+    } else {
+      setSelectedLeads(new Set(filteredLeads.map(lead => lead.id)))
+    }
+  }
+
+  const handleCreateCampaignFromSelected = async () => {
+    if (selectedLeads.size === 0) {
+      toast.error('Please select at least one lead')
+      return
+    }
+    setShowCreateCampaignModal(true)
+  }
+
+  const [createCampaignForm, setCreateCampaignForm] = useState({
+    name: '',
+    description: '',
+    emailSubject: '',
+    emailBody: '',
+  })
+
+  const handleSubmitManualCampaign = async () => {
+    try {
+      if (!createCampaignForm.name || !createCampaignForm.emailSubject || !createCampaignForm.emailBody) {
+        toast.error('Please fill in all required fields')
+        return
+      }
+
+      toast.loading('Creating campaign...')
+      
+      // Create campaign
+      const campaignResponse = await api.post('/campaigns', {
+        name: createCampaignForm.name,
+        description: createCampaignForm.description,
+        campaignType: 'manual',
+        status: 'draft',
+      })
+
+      const campaignId = campaignResponse.data.data.id
+
+      // Link selected leads to campaign
+      await api.post(`/campaigns/${campaignId}/leads`, {
+        leadIds: Array.from(selectedLeads),
+      })
+
+      // Create email template for campaign
+      await api.post('/email-templates', {
+        name: `${createCampaignForm.name} Template`,
+        subject: createCampaignForm.emailSubject,
+        bodyText: createCampaignForm.emailBody,
+        campaignId,
+      })
+
+      toast.dismiss()
+      toast.success(`Campaign "${createCampaignForm.name}" created with ${selectedLeads.size} leads!`)
+      
+      setShowCreateCampaignModal(false)
+      setSelectedLeads(new Set())
+      setCreateCampaignForm({ name: '', description: '', emailSubject: '', emailBody: '' })
+      
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.response?.data?.error?.message || 'Failed to create campaign')
+    }
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       new: 'bg-blue-100 text-blue-800',
@@ -319,6 +405,81 @@ export default function Leads() {
             </div>
           </div>
         </div>
+
+        {/* Tabs */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px">
+              <button
+                onClick={() => { setActiveTab('all'); setSelectedLeads(new Set()) }}
+                className={`px-6 py-3 border-b-2 font-medium text-sm ${
+                  activeTab === 'all'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                All Leads
+                <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+                  {leads.length}
+                </span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('imported'); setSelectedLeads(new Set()) }}
+                className={`px-6 py-3 border-b-2 font-medium text-sm ${
+                  activeTab === 'imported'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Upload className="w-4 h-4 inline mr-2" />
+                Imported
+                <span className="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">
+                  {leads.filter(l => l.sourceType === 'manual_import').length}
+                </span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('generated'); setSelectedLeads(new Set()) }}
+                className={`px-6 py-3 border-b-2 font-medium text-sm ${
+                  activeTab === 'generated'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Zap className="w-4 h-4 inline mr-2" />
+                Generated
+                <span className="ml-2 px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">
+                  {leads.filter(l => l.sourceType === 'automated' || !l.sourceType).length}
+                </span>
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Bulk Actions Bar */}
+        {selectedLeads.size > 0 && (
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium text-primary-900">
+                {selectedLeads.size} lead{selectedLeads.size !== 1 ? 's' : ''} selected
+              </span>
+              <button
+                onClick={() => setSelectedLeads(new Set())}
+                className="text-sm text-primary-600 hover:text-primary-800"
+              >
+                Clear selection
+              </button>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleCreateCampaignFromSelected}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+              >
+                <Plus className="w-4 h-4 inline mr-2" />
+                Create Campaign from Selected
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-4 space-y-4">
@@ -485,6 +646,14 @@ export default function Leads() {
               <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedLeads.size === filteredLeads.length && filteredLeads.length > 0}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Company
                   </th>
@@ -514,6 +683,14 @@ export default function Leads() {
                   const tierBadge = getTierBadge(score)
                   return (
                   <tr key={lead.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedLeads.has(lead.id)}
+                        onChange={() => handleSelectLead(lead.id)}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{lead.companyName}</div>
                       <div className="text-sm text-gray-500">{lead.website || '-'}</div>
@@ -773,6 +950,114 @@ export default function Leads() {
                       Generate Leads
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Campaign from Selected Leads Modal */}
+        {showCreateCampaignModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Create Manual Campaign</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Campaign will be created with {selectedLeads.size} selected lead{selectedLeads.size !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCreateCampaignModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Campaign Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={createCampaignForm.name}
+                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, name: e.target.value })}
+                    placeholder="e.g., Imported Leads Q4 Outreach"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    value={createCampaignForm.description}
+                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, description: e.target.value })}
+                    placeholder="Describe the campaign purpose..."
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Subject *
+                  </label>
+                  <input
+                    type="text"
+                    value={createCampaignForm.emailSubject}
+                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailSubject: e.target.value })}
+                    placeholder="e.g., Transform Your Booking Process with [Product]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Body *
+                  </label>
+                  <textarea
+                    value={createCampaignForm.emailBody}
+                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailBody: e.target.value })}
+                    placeholder="Hi {{contactName}},&#10;&#10;I noticed {{companyName}} and wanted to reach out...&#10;&#10;Use {{variable}} for personalization"
+                    rows={8}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">
+                    Available variables: {'{{companyName}}'}, {'{{contactName}}'}, {'{{website}}'}, {'{{industry}}'}
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2">Next Steps:</h4>
+                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                    <li>Campaign will be created in draft status</li>
+                    <li>All {selectedLeads.size} selected leads will be linked</li>
+                    <li>Go to Campaigns page to start sending emails</li>
+                  </ol>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between p-6 border-t">
+                <button
+                  onClick={() => setShowCreateCampaignModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitManualCampaign}
+                  disabled={!createCampaignForm.name || !createCampaignForm.emailSubject || !createCampaignForm.emailBody}
+                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4 inline mr-2" />
+                  Create Campaign
                 </button>
               </div>
             </div>

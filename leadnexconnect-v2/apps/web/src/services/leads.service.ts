@@ -31,6 +31,8 @@ export interface Lead {
   responseTime?: string
   priceLevel?: string
   source?: string
+  sourceType?: string
+  batchId?: string
   createdAt: string
 }
 
