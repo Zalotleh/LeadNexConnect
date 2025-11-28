@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import leadsService, { Lead } from '@/services/leads.service'
 import { leadsAPI, aiAPI } from '@/services/api'
 import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
@@ -26,6 +27,9 @@ export default function Leads() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [editForm, setEditForm] = useState<Partial<Lead>>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [leadToDelete, setLeadToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [filters, setFilters] = useState({
     industry: 'all',
     minScore: 0,

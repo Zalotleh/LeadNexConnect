@@ -1,4 +1,5 @@
 import Layout from '@/components/Layout'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
@@ -46,6 +47,15 @@ export default function Campaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showStartConfirm, setShowStartConfirm] = useState(false)
+  const [campaignToStart, setCampaignToStart] = useState<string | null>(null)
+  const [isStarting, setIsStarting] = useState(false)
+  const [showPauseConfirm, setShowPauseConfirm] = useState(false)
+  const [campaignToPause, setCampaignToPause] = useState<string | null>(null)
+  const [isPausing, setIsPausing] = useState(false)
   
   const [formData, setFormData] = useState<CampaignFormData>({
     name: '',
@@ -156,41 +166,74 @@ export default function Campaigns() {
   }
 
   const handleStartCampaign = async (campaignId: string) => {
+    setCampaignToStart(campaignId)
+    setShowStartConfirm(true)
+  }
+
+  const confirmStartCampaign = async () => {
+    if (!campaignToStart) return
+    
     try {
-      await api.post(`/campaigns/${campaignId}/start`)
-      toast.success('Campaign started!')
+      setIsStarting(true)
+      await api.post(`/campaigns/${campaignToStart}/start`)
+      toast.success('Campaign started successfully!')
       fetchCampaigns()
+      setShowStartConfirm(false)
+      setCampaignToStart(null)
     } catch (error: any) {
       toast.error('Failed to start campaign')
       console.error(error)
+    } finally {
+      setIsStarting(false)
     }
   }
 
   const handlePauseCampaign = async (campaignId: string) => {
+    setCampaignToPause(campaignId)
+    setShowPauseConfirm(true)
+  }
+
+  const confirmPauseCampaign = async () => {
+    if (!campaignToPause) return
+    
     try {
-      await api.post(`/campaigns/${campaignId}/pause`)
-      toast.success('Campaign paused!')
+      setIsPausing(true)
+      await api.post(`/campaigns/${campaignToPause}/pause`)
+      toast.success('Campaign paused successfully!')
       fetchCampaigns()
+      setShowPauseConfirm(false)
+      setCampaignToPause(null)
     } catch (error: any) {
       toast.error('Failed to pause campaign')
       console.error(error)
+    } finally {
+      setIsPausing(false)
     }
   }
 
   const handleDeleteCampaign = async (campaignId: string) => {
-    if (!confirm('Are you sure you want to delete this campaign?')) {
-      return
-    }
+    setCampaignToDelete(campaignId)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteCampaign = async () => {
+    if (!campaignToDelete) return
     
     try {
-      await api.delete(`/campaigns/${campaignId}`)
-      toast.success('Campaign deleted!')
+      setIsDeleting(true)
+      await api.delete(`/campaigns/${campaignToDelete}`)
+      toast.success('Campaign deleted successfully!')
       fetchCampaigns()
+      setShowDeleteConfirm(false)
+      setCampaignToDelete(null)
     } catch (error: any) {
       toast.error('Failed to delete campaign')
       console.error(error)
+    } finally {
+      setIsDeleting(false)
     }
   }
+
 
   const calculateOpenRate = (campaign: Campaign) => {
     if (campaign.emailsSent === 0) return 0
@@ -801,6 +844,54 @@ export default function Campaigns() {
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false)
+            setCampaignToDelete(null)
+          }}
+          onConfirm={confirmDeleteCampaign}
+          title="Delete Campaign"
+          message="Are you sure you want to delete this campaign? This action cannot be undone. All campaign data, leads, and email history will be permanently removed."
+          confirmText="Delete Campaign"
+          cancelText="Cancel"
+          variant="danger"
+          isLoading={isDeleting}
+        />
+
+        {/* Start Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showStartConfirm}
+          onClose={() => {
+            setShowStartConfirm(false)
+            setCampaignToStart(null)
+          }}
+          onConfirm={confirmStartCampaign}
+          title="Start Campaign"
+          message="Are you ready to activate this campaign? Emails will be sent to leads according to your schedule settings. You can pause the campaign at any time."
+          confirmText="Start Campaign"
+          cancelText="Cancel"
+          variant="success"
+          isLoading={isStarting}
+        />
+
+        {/* Pause Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showPauseConfirm}
+          onClose={() => {
+            setShowPauseConfirm(false)
+            setCampaignToPause(null)
+          }}
+          onConfirm={confirmPauseCampaign}
+          title="Pause Campaign"
+          message="This will temporarily stop all email outreach for this campaign. You can resume it at any time. Scheduled emails will not be sent while paused."
+          confirmText="Pause Campaign"
+          cancelText="Cancel"
+          variant="warning"
+          isLoading={isPausing}
+        />
       </div>
     </Layout>
   )
