@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import leadsService, { Lead } from '@/services/leads.service'
@@ -10,6 +10,7 @@ import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
 
 export default function Leads() {
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')
   const [viewMode, setViewMode] = useState<'table' | 'batches'>('table')
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
@@ -65,10 +66,10 @@ export default function Leads() {
   })
 
   // Fetch batches for batch view
-  const { data: batchesData, isLoading: batchesLoading } = useQuery({
+  const { data: batchesData, isLoading: batchesLoading, refetch: refetchBatches } = useQuery({
     queryKey: ['batches'],
     queryFn: async () => await leadsAPI.getBatches(),
-    enabled: viewMode === 'batches',
+    enabled: viewMode === 'batches' || generating, // Enable when in batch view or generating
   })
 
   const leads: Lead[] = data?.data || []
@@ -120,6 +121,10 @@ export default function Leads() {
       setGenerating(true)
       setGenerationProgress(`Generating leads from ${generateForm.source}...`)
 
+      // Close modal and switch to batch view
+      setShowGenerateModal(false)
+      setViewMode('batches')
+
       // Use the new unified generation endpoint with batch name
       const response = await leadsAPI.generateLeads({
         batchName: generateForm.batchName,
@@ -149,8 +154,14 @@ export default function Leads() {
       }
 
       toast.success(message, { duration: 5000 })
-      setShowGenerateModal(false)
-      refetch()
+      
+      // Refresh both leads and batches - force refetch
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['leads'] }),
+        queryClient.invalidateQueries({ queryKey: ['batches'] }),
+        refetch(), // Force immediate refetch of leads
+        refetchBatches() // Force immediate refetch of batches
+      ])
       
       // Reset form
       setGenerateForm({
@@ -164,6 +175,9 @@ export default function Leads() {
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || 'Failed to generate leads')
       console.error(error)
+      
+      // Switch back to table view on error
+      setViewMode('table')
     } finally {
       setGenerating(false)
       setGenerationProgress('')
@@ -877,11 +891,41 @@ export default function Leads() {
               ) : (
                 // Batch View
                 <div className="p-6 space-y-4">
+                  {/* Loading Card - Show when generating */}
+                  {generating && (
+                    <div className="border-2 border-primary-500 rounded-lg overflow-hidden bg-primary-50 animate-pulse">
+                      <div className="flex items-center justify-between p-6">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="relative">
+                            <Loader className="w-8 h-8 animate-spin text-primary-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-primary-900 flex items-center gap-2">
+                              <Zap className="w-5 h-5" />
+                              Generating: {generateForm.batchName}
+                            </h3>
+                            <p className="text-sm text-primary-700 mt-1">
+                              {generationProgress || 'Preparing to generate leads...'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <div className="text-center">
+                            <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
+                              <Loader className="w-8 h-8 animate-spin text-primary-600" />
+                            </div>
+                            <p className="text-xs text-primary-700 mt-2">Processing...</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {batchesLoading ? (
                     <div className="flex justify-center items-center py-12">
                       <Loader className="w-8 h-8 animate-spin text-primary-600" />
                     </div>
-                  ) : batches.length === 0 ? (
+                  ) : batches.length === 0 && !generating ? (
                     <div className="text-center py-12">
                       <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No Batches Yet</h3>
