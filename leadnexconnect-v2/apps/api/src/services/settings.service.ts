@@ -25,10 +25,8 @@ interface SettingsData {
   fromEmail?: string;
   
   // Email Settings
-
   emailsPerHour?: number;
   dailyEmailLimit?: number;
-
 }
 
 export class SettingsService {
@@ -210,6 +208,7 @@ export class SettingsService {
       peopleDataLabsApiKey: this.maskApiKey(allSettings.peopleDataLabsApiKey),
       googlePlacesApiKey: this.maskApiKey(allSettings.googlePlacesApiKey),
       googleCustomSearchApiKey: this.maskApiKey(allSettings.googleCustomSearchApiKey),
+      googleCustomSearchEngineId: this.maskApiKey(allSettings.googleCustomSearchEngineId),
       smtpPass: this.maskApiKey(allSettings.smtpPass),
     };
   }

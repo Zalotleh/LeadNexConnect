@@ -215,7 +215,7 @@ Overall Progress:   ██████████████░░░░░░
 ### Path B: VPS Deployment (Production)
 
 ```bash
-# 1. SSH into VPS
+# 1. SSH into VPSANTHROPIC_API_KEY
 ssh user@your-server-ip
 
 # 2. Upload and extract
@@ -233,7 +233,7 @@ sudo nano .env
 
 # 5. Restart services
 pm2 restart all
-
+ANTHROPIC_API_KEY
 # 6. Test
 curl https://your-domain.com/api/health
 ```
@@ -249,7 +249,7 @@ Your package includes comprehensive guides:
 1. **README.md** (4,500 words)
    - Complete feature list
    - Tech stack overview
-   - Installation instructions
+   - Installation instructionsANTHROPIC_API_KEY
    - Deployment guides (Replit + VPS + Railway)
    - API documentation
    - Troubleshooting
@@ -283,7 +283,7 @@ Your package includes comprehensive guides:
 - Google Places: $0 ($200 credit)
 - Email: $0 (Gmail SMTP)
 - VPS: $5-10/month (or $0 if using existing server)
-
+ANTHROPIC_API_KEY
 **Total: $5-10/month**
 
 ### Month 4+ (Scale)
@@ -351,7 +351,7 @@ Your package includes comprehensive guides:
 
 Before going live, verify:
 
-- [ ] Database migrated successfully
+- [ ] Database migrated successfullyANTHROPIC_API_KEY
 - [ ] All API keys added to `.env`
 - [ ] Email templates seeded
 - [ ] SMTP credentials tested
