@@ -18,6 +18,9 @@ export const API_LIMITS = {
   },
 } as const;
 
+// Export industries
+export * from './industries';
+
 export const EMAIL_LIMITS = {
   DAILY_LIMIT: 50,
   HOURLY_LIMIT: 20,

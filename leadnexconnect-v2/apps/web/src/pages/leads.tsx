@@ -6,6 +6,7 @@ import { leadsAPI } from '@/services/api'
 import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
+import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES } from '@leadnex/shared'
 
 export default function Leads() {
   const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')
@@ -76,11 +77,8 @@ export default function Leads() {
     return { label: 'COLD', className: 'bg-blue-100 text-blue-800' }
   }
 
-  const industries = [
-    'Restaurant', 'Hotel', 'Retail', 'Healthcare', 'Technology',
-    'Construction', 'Real Estate', 'Education', 'Finance', 'Manufacturing',
-    'Legal', 'Consulting', 'Marketing', 'Transportation', 'Other'
-  ]
+  // Use shared industries grouped by category
+  const industriesByCategory = getIndustriesByCategory()
 
   const countries = [
     'United States', 'Canada', 'United Kingdom', 'Australia', 
@@ -539,8 +537,8 @@ export default function Leads() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="all">All Industries</option>
-                  {industries.map((industry) => (
-                    <option key={industry} value={industry}>{industry}</option>
+                  {INDUSTRIES.map((industry) => (
+                    <option key={industry.value} value={industry.value}>{industry.label}</option>
                   ))}
                 </select>
               </div>
@@ -852,11 +850,20 @@ export default function Leads() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     disabled={generating}
                   >
-                    <option value="">Select industry</option>
-                    {industries.map((industry) => (
-                      <option key={industry} value={industry}>{industry}</option>
+                    <option value="">Select industry...</option>
+                    {Object.entries(industriesByCategory).map(([category, items]) => (
+                      <optgroup key={category} label={category}>
+                        {items.map((industry) => (
+                          <option key={industry.value} value={industry.value}>
+                            {industry.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Choose the specific business type for better targeting
+                  </p>
                 </div>
 
                 {/* Location Filters */}

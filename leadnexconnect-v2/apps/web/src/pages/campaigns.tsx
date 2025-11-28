@@ -3,6 +3,7 @@ import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Tra
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
+import { INDUSTRIES, getIndustriesByCategory } from '@leadnex/shared'
 
 interface CampaignFormData {
   name: string
@@ -66,10 +67,8 @@ export default function Campaigns() {
     scheduleTime: '09:00',
   })
 
-  const industries = [
-    'Restaurant', 'Hotel', 'Retail', 'Healthcare', 'Technology',
-    'Construction', 'Real Estate', 'Education', 'Finance', 'Other'
-  ]
+  // Use shared industries grouped by category
+  const industriesByCategory = getIndustriesByCategory()
 
   const countries = ['United States', 'Canada', 'United Kingdom', 'Australia', 'Germany', 'France', 'Other']
   const companySizes = ['1-10', '11-50', '51-200', '201-500', '500+']
@@ -530,11 +529,20 @@ export default function Campaigns() {
                         onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       >
-                        <option value="">Select industry</option>
-                        {industries.map((industry) => (
-                          <option key={industry} value={industry}>{industry}</option>
+                        <option value="">Select industry...</option>
+                        {Object.entries(industriesByCategory).map(([category, items]) => (
+                          <optgroup key={category} label={category}>
+                            {items.map((industry) => (
+                              <option key={industry.value} value={industry.value}>
+                                {industry.label}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Choose the specific business type for better targeting
+                      </p>
                     </div>
                     
                     <div>

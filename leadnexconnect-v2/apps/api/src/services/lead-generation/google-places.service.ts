@@ -2,6 +2,7 @@ import axios from 'axios';
 import { db, apiUsage } from '@leadnex/database';
 import { logger } from '../../utils/logger';
 import type { Lead, LeadSource } from '@leadnex/shared';
+import { getGooglePlacesKeyword } from '@leadnex/shared';
 import { settingsService } from '../settings.service';
 
 const GOOGLE_PLACES_API_BASE = 'https://maps.googleapis.com/maps/api/place';
@@ -153,50 +154,8 @@ export class GooglePlacesService {
   }
 
   private buildSearchQuery(params: PlacesSearchParams): string {
-    // Map common industries to Google Places search terms
-    const industryKeywords: Record<string, string> = {
-      // Hospitality
-      'restaurant': 'restaurant',
-      'hotel': 'hotel',
-      'cafe': 'cafe',
-      'bar': 'bar',
-      'spa': 'spa',
-      
-      // Healthcare
-      'clinic': 'medical clinic',
-      'healthcare': 'healthcare',
-      'dental': 'dental clinic',
-      'pharmacy': 'pharmacy',
-      
-      // Professional Services
-      'tours': 'tour operator',
-      'education': 'education center',
-      'consultancy': 'consulting',
-      'legal': 'law firm',
-      'accounting': 'accounting firm',
-      
-      // Fitness & Wellness
-      'fitness': 'gym',
-      'yoga': 'yoga studio',
-      'beauty': 'beauty salon',
-      
-      // Retail & Services
-      'retail': 'retail store',
-      'repair': 'repair service',
-      'automotive': 'auto repair',
-      'real estate': 'real estate agency',
-      
-      // Technology
-      'technology': 'technology company',
-      'construction': 'construction company',
-      'finance': 'financial services',
-    };
-
-    // Convert industry to lowercase for matching
-    const industryLower = params.industry.toLowerCase();
-    
-    // Return mapped keyword or original industry
-    return industryKeywords[industryLower] || params.industry;
+    // Use the shared industry mapping for consistent Google Places searches
+    return getGooglePlacesKeyword(params.industry);
   }
 
   private extractCity(address: string): string {
