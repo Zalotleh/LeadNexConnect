@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import leadsService, { Lead } from '@/services/leads.service'
-import { leadsAPI } from '@/services/api'
-import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp } from 'lucide-react'
+import { leadsAPI, aiAPI } from '@/services/api'
+import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
@@ -21,6 +21,7 @@ export default function Leads() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
   const [showCreateCampaignModal, setShowCreateCampaignModal] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -254,6 +255,36 @@ export default function Leads() {
     emailSubject: '',
     emailBody: '',
   })
+
+  const handleGenerateAIContent = async () => {
+    try {
+      setAiGenerating(true)
+      
+      // Get sample lead for context
+      const sampleLead = filteredLeads[0]
+      
+      const response = await aiAPI.generateEmailContent({
+        industry: sampleLead?.industry,
+        companyName: sampleLead?.companyName,
+        tone: 'professional',
+        purpose: createCampaignForm.description || 'introduce our services',
+        callToAction: 'schedule a demo'
+      })
+      
+      if (response.data.success) {
+        setCreateCampaignForm({
+          ...createCampaignForm,
+          emailSubject: response.data.data.subject,
+          emailBody: response.data.data.body
+        })
+        toast.success('AI content generated successfully!')
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to generate AI content')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
 
   const handleSubmitManualCampaign = async () => {
     try {
@@ -1259,9 +1290,24 @@ export default function Leads() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Subject *
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Email Subject *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAIContent}
+                      disabled={aiGenerating}
+                      className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {aiGenerating ? (
+                        <Loader className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3 h-3" />
+                      )}
+                      {aiGenerating ? 'Generating...' : 'Generate with AI'}
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={createCampaignForm.emailSubject}

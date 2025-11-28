@@ -68,4 +68,21 @@ export const leadsAPI = {
   getLeadById: (id: string) => api.get(`/leads/${id}`),
 }
 
+// AI endpoints
+export const aiAPI = {
+  generateEmailContent: (data: {
+    industry?: string
+    companyName?: string
+    contactName?: string
+    website?: string
+    location?: string
+    companySize?: string
+    tone?: 'professional' | 'casual' | 'friendly'
+    purpose?: string
+    productService?: string
+    callToAction?: string
+  }) => api.post('/ai/generate-email', data),
+  testConnection: () => api.get('/ai/test'),
+}
+
 export default api
