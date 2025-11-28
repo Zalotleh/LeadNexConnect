@@ -4,6 +4,7 @@ import { logger } from '../../utils/logger';
 import { deduplicationService } from './deduplication.service';
 import { emailVerificationService } from '../lead-generation/email-verification.service';
 import { peopleDataLabsService } from '../lead-generation/peopledatalabs.service';
+import { emailFinderService } from '../enrichment/email-finder.service';
 import { leadScoringService } from './lead-scoring.service';
 import type { Lead } from '@leadnex/shared';
 
@@ -61,9 +62,43 @@ export class EnrichmentPipelineService {
         };
       }
 
-      // Step 2: Enrich with People Data Labs (if email is missing)
+      // Step 2: Find email using multi-method email finder (if missing)
       if (!lead.email && lead.website) {
-        logger.info('[EnrichmentPipeline] Email missing, attempting PDL enrichment');
+        logger.info('[EnrichmentPipeline] Email missing, attempting email finder');
+
+        try {
+          const emailResult = await emailFinderService.findEmail({
+            website: lead.website || undefined,
+            domain: undefined,
+            companyName: lead.companyName || undefined,
+          });
+
+          if (emailResult.email && emailFinderService.validateEmail(emailResult.email)) {
+            lead.email = emailResult.email;
+            lead.customFields = {
+              ...(lead.customFields as any || {}),
+              emailSource: emailResult.source,
+              emailConfidence: emailResult.confidence,
+              emailMethod: emailResult.method,
+            };
+            logger.info('[EnrichmentPipeline] Email found via email finder', {
+              email: emailResult.email,
+              source: emailResult.source,
+              confidence: emailResult.confidence,
+              method: emailResult.method,
+            });
+          }
+        } catch (error: any) {
+          logger.error('[EnrichmentPipeline] Email finder error', {
+            error: error.message,
+            companyName: lead.companyName,
+          });
+        }
+      }
+
+      // Step 3: Enrich with People Data Labs (if email still missing)
+      if (!lead.email && lead.website) {
+        logger.info('[EnrichmentPipeline] Email still missing, attempting PDL enrichment');
 
         const domain = this.extractDomain(lead.website);
         if (domain && lead.contactName) {
@@ -87,7 +122,7 @@ export class EnrichmentPipelineService {
         }
       }
 
-      // Step 3: Verify email with Hunter.io (if we have one)
+      // Step 4: Verify email with Hunter.io (if we have one)
       if (lead.email) {
         logger.info('[EnrichmentPipeline] Verifying email');
 
@@ -116,7 +151,7 @@ export class EnrichmentPipelineService {
         };
       }
 
-      // Step 4: Enrich contact info from PDL (if we have email)
+      // Step 5: Enrich contact info from PDL (if we have email)
       if (lead.email) {
         logger.info('[EnrichmentPipeline] Enriching contact info');
 
@@ -149,7 +184,7 @@ export class EnrichmentPipelineService {
         }
       }
 
-      // Step 5: Calculate quality score
+      // Step 6: Calculate quality score
       logger.info('[EnrichmentPipeline] Calculating quality score');
       const qualityScore = leadScoringService.calculateScore(lead as Lead);
       lead.qualityScore = qualityScore;
@@ -158,7 +193,7 @@ export class EnrichmentPipelineService {
         score: qualityScore,
       });
 
-      // Step 6: Save to database (only if quality score is acceptable)
+      // Step 7: Save to database (only if quality score is acceptable)
       if (qualityScore < 40) {
         logger.warn('[EnrichmentPipeline] Quality score too low, skipping save', {
           score: qualityScore,

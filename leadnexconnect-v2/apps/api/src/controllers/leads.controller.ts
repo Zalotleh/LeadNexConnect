@@ -362,6 +362,95 @@ export class LeadsController {
     });
     return counts;
   }
+
+  /**
+   * GET /api/leads/export - Export leads to CSV
+   */
+  async exportLeads(req: Request, res: Response) {
+    try {
+      const { status, industry, source, minScore, maxScore } = req.query;
+
+      logger.info('[LeadsController] Exporting leads', { filters: req.query });
+
+      // Build query
+      let query = db.select().from(leads);
+
+      // Apply filters
+      const conditions: any[] = [];
+      if (status && typeof status === 'string') {
+        conditions.push(eq(leads.status, status as any));
+      }
+      if (industry) conditions.push(eq(leads.industry, industry as string));
+      if (source) conditions.push(eq(leads.source, source as any));
+      if (minScore) conditions.push(gte(leads.qualityScore, parseInt(minScore as string)));
+      if (maxScore) conditions.push(lte(leads.qualityScore, parseInt(maxScore as string)));
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+
+      const allLeads = await query;
+
+      // Convert to CSV
+      const csvRows: string[] = [];
+      
+      // CSV Header
+      csvRows.push([
+        'Company Name',
+        'Contact Name',
+        'Email',
+        'Phone',
+        'Job Title',
+        'Industry',
+        'City',
+        'Country',
+        'Website',
+        'Quality Score',
+        'Tier',
+        'Status',
+        'Source',
+        'Created At'
+      ].join(','));
+
+      // CSV Data
+      allLeads.forEach((lead: any) => {
+        const tier = lead.qualityScore >= 80 ? 'HOT' : lead.qualityScore >= 60 ? 'WARM' : 'COLD';
+        csvRows.push([
+          `"${lead.companyName || ''}"`,
+          `"${lead.contactName || ''}"`,
+          `"${lead.email || ''}"`,
+          `"${lead.phone || ''}"`,
+          `"${lead.jobTitle || ''}"`,
+          `"${lead.industry || ''}"`,
+          `"${lead.city || ''}"`,
+          `"${lead.country || ''}"`,
+          `"${lead.website || ''}"`,
+          lead.qualityScore || 0,
+          tier,
+          lead.status || '',
+          lead.source || '',
+          lead.createdAt ? new Date(lead.createdAt).toISOString() : ''
+        ].join(','));
+      });
+
+      const csvContent = csvRows.join('\n');
+
+      // Set headers for CSV download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="leads-export-${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csvContent);
+
+      logger.info('[LeadsController] Exported leads', { count: allLeads.length });
+    } catch (error: any) {
+      logger.error('[LeadsController] Error exporting leads', {
+        error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
 }
 
 export const leadsController = new LeadsController();

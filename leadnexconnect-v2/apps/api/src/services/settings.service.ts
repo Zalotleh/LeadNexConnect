@@ -11,6 +11,8 @@ interface SettingsData {
   hunterApiKey?: string;
   peopleDataLabsApiKey?: string;
   googlePlacesApiKey?: string;
+  googleCustomSearchApiKey?: string;
+  googleCustomSearchEngineId?: string;
   
   // SMTP Configuration
   smtpProvider?: string;

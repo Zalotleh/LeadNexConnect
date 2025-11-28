@@ -139,10 +139,59 @@ export default function Leads() {
 
   const handleExport = async () => {
     try {
-      toast.success('Export functionality coming soon!')
+      // Build query params from current filters
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (filters.industry !== 'all') params.append('industry', filters.industry);
+      if (filters.source !== 'all') params.append('source', filters.source);
+      if (filters.minScore > 0) params.append('minScore', filters.minScore.toString());
+      if (filters.maxScore < 100) params.append('maxScore', filters.maxScore.toString());
+
+      const queryString = params.toString();
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/leads/export${queryString ? '?' + queryString : ''}`;
+      
+      // Download file
+      window.location.href = url;
+      toast.success('Exporting leads...');
     } catch (error) {
-      toast.error('Failed to export leads')
+      toast.error('Failed to export leads');
     }
+  }
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
+    input.onchange = async (e: any) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const csvData = event.target?.result as string;
+          
+          toast.loading('Importing leads...');
+          
+          const response = await api.post('/leads/import', {
+            csvData,
+            industry: 'Other', // Can be enhanced with a modal to select industry
+            enrichEmail: true,
+          });
+
+          if (response.data.success) {
+            toast.dismiss();
+            toast.success(`Imported ${response.data.data.imported} leads successfully!`);
+            refetch();
+          }
+        };
+        reader.readAsText(file);
+      } catch (error: any) {
+        toast.dismiss();
+        toast.error(error.response?.data?.error?.message || 'Failed to import leads');
+      }
+    };
+    input.click();
   }
 
   const getStatusColor = (status: string) => {
@@ -174,7 +223,10 @@ export default function Leads() {
               <Zap className="w-4 h-4 inline mr-2" />
               Generate Leads
             </button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button 
+              onClick={handleImport}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
               <Upload className="w-4 h-4 inline mr-2" />
               Import CSV
             </button>
