@@ -10,6 +10,7 @@ import { leadScoringService } from '../services/crm/lead-scoring.service';
 import { leadScoringV2Service } from '../services/crm/lead-scoring-v2.service';
 import { websiteAnalysisService } from '../services/analysis/website-analysis.service';
 import { apiPerformanceService } from '../services/tracking/api-performance.service';
+import { enrichmentPipelineService } from '../services/crm/enrichment-pipeline.service';
 import { logger } from '../utils/logger';
 
 export class LeadsController {
@@ -150,11 +151,45 @@ export class LeadsController {
         };
       });
 
-      // Save to database
+      // Enrich leads through enrichment pipeline (includes email finder)
       const saved: any[] = [];
       for (const lead of scored) {
-        const result = await db.insert(leads).values(lead).returning();
-        saved.push(result[0]);
+        try {
+          // Use enrichment pipeline to find missing contact info
+          const enrichmentResult = await enrichmentPipelineService.enrichLead(lead);
+          
+          if (enrichmentResult.success && enrichmentResult.leadId) {
+            // Get the enriched lead from database
+            const enrichedLead = await db
+              .select()
+              .from(leads)
+              .where(eq(leads.id, enrichmentResult.leadId))
+              .limit(1);
+            
+            if (enrichedLead[0]) {
+              saved.push(enrichedLead[0]);
+            }
+          } else if (!enrichmentResult.isDuplicate) {
+            // Fallback: save without enrichment if pipeline fails
+            const result = await db.insert(leads).values(lead).returning();
+            saved.push(result[0]);
+          }
+        } catch (error: any) {
+          logger.warn('[LeadsController] Enrichment failed, saving lead without enrichment', {
+            company: lead.companyName,
+            error: error.message,
+          });
+          // Fallback: save without enrichment
+          try {
+            const result = await db.insert(leads).values(lead).returning();
+            saved.push(result[0]);
+          } catch (saveError: any) {
+            logger.error('[LeadsController] Failed to save lead', {
+              company: lead.companyName,
+              error: saveError.message,
+            });
+          }
+        }
       }
 
       // Track API performance
