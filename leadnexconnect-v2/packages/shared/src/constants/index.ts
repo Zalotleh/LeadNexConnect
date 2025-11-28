@@ -47,19 +47,6 @@ export const FOLLOW_UP_STAGES = {
   FOLLOW_UP_1: 'follow_up_1',
   FOLLOW_UP_2: 'follow_up_2',
 } as const;
-
-export const INDUSTRY_KEYWORDS = {
-  spa: ['spa', 'massage', 'wellness', 'beauty salon', 'nail salon'],
-  clinic: ['clinic', 'medical', 'healthcare', 'doctor', 'dentist'],
-  tours: ['tour', 'travel', 'excursion', 'sightseeing', 'tourism'],
-  education: ['tutor', 'education', 'training', 'courses', 'lessons'],
-  fitness: ['gym', 'fitness', 'yoga', 'pilates', 'personal training'],
-  repair: ['repair', 'service', 'maintenance', 'fix'],
-  consultancy: ['consultant', 'consulting', 'advisory', 'coaching'],
-  beauty: ['beauty', 'hairdresser', 'barber', 'makeup'],
-  activities: ['activities', 'events', 'entertainment', 'recreation'],
-} as const;
-
 export const ERROR_CODES = {
   // General
   INTERNAL_ERROR: 'INTERNAL_ERROR',
