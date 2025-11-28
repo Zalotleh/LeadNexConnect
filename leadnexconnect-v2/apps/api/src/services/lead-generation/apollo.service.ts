@@ -44,18 +44,33 @@ export class ApolloService {
 
   /**
    * Search for leads using Apollo.io People Search API
+   * Using /people/search endpoint which is available on free plan
    */
   async searchLeads(params: ApolloSearchParams): Promise<Lead[]> {
     try {
       const apiKey = await this.getApiKey();
       logger.info('[Apollo] Searching for leads', { params });
 
+      // Build search query for /people/search endpoint (free tier compatible)
       const searchQuery: any = {
-        api_key: apiKey,
-        q_organization_keyword_tags: [params.industry],
-        per_page: Math.min(params.maxResults || 10, 100),
         page: 1,
+        per_page: Math.min(params.maxResults || 10, 25), // Free tier limit
+        person_titles: [
+          'owner',
+          'founder',
+          'ceo',
+          'manager',
+          'director',
+          'president',
+          'co-founder',
+          'chief executive officer',
+        ],
       };
+
+      // Add organization keywords (industry)
+      if (params.industry) {
+        searchQuery.organization_industry_tag_ids = [params.industry.toLowerCase()];
+      }
 
       // Add location filters
       if (params.country) {
@@ -66,23 +81,15 @@ export class ApolloService {
         searchQuery.person_locations = [`${params.city}, ${params.country || ''}`];
       }
 
-      // Search for decision makers (owners, managers, directors)
-      searchQuery.person_titles = [
-        'owner',
-        'founder',
-        'ceo',
-        'manager',
-        'director',
-        'president',
-      ];
-
+      // Apollo requires API key in X-Api-Key header (free tier compatible)
       const response = await axios.post(
-        `${APOLLO_API_BASE}/mixed_people/search`,
+        `${APOLLO_API_BASE}/people/search`,
         searchQuery,
         {
           headers: {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache',
+            'X-Api-Key': apiKey,
           },
           timeout: 30000,
         }
@@ -92,6 +99,8 @@ export class ApolloService {
         logger.warn('[Apollo] No people found in response');
         return [];
       }
+
+      logger.info(`[Apollo] Found ${response.data.people.length} people from Apollo.io`);
 
       const leads: Lead[] = response.data.people.map((person: ApolloContact) => {
         const lead: Partial<Lead> = {
@@ -226,9 +235,8 @@ export class ApolloService {
       const apiKey = await this.getApiKey();
       logger.info('[Apollo] Enriching lead', { params });
 
-      const enrichQuery: any = {
-        api_key: apiKey,
-      };
+      // Build enrichment query (DO NOT include api_key in body)
+      const enrichQuery: any = {};
 
       if (params.email) {
         enrichQuery.email = params.email;
@@ -238,12 +246,14 @@ export class ApolloService {
         throw new Error('Either email or domain is required for enrichment');
       }
 
+      // Apollo requires API key in X-Api-Key header
       const response = await axios.post(
         `${APOLLO_API_BASE}/people/match`,
         enrichQuery,
         {
           headers: {
             'Content-Type': 'application/json',
+            'X-Api-Key': apiKey,
           },
           timeout: 15000,
         }

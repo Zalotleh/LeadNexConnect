@@ -14,8 +14,12 @@ interface PlacesSearchParams {
 }
 
 export class GooglePlacesService {
-  private async getApiKey(): Promise<string | null> {
-    return await settingsService.get('googlePlacesApiKey', process.env.GOOGLE_PLACES_API_KEY || '');
+  private async getApiKey(): Promise<string> {
+    const apiKey = await settingsService.get('googlePlacesApiKey', process.env.GOOGLE_PLACES_API_KEY);
+    if (!apiKey) {
+      throw new Error('GOOGLE_PLACES_API_KEY is not configured. Please set it in Settings or .env file');
+    }
+    return apiKey;
   }
 
   /**
@@ -24,17 +28,14 @@ export class GooglePlacesService {
   async searchLeads(params: PlacesSearchParams): Promise<Lead[]> {
     try {
       const apiKey = await this.getApiKey();
-      if (!apiKey) {
-        logger.warn('[GooglePlaces] API key not configured');
-        return [];
-      }
-
       logger.info('[GooglePlaces] Searching for leads', { params });
 
       const query = this.buildSearchQuery(params);
       const location = params.city 
         ? `${params.city}, ${params.country || ''}` 
-        : params.country || '';
+        : params.country || 'United States';
+
+      logger.info('[GooglePlaces] Search query', { query, location });
 
       // Step 1: Text search to find places
       const searchResponse = await axios.get(
@@ -44,18 +45,27 @@ export class GooglePlacesService {
             query: `${query} in ${location}`,
             key: apiKey,
           },
+          timeout: 15000,
         }
       );
 
-      if (!searchResponse.data.results || searchResponse.data.results.length === 0) {
-        logger.warn('[GooglePlaces] No places found');
+      // Check for API errors
+      if (searchResponse.data.status === 'REQUEST_DENIED') {
+        throw new Error(`Google Places API error: ${searchResponse.data.error_message || 'Invalid API key or API not enabled'}`);
+      }
+
+      if (searchResponse.data.status === 'ZERO_RESULTS' || !searchResponse.data.results || searchResponse.data.results.length === 0) {
+        logger.warn('[GooglePlaces] No places found for query', { query, location });
         return [];
       }
 
       const places = searchResponse.data.results.slice(0, params.maxResults || 50);
+      logger.info(`[GooglePlaces] Found ${places.length} places, fetching details...`);
 
       // Step 2: Get details for each place
       const leads: Lead[] = [];
+      let successCount = 0;
+      let errorCount = 0;
 
       for (const place of places) {
         try {
@@ -64,21 +74,31 @@ export class GooglePlacesService {
             {
               params: {
                 place_id: place.place_id,
-                fields: 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total',
+                fields: 'name,formatted_address,formatted_phone_number,website,rating,user_ratings_total,international_phone_number',
                 key: apiKey,
               },
+              timeout: 10000,
             }
           );
+
+          if (detailsResponse.data.status !== 'OK') {
+            logger.warn('[GooglePlaces] Failed to get place details', { 
+              placeId: place.place_id, 
+              status: detailsResponse.data.status 
+            });
+            errorCount++;
+            continue;
+          }
 
           const details = detailsResponse.data.result;
 
           const lead: Partial<Lead> = {
             companyName: details.name || place.name,
             website: details.website,
-            phone: details.formatted_phone_number,
+            phone: details.formatted_phone_number || details.international_phone_number,
             address: details.formatted_address || place.formatted_address,
-            city: params.city || this.extractCity(details.formatted_address),
-            country: params.country,
+            city: params.city || this.extractCity(details.formatted_address || place.formatted_address),
+            country: params.country || 'United States',
             industry: params.industry,
             source: 'google_places' as LeadSource,
             qualityScore: 0,
@@ -98,49 +118,85 @@ export class GooglePlacesService {
           };
 
           leads.push(lead as Lead);
+          successCount++;
 
-          // Small delay to avoid rate limits
+          // Small delay to avoid rate limits (100ms between requests)
           await this.delay(100);
         } catch (error: any) {
           logger.error('[GooglePlaces] Error fetching place details', {
             placeId: place.place_id,
             error: error.message,
           });
+          errorCount++;
         }
       }
 
       logger.info('[GooglePlaces] Successfully fetched leads', {
-        count: leads.length,
+        totalPlaces: places.length,
+        successCount,
+        errorCount,
         industry: params.industry,
+        location,
       });
 
       // Track API usage
-      await this.trackApiUsage(leads.length);
+      await this.trackApiUsage(successCount);
 
       return leads;
     } catch (error: any) {
       logger.error('[GooglePlaces] Error searching leads', {
         error: error.message,
+        params,
       });
-      throw error;
+      throw new Error(`Google Places API error: ${error.message}`);
     }
   }
 
   private buildSearchQuery(params: PlacesSearchParams): string {
-    const industryKeywords: Record<string, string[]> = {
-      spa: ['spa', 'massage', 'wellness center'],
-      clinic: ['medical clinic', 'healthcare', 'doctor'],
-      tours: ['tour operator', 'tours', 'travel agency'],
-      education: ['tutoring', 'education center', 'training'],
-      fitness: ['gym', 'fitness center', 'yoga studio'],
-      repair: ['repair service', 'maintenance'],
-      consultancy: ['consultant', 'consulting firm'],
-      beauty: ['beauty salon', 'hair salon', 'barber'],
-      activities: ['activity center', 'entertainment'],
+    // Map common industries to Google Places search terms
+    const industryKeywords: Record<string, string> = {
+      // Hospitality
+      'restaurant': 'restaurant',
+      'hotel': 'hotel',
+      'cafe': 'cafe',
+      'bar': 'bar',
+      'spa': 'spa',
+      
+      // Healthcare
+      'clinic': 'medical clinic',
+      'healthcare': 'healthcare',
+      'dental': 'dental clinic',
+      'pharmacy': 'pharmacy',
+      
+      // Professional Services
+      'tours': 'tour operator',
+      'education': 'education center',
+      'consultancy': 'consulting',
+      'legal': 'law firm',
+      'accounting': 'accounting firm',
+      
+      // Fitness & Wellness
+      'fitness': 'gym',
+      'yoga': 'yoga studio',
+      'beauty': 'beauty salon',
+      
+      // Retail & Services
+      'retail': 'retail store',
+      'repair': 'repair service',
+      'automotive': 'auto repair',
+      'real estate': 'real estate agency',
+      
+      // Technology
+      'technology': 'technology company',
+      'construction': 'construction company',
+      'finance': 'financial services',
     };
 
-    const keywords = industryKeywords[params.industry] || [params.industry];
-    return keywords[0];
+    // Convert industry to lowercase for matching
+    const industryLower = params.industry.toLowerCase();
+    
+    // Return mapped keyword or original industry
+    return industryKeywords[industryLower] || params.industry;
   }
 
   private extractCity(address: string): string {

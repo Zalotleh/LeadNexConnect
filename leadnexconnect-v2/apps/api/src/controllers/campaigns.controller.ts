@@ -88,30 +88,71 @@ export class CampaignsController {
         description,
         industry,
         targetCountry,
+        targetCountries,
         targetCity,
+        targetCities,
+        companySize,
+        leadsPerDay,
+        usesLinkedin,
+        usesApollo,
+        usesPeopleDL,
+        usesGooglePlaces,
+        usesWebScraping,
+        emailTemplateId,
+        followUpEnabled,
+        followUp1DelayDays,
+        followUp2DelayDays,
         leadIds,
         scheduleType,
+        scheduleTime,
         scheduledAt,
       } = req.body;
 
-      logger.info('[CampaignsController] Creating campaign', { name });
+      logger.info('[CampaignsController] Creating campaign', { 
+        name, 
+        usesApollo, 
+        usesGooglePlaces,
+        industry,
+        targetCountries: targetCountries || [targetCountry],
+      });
+
+      // Prepare campaign data - only include emailTemplateId if it's a valid UUID
+      const campaignData: any = {
+        name,
+        description,
+        industry,
+        targetCountries: targetCountries || (targetCountry ? [targetCountry] : []),
+        targetCities: targetCities || (targetCity ? [targetCity] : []),
+        companySize,
+        leadsPerDay: leadsPerDay || 50,
+        usesLinkedin: usesLinkedin || false,
+        usesApollo: usesApollo || false,
+        usesPeopleDL: usesPeopleDL || false,
+        usesGooglePlaces: usesGooglePlaces || false,
+        usesWebScraping: usesWebScraping || false,
+        followUpEnabled: followUpEnabled !== undefined ? followUpEnabled : true,
+        followUp1DelayDays: followUp1DelayDays || 3,
+        followUp2DelayDays: followUp2DelayDays || 5,
+        status: scheduleType === 'immediate' ? 'active' : 'draft',
+        scheduleType: scheduleType || 'manual',
+        scheduleTime,
+        startDate: scheduledAt ? new Date(scheduledAt) : undefined,
+        leadsGenerated: leadIds?.length || 0,
+        emailsSent: 0,
+        emailsOpened: 0,
+        emailsClicked: 0,
+        responsesReceived: 0,
+      };
+
+      // Only add emailTemplateId if it's provided and not empty
+      if (emailTemplateId && emailTemplateId.trim() !== '') {
+        campaignData.emailTemplateId = emailTemplateId;
+      }
 
       // Create campaign
       const newCampaign = await db
         .insert(campaigns)
-        .values({
-          name,
-          description,
-          industry,
-          status: scheduleType === 'immediate' ? 'active' : 'draft',
-          scheduleType,
-          startDate: scheduledAt ? new Date(scheduledAt) : undefined,
-          leadsGenerated: leadIds?.length || 0,
-          emailsSent: 0,
-          emailsOpened: 0,
-          emailsClicked: 0,
-          responsesReceived: 0,
-        })
+        .values(campaignData)
         .returning();
 
       // Note: Lead-campaign association can be tracked via campaignId in emails table
@@ -237,10 +278,21 @@ export class CampaignsController {
       logger.info('[CampaignsController] Executing campaign', {
         campaignId,
         name: campaign.name,
+        usesApollo: campaign.usesApollo,
+        usesGooglePlaces: campaign.usesGooglePlaces,
+        industry: campaign.industry,
+        targetCountries: campaign.targetCountries,
+        targetCities: campaign.targetCities,
       });
 
       const rawLeads: any[] = [];
       const leadsPerSource = Math.ceil((campaign.leadsPerDay || 50) / this.countActiveSources(campaign));
+
+      logger.info('[CampaignsController] Lead generation config', {
+        leadsPerDay: campaign.leadsPerDay || 50,
+        activeSources: this.countActiveSources(campaign),
+        leadsPerSource,
+      });
 
       // 1. Generate leads from enabled sources
       if (campaign.usesApollo) {

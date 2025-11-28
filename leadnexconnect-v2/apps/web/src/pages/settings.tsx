@@ -1,5 +1,5 @@
 import Layout from '@/components/Layout'
-import { Save, TestTube } from 'lucide-react'
+import { Save, TestTube, Eye, EyeOff } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
@@ -8,6 +8,14 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [showKeys, setShowKeys] = useState({
+    anthropicApiKey: false,
+    apolloApiKey: false,
+    hunterApiKey: false,
+    peopleDataLabsApiKey: false,
+    googlePlacesApiKey: false,
+    smtpPass: false,
+  })
   const [settings, setSettings] = useState({
     // AI Keys
     anthropicApiKey: '',
@@ -36,6 +44,10 @@ export default function Settings() {
   useEffect(() => {
     loadSettings()
   }, [])
+
+  const toggleKeyVisibility = (field: keyof typeof showKeys) => {
+    setShowKeys(prev => ({ ...prev, [field]: !prev[field] }))
+  }
 
   const loadSettings = async () => {
     try {
@@ -113,13 +125,22 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Anthropic API Key (Claude)
               </label>
-              <input
-                type="password"
-                value={settings.anthropicApiKey}
-                onChange={(e) => setSettings({...settings, anthropicApiKey: e.target.value})}
-                placeholder="sk-ant-..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showKeys.anthropicApiKey ? "text" : "password"}
+                  value={settings.anthropicApiKey}
+                  onChange={(e) => setSettings({...settings, anthropicApiKey: e.target.value})}
+                  placeholder="sk-ant-..."
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('anthropicApiKey')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.anthropicApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">Used for AI-powered email generation</p>
             </div>
           </div>
@@ -134,52 +155,88 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Apollo.io API Key
               </label>
-              <input
-                type="password"
-                value={settings.apolloApiKey}
-                onChange={(e) => setSettings({...settings, apolloApiKey: e.target.value})}
-                placeholder="Enter your Apollo.io API key"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showKeys.apolloApiKey ? "text" : "password"}
+                  value={settings.apolloApiKey}
+                  onChange={(e) => setSettings({...settings, apolloApiKey: e.target.value})}
+                  placeholder="Enter your Apollo.io API key"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('apolloApiKey')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.apolloApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">B2B contact database (100 leads/day free tier)</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Hunter.io API Key
               </label>
-              <input
-                type="password"
-                value={settings.hunterApiKey}
-                onChange={(e) => setSettings({...settings, hunterApiKey: e.target.value})}
-                placeholder="Enter your Hunter.io API key"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showKeys.hunterApiKey ? "text" : "password"}
+                  value={settings.hunterApiKey}
+                  onChange={(e) => setSettings({...settings, hunterApiKey: e.target.value})}
+                  placeholder="Enter your Hunter.io API key"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('hunterApiKey')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.hunterApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">Email verification and finding</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 People Data Labs API Key
               </label>
-              <input
-                type="password"
-                value={settings.peopleDataLabsApiKey}
-                onChange={(e) => setSettings({...settings, peopleDataLabsApiKey: e.target.value})}
-                placeholder="Enter your PDL API key"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showKeys.peopleDataLabsApiKey ? "text" : "password"}
+                  value={settings.peopleDataLabsApiKey}
+                  onChange={(e) => setSettings({...settings, peopleDataLabsApiKey: e.target.value})}
+                  placeholder="Enter your PDL API key"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('peopleDataLabsApiKey')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.peopleDataLabsApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">Contact enrichment (1000 credits/month free tier)</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Google Places API Key
               </label>
-              <input
-                type="password"
-                value={settings.googlePlacesApiKey}
-                onChange={(e) => setSettings({...settings, googlePlacesApiKey: e.target.value})}
-                placeholder="Enter your Google Places API key"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showKeys.googlePlacesApiKey ? "text" : "password"}
+                  value={settings.googlePlacesApiKey}
+                  onChange={(e) => setSettings({...settings, googlePlacesApiKey: e.target.value})}
+                  placeholder="Enter your Google Places API key"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('googlePlacesApiKey')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.googlePlacesApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">Local business database</p>
             </div>
           </div>
@@ -247,13 +304,22 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 SMTP Password
               </label>
-              <input
-                type="password"
-                value={settings.smtpPass}
-                onChange={(e) => setSettings({...settings, smtpPass: e.target.value})}
-                placeholder="Enter your SMTP password"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showKeys.smtpPass ? "text" : "password"}
+                  value={settings.smtpPass}
+                  onChange={(e) => setSettings({...settings, smtpPass: e.target.value})}
+                  placeholder="Enter your SMTP password"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('smtpPass')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.smtpPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
