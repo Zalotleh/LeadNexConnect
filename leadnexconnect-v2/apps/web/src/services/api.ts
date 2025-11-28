@@ -49,6 +49,7 @@ export const dashboardAPI = {
 // Enhanced Leads endpoints
 export const leadsAPI = {
   generateLeads: (data: {
+    batchName?: string
     industry: string
     country: string
     city?: string
@@ -63,6 +64,7 @@ export const leadsAPI = {
     source?: string
     industry?: string
   }) => api.get('/leads', { params }),
+  getBatches: () => api.get('/leads/batches'),
   getLeadById: (id: string) => api.get(`/leads/${id}`),
 }
 

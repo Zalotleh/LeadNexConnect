@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
-import { leads } from '@leadnex/database';
+import { leads, leadBatches } from '@leadnex/database';
 import { eq, and, gte, lte, ilike, desc } from 'drizzle-orm';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
@@ -80,9 +80,31 @@ export class LeadsController {
    */
   async generateLeads(req: Request, res: Response) {
     try {
-      const { industry, country, city, maxResults = 50, sources } = req.body;
+      const { batchName, industry, country, city, maxResults = 50, sources } = req.body;
 
       logger.info('[LeadsController] Generating leads', { body: req.body });
+
+      // Create lead batch
+      const batch = await db
+        .insert(leadBatches)
+        .values({
+          name: batchName || `${industry} - ${new Date().toLocaleDateString()}`,
+          uploadedBy: 'system',
+          totalLeads: 0,
+          successfulImports: 0,
+          failedImports: 0,
+          duplicatesSkipped: 0,
+          importSettings: {
+            sources,
+            industry,
+            country,
+            city,
+            maxResults,
+          },
+        })
+        .returning();
+
+      const batchId = batch[0].id;
 
       const allLeads: any[] = [];
 
@@ -137,7 +159,7 @@ export class LeadsController {
         }
       }
 
-      // Calculate enhanced scores using V2 scoring
+      // Calculate enhanced scores using V2 scoring and add batch ID
       const scored = deduped.map(lead => {
         const qualityScore = leadScoringV2Service.calculateScore(lead);
         const digitalMaturityScore = leadScoringV2Service.calculateDigitalMaturity(lead);
@@ -145,6 +167,7 @@ export class LeadsController {
         
         return {
           ...lead,
+          batchId, // Associate with batch
           qualityScore,
           digitalMaturityScore,
           bookingPotential,
@@ -220,7 +243,20 @@ export class LeadsController {
       const warm = saved.filter((l: any) => l.qualityScore >= 60 && l.qualityScore < 80);
       const cold = saved.filter((l: any) => l.qualityScore < 60);
 
+      // Update batch with final counts
+      await db
+        .update(leadBatches)
+        .set({
+          totalLeads: allLeads.length,
+          successfulImports: saved.length,
+          duplicatesSkipped: allLeads.length - saved.length,
+          completedAt: new Date(),
+        })
+        .where(eq(leadBatches.id, batchId));
+
       logger.info('[LeadsController] Lead generation complete', {
+        batchId,
+        batchName: batch[0].name,
         total: saved.length,
         hot: hot.length,
         warm: warm.length,
@@ -230,6 +266,8 @@ export class LeadsController {
       res.json({
         success: true,
         data: {
+          batchId,
+          batchName: batch[0].name,
           leads: saved,
           summary: {
             total: allLeads.length,
@@ -246,6 +284,60 @@ export class LeadsController {
       });
     } catch (error: any) {
       logger.error('[LeadsController] Error generating leads', {
+        error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * GET /api/leads/batches - Get all lead batches
+   */
+  async getBatches(req: Request, res: Response) {
+    try {
+      const { sourceType } = req.query;
+
+      logger.info('[LeadsController] Getting lead batches');
+
+      // Get all batches
+      let query = db
+        .select()
+        .from(leadBatches)
+        .orderBy(desc(leadBatches.createdAt));
+
+      const batches = await query;
+
+      // For each batch, get lead count and sample leads
+      const batchesWithLeads = await Promise.all(
+        batches.map(async (batch) => {
+          const batchLeads = await db
+            .select()
+            .from(leads)
+            .where(eq(leads.batchId, batch.id))
+            .limit(5); // Get first 5 leads as sample
+
+          const totalLeads = await db
+            .select()
+            .from(leads)
+            .where(eq(leads.batchId, batch.id));
+
+          return {
+            ...batch,
+            leadCount: totalLeads.length,
+            sampleLeads: batchLeads,
+          };
+        })
+      );
+
+      res.json({
+        success: true,
+        data: batchesWithLeads,
+      });
+    } catch (error: any) {
+      logger.error('[LeadsController] Error getting batches', {
         error: error.message,
       });
       res.status(500).json({

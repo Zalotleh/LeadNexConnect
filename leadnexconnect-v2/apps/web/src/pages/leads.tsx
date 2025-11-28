@@ -32,6 +32,7 @@ export default function Leads() {
   })
   
   const [generateForm, setGenerateForm] = useState({
+    batchName: '',
     source: 'apollo' as 'apollo' | 'google_places' | 'peopledatalabs' | 'linkedin',
     industry: '',
     country: 'United States',
@@ -95,12 +96,18 @@ export default function Leads() {
       return
     }
 
+    if (!generateForm.batchName.trim()) {
+      toast.error('Please enter a batch name')
+      return
+    }
+
     try {
       setGenerating(true)
       setGenerationProgress(`Generating leads from ${generateForm.source}...`)
 
-      // Use the new unified generation endpoint
+      // Use the new unified generation endpoint with batch name
       const response = await leadsAPI.generateLeads({
+        batchName: generateForm.batchName,
         industry: generateForm.industry,
         country: generateForm.country,
         city: generateForm.city,
@@ -132,6 +139,7 @@ export default function Leads() {
       
       // Reset form
       setGenerateForm({
+        batchName: '',
         source: 'apollo',
         industry: '',
         country: 'United States',
@@ -888,6 +896,24 @@ export default function Leads() {
                       </div>
                     </label>
                   </div>
+                </div>
+
+                {/* Batch Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Batch Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={generateForm.batchName}
+                    onChange={(e) => setGenerateForm({ ...generateForm, batchName: e.target.value })}
+                    placeholder="e.g., NYC Hotels - March 2024"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    disabled={generating}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Give this batch a descriptive name to organize your leads
+                  </p>
                 </div>
 
                 {/* Industry Filter */}
