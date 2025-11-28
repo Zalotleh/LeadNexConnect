@@ -37,7 +37,7 @@ class AnthropicService {
       const prompt = this.buildPrompt(params)
       
       const message = await this.client.messages.create({
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
         messages: [{
           role: 'user',
@@ -147,7 +147,7 @@ Write a ${tone} email that will get responses. Do not include quotation marks ar
   async testConnection(): Promise<boolean> {
     try {
       const message = await this.client.messages.create({
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 10,
         messages: [{
           role: 'user',
