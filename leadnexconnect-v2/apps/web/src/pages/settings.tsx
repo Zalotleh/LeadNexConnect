@@ -57,7 +57,27 @@ export default function Settings() {
       setLoading(true)
       const response = await api.get('/settings')
       if (response.data.success) {
-        setSettings(response.data.data)
+        const loadedSettings = response.data.data
+        // Ensure all values are strings (not undefined/null) to avoid uncontrolled input warnings
+        setSettings({
+          anthropicApiKey: loadedSettings.anthropicApiKey || '',
+          apolloApiKey: loadedSettings.apolloApiKey || '',
+          hunterApiKey: loadedSettings.hunterApiKey || '',
+          peopleDataLabsApiKey: loadedSettings.peopleDataLabsApiKey || '',
+          googlePlacesApiKey: loadedSettings.googlePlacesApiKey || '',
+          googleCustomSearchApiKey: loadedSettings.googleCustomSearchApiKey || '',
+          googleCustomSearchEngineId: loadedSettings.googleCustomSearchEngineId || '',
+          smtpProvider: loadedSettings.smtpProvider || 'smtp2go',
+          smtpHost: loadedSettings.smtpHost || '',
+          smtpPort: loadedSettings.smtpPort || '',
+          smtpUser: loadedSettings.smtpUser || '',
+          smtpPass: loadedSettings.smtpPass || '',
+          smtpSecure: loadedSettings.smtpSecure || 'false',
+          fromName: loadedSettings.fromName || '',
+          fromEmail: loadedSettings.fromEmail || '',
+          emailsPerHour: loadedSettings.emailsPerHour || 50,
+          dailyEmailLimit: loadedSettings.dailyEmailLimit || 500,
+        })
       }
     } catch (error: any) {
       toast.error('Failed to load settings')

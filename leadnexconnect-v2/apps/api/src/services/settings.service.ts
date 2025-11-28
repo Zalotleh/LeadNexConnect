@@ -25,8 +25,10 @@ interface SettingsData {
   fromEmail?: string;
   
   // Email Settings
+
   emailsPerHour?: number;
   dailyEmailLimit?: number;
+
 }
 
 export class SettingsService {
@@ -35,11 +37,13 @@ export class SettingsService {
 
   /**
    * Get a setting value by key
+
    * Priority: 1. Database, 2. .env file, 3. default value
    */
   async get(key: string, defaultValue?: any): Promise<any> {
     try {
       // Check cache first
+
       const cacheKey = `setting:${key}`;
       if (this.cache.has(cacheKey)) {
         const cached = this.cache.get(cacheKey);
@@ -66,6 +70,7 @@ export class SettingsService {
       if (envValue !== undefined) {
         return envValue;
       }
+
 
       // Return default value
       return defaultValue;
@@ -97,6 +102,8 @@ export class SettingsService {
         hunterApiKey: await this.get('hunterApiKey', process.env.HUNTER_API_KEY),
         peopleDataLabsApiKey: await this.get('peopleDataLabsApiKey', process.env.PEOPLEDATALABS_API_KEY),
         googlePlacesApiKey: await this.get('googlePlacesApiKey', process.env.GOOGLE_PLACES_API_KEY),
+        googleCustomSearchApiKey: await this.get('googleCustomSearchApiKey', process.env.GOOGLE_CUSTOM_SEARCH_API_KEY),
+        googleCustomSearchEngineId: await this.get('googleCustomSearchEngineId', process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID),
         
         // SMTP Config
         smtpProvider: await this.get('smtpProvider', process.env.SMTP_PROVIDER || 'smtp2go'),
@@ -202,6 +209,7 @@ export class SettingsService {
       hunterApiKey: this.maskApiKey(allSettings.hunterApiKey),
       peopleDataLabsApiKey: this.maskApiKey(allSettings.peopleDataLabsApiKey),
       googlePlacesApiKey: this.maskApiKey(allSettings.googlePlacesApiKey),
+      googleCustomSearchApiKey: this.maskApiKey(allSettings.googleCustomSearchApiKey),
       smtpPass: this.maskApiKey(allSettings.smtpPass),
     };
   }
@@ -224,6 +232,8 @@ export class SettingsService {
       hunterApiKey: process.env.HUNTER_API_KEY,
       peopleDataLabsApiKey: process.env.PEOPLEDATALABS_API_KEY,
       googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY,
+      googleCustomSearchApiKey: process.env.GOOGLE_CUSTOM_SEARCH_API_KEY,
+      googleCustomSearchEngineId: process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID,
       smtpProvider: process.env.SMTP_PROVIDER,
       smtpHost: process.env.SMTP_HOST,
       smtpPort: process.env.SMTP_PORT,
