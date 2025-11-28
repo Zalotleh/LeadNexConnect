@@ -3,13 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import leadsService, { Lead } from '@/services/leads.service'
 import { leadsAPI } from '@/services/api'
-import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target } from 'lucide-react'
+import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
 
 export default function Leads() {
   const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')
+  const [viewMode, setViewMode] = useState<'table' | 'batches'>('table')
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [tierFilter, setTierFilter] = useState<string>('all')
   const [showGenerateModal, setShowGenerateModal] = useState(false)
@@ -57,7 +59,15 @@ export default function Leads() {
     },
   })
 
+  // Fetch batches for batch view
+  const { data: batchesData, isLoading: batchesLoading } = useQuery({
+    queryKey: ['batches'],
+    queryFn: async () => await leadsAPI.getBatches(),
+    enabled: viewMode === 'batches',
+  })
+
   const leads: Lead[] = data?.data || []
+  const batches = batchesData?.data || []
 
   // Client-side filtering for score and tier
   const filteredLeads = leads.filter(lead => {
@@ -530,6 +540,34 @@ export default function Leads() {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-4 space-y-4">
+          {/* View Mode Toggle */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+                  viewMode === 'table'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                Table View
+              </button>
+              <button
+                onClick={() => setViewMode('batches')}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+                  viewMode === 'batches'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Package className="w-4 h-4" />
+                Batch View
+              </button>
+            </div>
+          </div>
+
           {/* Search Bar and Status Filters */}
           <div className="flex items-center gap-4">
             <div className="flex-1 relative">
@@ -685,12 +723,15 @@ export default function Leads() {
             </div>
           ) : (
             <>
-              <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{filteredLeads.length}</span> of <span className="font-medium">{leads.length}</span> leads
-                </p>
-              </div>
-              <table className="min-w-full divide-y divide-gray-200">
+              {viewMode === 'table' ? (
+                // Table View
+                <>
+                  <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <p className="text-sm text-gray-700">
+                      Showing <span className="font-medium">{filteredLeads.length}</span> of <span className="font-medium">{leads.length}</span> leads
+                    </p>
+                  </div>
+                  <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left">
@@ -797,6 +838,135 @@ export default function Leads() {
                 })}
               </tbody>
             </table>
+                </>
+              ) : (
+                // Batch View
+                <div className="p-6 space-y-4">
+                  {batchesLoading ? (
+                    <div className="flex justify-center items-center py-12">
+                      <Loader className="w-8 h-8 animate-spin text-primary-600" />
+                    </div>
+                  ) : batches.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Batches Yet</h3>
+                      <p className="text-gray-600">Generate leads with batch names to see them organized here</p>
+                    </div>
+                  ) : (
+                    batches.map((batch: any) => {
+                      const isExpanded = expandedBatches.has(batch.id)
+                      return (
+                        <div key={batch.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                          {/* Batch Header */}
+                          <div
+                            onClick={() => {
+                              const newExpanded = new Set(expandedBatches)
+                              if (isExpanded) {
+                                newExpanded.delete(batch.id)
+                              } else {
+                                newExpanded.add(batch.id)
+                              }
+                              setExpandedBatches(newExpanded)
+                            }}
+                            className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center gap-4 flex-1">
+                              {isExpanded ? (
+                                <ChevronDown className="w-5 h-5 text-gray-500" />
+                              ) : (
+                                <ChevronUp className="w-5 h-5 text-gray-500" />
+                              )}
+                              <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-gray-900">{batch.name}</h3>
+                                <p className="text-sm text-gray-600">
+                                  Generated on {new Date(batch.createdAt).toLocaleDateString()} at {new Date(batch.createdAt).toLocaleTimeString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-6">
+                              <div className="text-center">
+                                <p className="text-2xl font-bold text-primary-600">{batch.leadCount}</p>
+                                <p className="text-xs text-gray-600">Total Leads</p>
+                              </div>
+                              {batch.totalLeads && (
+                                <>
+                                  <div className="text-center">
+                                    <p className="text-2xl font-bold text-green-600">{batch.successfulImports}</p>
+                                    <p className="text-xs text-gray-600">Successful</p>
+                                  </div>
+                                  <div className="text-center">
+                                    <p className="text-2xl font-bold text-yellow-600">{batch.duplicatesSkipped}</p>
+                                    <p className="text-xs text-gray-600">Duplicates</p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Expanded Batch Content */}
+                          {isExpanded && (
+                            <div className="p-4 bg-white">
+                              {batch.sampleLeads && batch.sampleLeads.length > 0 ? (
+                                <>
+                                  <div className="mb-4">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Settings Used:</h4>
+                                    <div className="bg-gray-50 rounded p-3 text-sm space-y-1">
+                                      {batch.settings && (
+                                        <>
+                                          {batch.settings.industry && (
+                                            <p><span className="font-medium">Industry:</span> {batch.settings.industry}</p>
+                                          )}
+                                          {batch.settings.location && (
+                                            <p><span className="font-medium">Location:</span> {batch.settings.location}</p>
+                                          )}
+                                          {batch.settings.source && (
+                                            <p><span className="font-medium">Source:</span> {batch.settings.source}</p>
+                                          )}
+                                          {batch.settings.count && (
+                                            <p><span className="font-medium">Count:</span> {batch.settings.count}</p>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Leads in this Batch:</h4>
+                                  <div className="space-y-2">
+                                    {batch.sampleLeads.map((lead: any) => (
+                                      <div key={lead.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                        <div className="flex-1">
+                                          <h5 className="font-medium text-gray-900">{lead.companyName}</h5>
+                                          <p className="text-sm text-gray-600">{lead.contactName || 'No contact'} • {lead.email || 'No email'}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                            lead.tier === 'A' ? 'bg-green-100 text-green-800' :
+                                            lead.tier === 'B' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-gray-100 text-gray-800'
+                                          }`}>
+                                            Tier {lead.tier}
+                                          </span>
+                                          <span className="text-sm font-medium text-gray-700">Score: {lead.score}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {batch.leadCount > 5 && (
+                                      <p className="text-sm text-gray-500 text-center pt-2">
+                                        Showing 5 of {batch.leadCount} leads. Switch to table view to see all.
+                                      </p>
+                                    )}
+                                  </div>
+                                </>
+                              ) : (
+                                <p className="text-sm text-gray-500 text-center py-4">No leads found in this batch</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>
