@@ -68,7 +68,7 @@ export default function Leads() {
   })
 
   const leads: Lead[] = data?.data || []
-  const batches = batchesData?.data || []
+  const batches = Array.isArray(batchesData?.data) ? batchesData.data : []
 
   // Client-side filtering for score and tier
   const filteredLeads = leads.filter(lead => {
