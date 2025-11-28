@@ -6,7 +6,7 @@ import { leadsAPI } from '@/services/api'
 import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
-import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES } from '@leadnex/shared'
+import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
 
 export default function Leads() {
   const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')

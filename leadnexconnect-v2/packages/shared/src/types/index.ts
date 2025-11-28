@@ -256,19 +256,11 @@ export interface LeadFilters extends PaginationParams {
   createdBefore?: Date;
 }
 
-// Constants
-export const INDUSTRIES = [
-  'spa',
-  'clinic',
-  'tours',
-  'education',
-  'fitness',
-  'repair',
-  'consultancy',
-  'beauty',
-  'activities',
-  'other',
-] as const;
+// Import industry constants from constants folder
+import { INDUSTRIES as INDUSTRY_OPTIONS } from '../constants/industries';
+
+// Re-export for backward compatibility - Industry is now a string (the value field)
+export type Industry = string;
 
 export const COUNTRIES = [
   'United States',
@@ -294,6 +286,6 @@ export const COMPANY_SIZES = [
   '1000+',
 ] as const;
 
-export type Industry = (typeof INDUSTRIES)[number];
 export type Country = (typeof COUNTRIES)[number];
 export type CompanySize = (typeof COMPANY_SIZES)[number];
+
