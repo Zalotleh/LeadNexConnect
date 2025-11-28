@@ -19,6 +19,10 @@ export default function Leads() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
   const [showCreateCampaignModal, setShowCreateCampaignModal] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [editForm, setEditForm] = useState<Partial<Lead>>({})
   const [filters, setFilters] = useState({
     industry: 'all',
     minScore: 0,
@@ -269,6 +273,49 @@ export default function Leads() {
     } catch (error: any) {
       toast.dismiss()
       toast.error(error.response?.data?.error?.message || 'Failed to create campaign')
+    }
+  }
+
+  const handleViewLead = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowViewModal(true)
+  }
+
+  const handleEditLead = (lead: Lead) => {
+    setSelectedLead(lead)
+    setEditForm({
+      companyName: lead.companyName,
+      contactName: lead.contactName,
+      email: lead.email,
+      phone: lead.phone,
+      jobTitle: lead.jobTitle,
+      website: lead.website,
+      industry: lead.industry,
+      city: lead.city,
+      country: lead.country,
+      companySize: lead.companySize,
+      status: lead.status,
+    })
+    setShowEditModal(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedLead) return
+
+    try {
+      toast.loading('Updating lead...')
+      
+      await api.put(`/leads/${selectedLead.id}`, editForm)
+      
+      toast.dismiss()
+      toast.success('Lead updated successfully')
+      setShowEditModal(false)
+      setSelectedLead(null)
+      setEditForm({})
+      refetch()
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.response?.data?.error?.message || 'Failed to update lead')
     }
   }
 
@@ -724,8 +771,18 @@ export default function Leads() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button className="text-primary-600 hover:text-primary-900 mr-3">View</button>
-                      <button className="text-gray-600 hover:text-gray-900">Edit</button>
+                      <button 
+                        onClick={() => handleViewLead(lead)}
+                        className="text-primary-600 hover:text-primary-900 mr-3"
+                      >
+                        View
+                      </button>
+                      <button 
+                        onClick={() => handleEditLead(lead)}
+                        className="text-gray-600 hover:text-gray-900"
+                      >
+                        Edit
+                      </button>
                     </td>
                   </tr>
                   )
@@ -1059,6 +1116,335 @@ export default function Leads() {
                 >
                   <Plus className="w-4 h-4 inline mr-2" />
                   Create Campaign
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* View Lead Modal */}
+        {showViewModal && selectedLead && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-2xl font-bold text-gray-900">Lead Details</h2>
+                <button
+                  onClick={() => {
+                    setShowViewModal(false)
+                    setSelectedLead(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6">
+                {/* Company Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Company Name</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.companyName || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Industry</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.industry || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Website</label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedLead.website ? (
+                          <a href={selectedLead.website} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                            {selectedLead.website}
+                          </a>
+                        ) : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Company Size</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.companySize || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Contact Name</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.contactName || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Job Title</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.jobTitle || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Email</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.email || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Phone</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.phone || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">City</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.city || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Country</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.country || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lead Metrics */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Metrics</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Quality Score</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.qualityScore || 0}/100</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Status</label>
+                      <p className="mt-1">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedLead.status)}`}>
+                          {selectedLead.status?.toUpperCase()}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Source</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedLead.source || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">Source Type</label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedLead.sourceType === 'manual_import' ? 'Imported' : 'Generated'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end p-6 border-t space-x-3">
+                <button
+                  onClick={() => {
+                    setShowViewModal(false)
+                    handleEditLead(selectedLead)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                >
+                  Edit Lead
+                </button>
+                <button
+                  onClick={() => {
+                    setShowViewModal(false)
+                    setSelectedLead(null)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Lead Modal */}
+        {showEditModal && selectedLead && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-2xl font-bold text-gray-900">Edit Lead</h2>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setSelectedLead(null)
+                    setEditForm({})
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6">
+                {/* Company Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                      <input
+                        type="text"
+                        value={editForm.companyName || ''}
+                        onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                      <input
+                        type="text"
+                        value={editForm.industry || ''}
+                        onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                      <input
+                        type="url"
+                        value={editForm.website || ''}
+                        onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                        placeholder="https://example.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Size</label>
+                      <select
+                        value={editForm.companySize || ''}
+                        onChange={(e) => setEditForm({ ...editForm, companySize: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="">Select size</option>
+                        <option value="1-10">1-10</option>
+                        <option value="11-50">11-50</option>
+                        <option value="51-200">51-200</option>
+                        <option value="201-500">201-500</option>
+                        <option value="501-1000">501-1000</option>
+                        <option value="1000+">1000+</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                      <input
+                        type="text"
+                        value={editForm.contactName || ''}
+                        onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                      <input
+                        type="text"
+                        value={editForm.jobTitle || ''}
+                        onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editForm.email || ''}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={editForm.phone || ''}
+                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                      <input
+                        type="text"
+                        value={editForm.city || ''}
+                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                      <input
+                        type="text"
+                        value={editForm.country || ''}
+                        onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Status</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={editForm.status || ''}
+                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="new">New</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="qualified">Qualified</option>
+                        <option value="unqualified">Unqualified</option>
+                        <option value="responded">Responded</option>
+                        <option value="interested">Interested</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end p-6 border-t space-x-3">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setSelectedLead(null)
+                    setEditForm({})
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={!editForm.companyName}
+                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Changes
                 </button>
               </div>
             </div>

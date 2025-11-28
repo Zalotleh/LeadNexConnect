@@ -11,6 +11,8 @@ export interface Lead {
   location?: string
   city?: string
   country?: string
+  jobTitle?: string
+  companySize?: string
   status: string
   score?: number
   qualityScore?: number
