@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { settingsService } from '../services/settings.service';
+import { emailSenderService } from '../services/outreach/email-sender.service';
 import { logger } from '../utils/logger';
 
 export class SettingsController {
@@ -19,6 +20,16 @@ export class SettingsController {
       const settingsData = req.body;
       logger.info('[SettingsController] Updating settings', { keys: Object.keys(settingsData) });
       await settingsService.updateMany(settingsData);
+      
+      // Check if any SMTP settings were updated
+      const smtpKeys = ['smtpProvider', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'smtpSecure', 'fromName', 'fromEmail'];
+      const hasSmtpUpdate = Object.keys(settingsData).some(key => smtpKeys.includes(key));
+      
+      if (hasSmtpUpdate) {
+        logger.info('[SettingsController] SMTP settings updated, resetting email transporter');
+        emailSenderService.resetTransporter();
+      }
+      
       res.json({ success: true, message: 'Settings updated successfully' });
     } catch (error: any) {
       logger.error('[SettingsController] Error updating settings', { error: error.message });

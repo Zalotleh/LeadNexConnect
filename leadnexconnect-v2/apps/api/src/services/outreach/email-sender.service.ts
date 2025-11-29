@@ -27,23 +27,32 @@ export class EmailSenderService {
    */
   private async getSMTPConfig(): Promise<SMTPConfig> {
     try {
-      // Try to get from database settings first
-      const settingsResults = await db
-        .select()
-        .from(settings)
-        .where(eq(settings.key, 'smtp_config'))
-        .limit(1);
-
-      if (settingsResults[0]?.value) {
-        const config = settingsResults[0].value as any;
-        logger.info('[EmailSender] Using SMTP config from database');
+      // Try to get individual SMTP settings from database via settingsService
+      const provider = await settingsService.get('smtpProvider', null);
+      
+      // If we have a provider in database, use database settings
+      if (provider) {
+        logger.info('[EmailSender] Using SMTP config from database settings');
+        
+        const config = {
+          provider,
+          host: await settingsService.get('smtpHost', process.env.SMTP_HOST || 'localhost'),
+          port: parseInt(await settingsService.get('smtpPort', process.env.SMTP_PORT || '587')),
+          secure: (await settingsService.get('smtpSecure', process.env.SMTP_SECURE || 'false')) === 'true',
+          user: await settingsService.get('smtpUser', process.env.SMTP_USER || ''),
+          pass: await settingsService.get('smtpPass', process.env.SMTP_PASS || ''),
+          fromName: await settingsService.get('fromName', process.env.FROM_NAME || 'BookNex Solutions'),
+          fromEmail: await settingsService.get('fromEmail', process.env.FROM_EMAIL || ''),
+        };
+        
         return this.buildSMTPConfig(config);
       }
     } catch (error: any) {
-      logger.warn('[EmailSender] Could not load SMTP from database, using env vars');
+      logger.warn('[EmailSender] Could not load SMTP from database, using env vars', { error: error.message });
     }
 
     // Fallback to environment variables
+    logger.info('[EmailSender] Using SMTP config from .env file');
     return this.buildSMTPConfigFromEnv();
   }
 
@@ -378,6 +387,15 @@ export class EmailSenderService {
       fromEmail: config.fromEmail,
       // Don't return auth credentials
     };
+  }
+
+  /**
+   * Reset transporter to force reinitialization with new settings
+   */
+  resetTransporter(): void {
+    this.transporter = null;
+    this.currentConfig = null;
+    logger.info('[EmailSender] Transporter reset - will reinitialize with new settings on next email');
   }
 
   /**
