@@ -288,8 +288,6 @@ export default function Leads() {
     emailSubject: '',
     emailBody: '',
     startTime: '', // Optional start time for campaign
-    daysBetweenEmails: 1, // Default 1 day between emails
-    followUpCount: 0, // Default no follow-ups
     workflowId: null as string | null, // Selected workflow ID
   })
 
@@ -358,12 +356,6 @@ export default function Leads() {
       if (createCampaignForm.startTime) {
         campaignData.startTime = createCampaignForm.startTime
       }
-      if (createCampaignForm.daysBetweenEmails) {
-        campaignData.daysBetweenEmails = createCampaignForm.daysBetweenEmails
-      }
-      if (createCampaignForm.followUpCount) {
-        campaignData.followUpCount = createCampaignForm.followUpCount
-      }
 
       const campaignResponse = await api.post('/campaigns', campaignData)
 
@@ -385,8 +377,6 @@ export default function Leads() {
         emailSubject: '', 
         emailBody: '',
         startTime: '',
-        daysBetweenEmails: 1,
-        followUpCount: 0,
         workflowId: null,
       })
       
@@ -1537,42 +1527,6 @@ export default function Leads() {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       />
                       <p className="text-xs text-gray-500 mt-1">Leave empty to start immediately</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Days Between Emails
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="30"
-                        value={createCampaignForm.daysBetweenEmails}
-                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, daysBetweenEmails: parseInt(e.target.value) || 1 })}
-                        disabled={!!createCampaignForm.workflowId}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        {createCampaignForm.workflowId ? 'Managed by workflow' : 'For follow-up sequences'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Follow-Up Emails
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="5"
-                        value={createCampaignForm.followUpCount}
-                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, followUpCount: parseInt(e.target.value) || 0 })}
-                        disabled={!!createCampaignForm.workflowId}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        {createCampaignForm.workflowId ? 'Managed by workflow' : '0 = one-time send'}
-                      </p>
                     </div>
                   </div>
                 </div>
