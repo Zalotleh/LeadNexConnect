@@ -632,6 +632,9 @@ export class CampaignsController {
         continue;
       }
 
+      // Calculate cumulative delays for each step
+      let cumulativeDelayMinutes = 0;
+
       // Queue all steps for this lead with appropriate delays
       for (const step of steps) {
         try {
@@ -639,13 +642,17 @@ export class CampaignsController {
           const subject = this.replaceTemplateVariables(step.subject, lead);
           const bodyText = this.replaceTemplateVariables(step.body, lead);
 
-          // Calculate delay: first step sends immediately, others wait
-          const delayMinutes = (step.daysAfterPrevious || 0) * 24 * 60; // Convert days to minutes
+          // Calculate cumulative delay from campaign start
+          // First step sends immediately (cumulativeDelayMinutes = 0)
+          // Subsequent steps add their daysAfterPrevious to the cumulative total
+          if (step.stepNumber > 1) {
+            cumulativeDelayMinutes += (step.daysAfterPrevious || 0) * 24 * 60;
+          }
 
           // Queue email - let email sender service handle HTML conversion
-          if (delayMinutes > 0) {
-            // Schedule for later
-            const sendAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+          if (cumulativeDelayMinutes > 0) {
+            // Schedule for later based on cumulative delay
+            const sendAt = new Date(Date.now() + cumulativeDelayMinutes * 60 * 1000);
             await emailQueueService.scheduleEmail({
               leadId: lead.id,
               campaignId: campaignId,
@@ -661,8 +668,16 @@ export class CampaignsController {
                 workflowStepId: step.id,
               },
             }, sendAt);
+            
+            logger.info('[CampaignsController] Workflow step scheduled', { 
+              leadId: lead.id,
+              stepNumber: step.stepNumber,
+              delayDays: step.daysAfterPrevious,
+              cumulativeDelayMinutes,
+              sendAt: sendAt.toISOString(),
+            });
           } else {
-            // Send immediately
+            // Send immediately (first step)
             await emailQueueService.addEmail({
               leadId: lead.id,
               campaignId: campaignId,
@@ -678,15 +693,14 @@ export class CampaignsController {
                 workflowStepId: step.id,
               },
             });
+            
+            logger.info('[CampaignsController] Workflow step queued immediately', { 
+              leadId: lead.id,
+              stepNumber: step.stepNumber,
+            });
           }
 
           totalEmailsQueued++;
-          
-          logger.info('[CampaignsController] Workflow step queued', { 
-            leadId: lead.id,
-            stepNumber: step.stepNumber,
-            delayDays: step.daysAfterPrevious,
-          });
 
         } catch (error: any) {
           logger.error('[CampaignsController] Error queuing workflow step', {
@@ -805,13 +819,29 @@ export class CampaignsController {
    * Replace template variables with lead data
    */
   private replaceTemplateVariables(text: string, lead: any): string {
-    // BookNex signature HTML
+    // BookNex signature HTML with logo and professional design
     const signature = `
 <br><br>
-Best regards,<br>
-<strong>BookNex Solutions</strong><br>
-<a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none;">www.booknexsolutions.com</a><br>
-<a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none;">support@booknexsolutions.com</a>
+Best regards,<br><br>
+<table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;">
+  <tr>
+    <td style="padding-right: 15px; vertical-align: top; border-right: 2px solid #2563eb;">
+      <img src="https://booknexsolutions.com/wp-content/uploads/2025/08/Logo-Png-Clean-1.png" alt="BookNex Solutions" width="120" style="display: block;">
+    </td>
+    <td style="padding-left: 15px; vertical-align: top;">
+      <strong style="font-size: 16px; color: #1e293b;">BookNex Solutions</strong><br>
+      <span style="font-size: 12px; color: #64748b;">Smart Booking Management</span><br><br>
+      <a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none; font-size: 13px;">🌐 www.booknexsolutions.com</a><br>
+      <a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none; font-size: 13px;">✉️ support@booknexsolutions.com</a><br>
+      <a href="https://www.linkedin.com/company/booknex-solutions/" style="color: #2563eb; text-decoration: none; font-size: 13px;">💼 Connect on LinkedIn</a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" style="padding-top: 12px;">
+      <span style="font-size: 11px; color: #94a3b8;">Streamline your bookings • Reduce no-shows • Grow your business</span>
+    </td>
+  </tr>
+</table>
     `.trim();
 
     return text

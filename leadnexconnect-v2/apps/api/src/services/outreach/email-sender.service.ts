@@ -24,15 +24,49 @@ export class EmailSenderService {
 
   /**
    * Convert plain text to HTML with proper formatting
+   * Handles inline HTML elements (links, etc.) that should not be escaped
    */
   private convertTextToHtml(text: string): string {
-    // Escape HTML characters
+    // First, temporarily replace HTML link tags with placeholders to protect them
+    const linkPlaceholders: { [key: string]: string } = {};
+    let linkCounter = 0;
+    
+    // Protect existing <a> tags
+    text = text.replace(/<a\s+[^>]*>.*?<\/a>/g, (match) => {
+      const placeholder = `__LINK_${linkCounter}__`;
+      linkPlaceholders[placeholder] = match;
+      linkCounter++;
+      return placeholder;
+    });
+    
+    // Protect existing <br> tags
+    text = text.replace(/<br\s*\/?>/gi, (match) => {
+      const placeholder = `__BR_${linkCounter}__`;
+      linkPlaceholders[placeholder] = match;
+      linkCounter++;
+      return placeholder;
+    });
+    
+    // Protect existing <strong> tags
+    text = text.replace(/<strong>.*?<\/strong>/g, (match) => {
+      const placeholder = `__STRONG_${linkCounter}__`;
+      linkPlaceholders[placeholder] = match;
+      linkCounter++;
+      return placeholder;
+    });
+
+    // Escape HTML characters in the remaining text
     let html = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+
+    // Restore protected HTML elements
+    for (const [placeholder, original] of Object.entries(linkPlaceholders)) {
+      html = html.replace(placeholder, original);
+    }
 
     // Convert bullet points (lines starting with -, *, or •)
     html = html.replace(/^[\-\*•]\s+(.+)$/gm, '<li>$1</li>');
