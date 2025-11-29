@@ -266,6 +266,90 @@ Format your response as a JSON array with this structure:
   }
 
   /**
+   * Update workflow
+   */
+  async updateWorkflow(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { name, description, steps } = req.body;
+      
+      logger.info(`[WorkflowsController] Updating workflow ${id}`);
+
+      // Check if workflow exists
+      const [workflow] = await db
+        .select()
+        .from(workflows)
+        .where(eq(workflows.id, id))
+        .limit(1);
+
+      if (!workflow) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Workflow not found' },
+        });
+      }
+
+      // Update workflow
+      await db
+        .update(workflows)
+        .set({
+          name: name || workflow.name,
+          description: description !== undefined ? description : workflow.description,
+          updatedAt: new Date(),
+        })
+        .where(eq(workflows.id, id));
+
+      // Update steps if provided
+      if (steps && Array.isArray(steps)) {
+        for (const step of steps) {
+          if (step.id) {
+            await db
+              .update(workflowSteps)
+              .set({
+                subject: step.subject,
+                body: step.body,
+                daysAfterPrevious: step.daysAfterPrevious,
+              })
+              .where(eq(workflowSteps.id, step.id));
+          }
+        }
+      }
+
+      // Fetch updated workflow with steps
+      const [updatedWorkflow] = await db
+        .select()
+        .from(workflows)
+        .where(eq(workflows.id, id))
+        .limit(1);
+
+      const updatedSteps = await db
+        .select()
+        .from(workflowSteps)
+        .where(eq(workflowSteps.workflowId, id))
+        .orderBy(workflowSteps.stepNumber);
+
+      logger.info(`[WorkflowsController] Updated workflow ${id}`);
+
+      res.json({
+        success: true,
+        data: {
+          ...updatedWorkflow,
+          steps: updatedSteps,
+        },
+      });
+    } catch (error: any) {
+      logger.error('[WorkflowsController] Error updating workflow:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to update workflow',
+          details: error.message,
+        },
+      });
+    }
+  }
+
+  /**
    * Delete workflow
    */
   async deleteWorkflow(req: Request, res: Response) {

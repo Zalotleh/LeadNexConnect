@@ -174,7 +174,8 @@ export default function Workflows() {
             {workflows.map((workflow) => (
               <div
                 key={workflow.id}
-                className="bg-white rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200"
+                onClick={() => window.location.href = `/workflows/${workflow.id}`}
+                className="bg-white rounded-lg shadow hover:shadow-md transition-shadow border border-gray-200 cursor-pointer"
               >
                 <div className="p-6">
                   {/* Header */}
@@ -191,7 +192,10 @@ export default function Workflows() {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => deleteMutation.mutate(workflow.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMutation.mutate(workflow.id);
+                        }}
                         className="text-red-600 hover:text-red-700 p-1"
                         title="Delete"
                       >
