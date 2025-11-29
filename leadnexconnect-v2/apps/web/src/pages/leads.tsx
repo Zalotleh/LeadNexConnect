@@ -286,6 +286,9 @@ export default function Leads() {
     description: '',
     emailSubject: '',
     emailBody: '',
+    startTime: '', // Optional start time for campaign
+    daysBetweenEmails: 1, // Default 1 day between emails
+    followUpCount: 0, // Default no follow-ups
   })
 
   const handleGenerateAIContent = async () => {
@@ -349,7 +352,15 @@ export default function Leads() {
       
       setShowCreateCampaignModal(false)
       setSelectedLeads(new Set())
-      setCreateCampaignForm({ name: '', description: '', emailSubject: '', emailBody: '' })
+      setCreateCampaignForm({ 
+        name: '', 
+        description: '', 
+        emailSubject: '', 
+        emailBody: '',
+        startTime: '',
+        daysBetweenEmails: 1,
+        followUpCount: 0,
+      })
       
     } catch (error: any) {
       toast.dismiss()
@@ -1461,6 +1472,56 @@ export default function Leads() {
                   <p className="text-xs text-gray-500 mt-2">
                     Available variables: {'{{companyName}}'}, {'{{contactName}}'}, {'{{website}}'}, {'{{industry}}'}
                   </p>
+                </div>
+
+                {/* Schedule Options */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Schedule Options</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Start Time (Optional)
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={createCampaignForm.startTime}
+                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, startTime: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Leave empty to start immediately</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Days Between Emails
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={createCampaignForm.daysBetweenEmails}
+                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, daysBetweenEmails: parseInt(e.target.value) || 1 })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">For follow-up sequences</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Follow-Up Emails
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="5"
+                        value={createCampaignForm.followUpCount}
+                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, followUpCount: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">0 = one-time send</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
