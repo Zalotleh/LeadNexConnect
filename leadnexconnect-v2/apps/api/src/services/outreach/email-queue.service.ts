@@ -1,6 +1,8 @@
 import Bull, { Job } from 'bull';
 import { logger } from '../../utils/logger';
 import { emailSenderService } from './email-sender.service';
+import { db, campaigns } from '@leadnex/database';
+import { eq } from 'drizzle-orm';
 
 // Redis connection configuration
 const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
@@ -173,8 +175,35 @@ export class EmailQueueService {
       logger.info('[EmailQueue] Processing email job', {
         jobId: job.id,
         to: data.to,
+        campaignId: data.campaignId,
         attempt: job.attemptsMade + 1,
       });
+
+      // Check if campaign is still active (if campaignId is provided)
+      if (data.campaignId) {
+        const campaign = await db
+          .select()
+          .from(campaigns)
+          .where(eq(campaigns.id, data.campaignId))
+          .limit(1);
+
+        if (!campaign[0]) {
+          logger.warn('[EmailQueue] Campaign not found, cancelling job', {
+            jobId: job.id,
+            campaignId: data.campaignId,
+          });
+          throw new Error('Campaign not found');
+        }
+
+        if (campaign[0].status !== 'active') {
+          logger.warn('[EmailQueue] Campaign not active, cancelling job', {
+            jobId: job.id,
+            campaignId: data.campaignId,
+            status: campaign[0].status,
+          });
+          throw new Error(`Campaign is ${campaign[0].status}, not sending email`);
+        }
+      }
 
       // Check rate limits before sending
       const canSend = await this.checkRateLimit();
@@ -305,6 +334,48 @@ export class EmailQueueService {
   async clearQueue(): Promise<void> {
     logger.warn('[EmailQueue] Clearing queue');
     await this.queue.empty();
+  }
+
+  /**
+   * Cancel all jobs for a specific campaign
+   */
+  async cancelCampaignJobs(campaignId: string): Promise<number> {
+    try {
+      logger.info('[EmailQueue] Cancelling jobs for campaign', { campaignId });
+      
+      // Get all waiting and delayed jobs
+      const waitingJobs = await this.queue.getWaiting();
+      const delayedJobs = await this.queue.getDelayed();
+      const allPendingJobs = [...waitingJobs, ...delayedJobs];
+      
+      let cancelledCount = 0;
+      
+      // Remove jobs that belong to this campaign
+      for (const job of allPendingJobs) {
+        if (job.data.campaignId === campaignId) {
+          await job.remove();
+          cancelledCount++;
+          logger.info('[EmailQueue] Cancelled job', {
+            jobId: job.id,
+            campaignId,
+            to: job.data.to,
+          });
+        }
+      }
+      
+      logger.info('[EmailQueue] Campaign jobs cancelled', {
+        campaignId,
+        cancelledCount,
+      });
+      
+      return cancelledCount;
+    } catch (error: any) {
+      logger.error('[EmailQueue] Error cancelling campaign jobs', {
+        campaignId,
+        error: error.message,
+      });
+      throw error;
+    }
   }
 
   /**

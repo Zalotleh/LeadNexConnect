@@ -980,6 +980,20 @@ export class CampaignsController {
         });
       }
 
+      // Cancel all queued jobs for this campaign
+      try {
+        const cancelledCount = await emailQueueService.cancelCampaignJobs(id);
+        logger.info('[CampaignsController] Cancelled queued jobs for campaign', {
+          campaignId: id,
+          cancelledCount,
+        });
+      } catch (error: any) {
+        logger.error('[CampaignsController] Error cancelling jobs', {
+          campaignId: id,
+          error: error.message,
+        });
+      }
+
       res.json({
         success: true,
         data: updated[0],
