@@ -24,7 +24,7 @@ export interface EmailJob {
   to: string;
   subject: string;
   bodyText: string;
-  bodyHtml: string;
+  bodyHtml?: string;
   followUpStage: string;
   metadata?: any;
 }

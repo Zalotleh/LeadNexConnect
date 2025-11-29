@@ -643,21 +643,42 @@ export class CampaignsController {
           const delayMinutes = (step.daysAfterPrevious || 0) * 24 * 60; // Convert days to minutes
 
           // Queue email - let email sender service handle HTML conversion
-          await emailQueueService.addEmail({
-            leadId: lead.id,
-            campaignId: campaignId,
-            to: lead.email,
-            subject,
-            bodyText,
-            bodyHtml: undefined, // Let email sender convert to HTML
-            followUpStage: step.stepNumber === 1 ? 'initial' : `follow_up_${step.stepNumber - 1}`,
-            metadata: {
-              companyName: lead.companyName,
-              industry: lead.industry,
-              workflowStepNumber: step.stepNumber,
-              workflowStepId: step.id,
-            },
-          }, delayMinutes);
+          if (delayMinutes > 0) {
+            // Schedule for later
+            const sendAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+            await emailQueueService.scheduleEmail({
+              leadId: lead.id,
+              campaignId: campaignId,
+              to: lead.email,
+              subject,
+              bodyText,
+              bodyHtml: undefined, // Let email sender convert to HTML
+              followUpStage: step.stepNumber === 1 ? 'initial' : `follow_up_${step.stepNumber - 1}`,
+              metadata: {
+                companyName: lead.companyName,
+                industry: lead.industry,
+                workflowStepNumber: step.stepNumber,
+                workflowStepId: step.id,
+              },
+            }, sendAt);
+          } else {
+            // Send immediately
+            await emailQueueService.addEmail({
+              leadId: lead.id,
+              campaignId: campaignId,
+              to: lead.email,
+              subject,
+              bodyText,
+              bodyHtml: undefined, // Let email sender convert to HTML
+              followUpStage: step.stepNumber === 1 ? 'initial' : `follow_up_${step.stepNumber - 1}`,
+              metadata: {
+                companyName: lead.companyName,
+                industry: lead.industry,
+                workflowStepNumber: step.stepNumber,
+                workflowStepId: step.id,
+              },
+            });
+          }
 
           totalEmailsQueued++;
           
