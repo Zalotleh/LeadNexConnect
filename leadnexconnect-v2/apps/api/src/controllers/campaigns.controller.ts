@@ -428,79 +428,18 @@ export class CampaignsController {
 
       logger.info(`[CampaignsController] Fetched ${campaignLeadsList.length} lead details`);
 
-      // Get email template for the campaign
-      const templateResults = await db
-        .select()
-        .from(emailTemplates)
-        .where(eq(emailTemplates.id, campaign.emailTemplateId))
-        .limit(1);
-
-      if (!templateResults[0]) {
-        logger.error('[CampaignsController] Email template not found for manual campaign');
-        return;
+      // Check if campaign uses workflow or single template
+      if (campaign.workflowId) {
+        // Execute workflow sequence
+        await this.executeWorkflowSequence(campaignId, campaign, campaignLeadsList);
+      } else {
+        // Execute single email template
+        await this.executeSingleTemplate(campaignId, campaign, campaignLeadsList);
       }
-
-      const template = templateResults[0];
-      let emailsQueued = 0;
-
-      // Send emails to each lead
-      for (const lead of campaignLeadsList) {
-        try {
-          if (!lead.email) {
-            logger.warn('[CampaignsController] Lead has no email', { leadId: lead.id });
-            continue;
-          }
-
-          // Replace template variables with lead data
-          const subject = this.replaceTemplateVariables(template.subject, lead);
-          const bodyText = this.replaceTemplateVariables(template.bodyText, lead);
-          const bodyHtml = template.bodyHtml 
-            ? this.replaceTemplateVariables(template.bodyHtml, lead)
-            : bodyText;
-
-          // Queue email for sending
-          await emailQueueService.addEmail({
-            leadId: lead.id,
-            campaignId: campaignId,
-            to: lead.email,
-            subject,
-            bodyText,
-            bodyHtml,
-            followUpStage: 'initial',
-            metadata: {
-              companyName: lead.companyName,
-              industry: lead.industry,
-            },
-          });
-
-          emailsQueued++;
-          logger.info('[CampaignsController] Email queued for lead', { 
-            leadId: lead.id, 
-            email: lead.email 
-          });
-
-          // Small delay to avoid overwhelming the queue
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (error: any) {
-          logger.error('[CampaignsController] Error queuing email for lead', {
-            leadId: lead.id,
-            error: error.message,
-          });
-        }
-      }
-
-      // Update campaign metrics
-      await db
-        .update(campaigns)
-        .set({
-          emailsSent: (campaign.emailsSent || 0) + emailsQueued,
-          lastRunAt: new Date(),
-        })
-        .where(eq(campaigns.id, campaignId));
 
       logger.info('[CampaignsController] Manual campaign execution completed', {
         campaignId,
-        emailsQueued,
+        leadsProcessed: campaignLeadsList.length,
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error executing manual campaign', {
@@ -509,6 +448,188 @@ export class CampaignsController {
       });
       throw error;
     }
+  }
+
+  /**
+   * Execute workflow sequence for campaign leads
+   */
+  private async executeWorkflowSequence(campaignId: string, campaign: any, campaignLeadsList: any[]) {
+    const { workflowSteps } = await import('@leadnex/database');
+    
+    logger.info('[CampaignsController] Executing workflow sequence', { 
+      workflowId: campaign.workflowId 
+    });
+
+    // Get workflow steps
+    const steps = await db
+      .select()
+      .from(workflowSteps)
+      .where(eq(workflowSteps.workflowId, campaign.workflowId))
+      .orderBy(workflowSteps.stepNumber);
+
+    if (steps.length === 0) {
+      logger.error('[CampaignsController] No steps found for workflow', {
+        workflowId: campaign.workflowId
+      });
+      return;
+    }
+
+    logger.info(`[CampaignsController] Found ${steps.length} workflow steps`);
+
+    let totalEmailsQueued = 0;
+
+    // Process each lead
+    for (const lead of campaignLeadsList) {
+      if (!lead.email) {
+        logger.warn('[CampaignsController] Lead has no email', { leadId: lead.id });
+        continue;
+      }
+
+      // Queue all steps for this lead with appropriate delays
+      for (const step of steps) {
+        try {
+          // Replace template variables
+          const subject = this.replaceTemplateVariables(step.subject, lead);
+          const bodyText = this.replaceTemplateVariables(step.body, lead);
+
+          // Calculate delay: first step sends immediately, others wait
+          const delayMinutes = (step.daysAfterPrevious || 0) * 24 * 60; // Convert days to minutes
+
+          // Queue email
+          await emailQueueService.addEmail({
+            leadId: lead.id,
+            campaignId: campaignId,
+            to: lead.email,
+            subject,
+            bodyText,
+            bodyHtml: bodyText, // Use same content for HTML
+            followUpStage: step.stepNumber === 1 ? 'initial' : `follow_up_${step.stepNumber - 1}`,
+            metadata: {
+              companyName: lead.companyName,
+              industry: lead.industry,
+              workflowStepNumber: step.stepNumber,
+              workflowStepId: step.id,
+            },
+          }, delayMinutes);
+
+          totalEmailsQueued++;
+          
+          logger.info('[CampaignsController] Workflow step queued', { 
+            leadId: lead.id,
+            stepNumber: step.stepNumber,
+            delayDays: step.daysAfterPrevious,
+          });
+
+        } catch (error: any) {
+          logger.error('[CampaignsController] Error queuing workflow step', {
+            leadId: lead.id,
+            stepNumber: step.stepNumber,
+            error: error.message,
+          });
+        }
+      }
+
+      // Small delay between leads
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // Update campaign metrics
+    await db
+      .update(campaigns)
+      .set({
+        emailsSent: (campaign.emailsSent || 0) + totalEmailsQueued,
+        lastRunAt: new Date(),
+      })
+      .where(eq(campaigns.id, campaignId));
+
+    logger.info('[CampaignsController] Workflow execution complete', {
+      campaignId,
+      totalEmailsQueued,
+      leadsProcessed: campaignLeadsList.length,
+      stepsPerLead: steps.length,
+    });
+  }
+
+  /**
+   * Execute single email template for campaign leads
+   */
+  private async executeSingleTemplate(campaignId: string, campaign: any, campaignLeadsList: any[]) {
+    logger.info('[CampaignsController] Executing single email template');
+
+    // Get email template for the campaign
+    const templateResults = await db
+      .select()
+      .from(emailTemplates)
+      .where(eq(emailTemplates.id, campaign.emailTemplateId))
+      .limit(1);
+
+    if (!templateResults[0]) {
+      logger.error('[CampaignsController] Email template not found for manual campaign');
+      return;
+    }
+
+    const template = templateResults[0];
+    let emailsQueued = 0;
+
+    // Send emails to each lead
+    for (const lead of campaignLeadsList) {
+      try {
+        if (!lead.email) {
+          logger.warn('[CampaignsController] Lead has no email', { leadId: lead.id });
+          continue;
+        }
+
+        // Replace template variables with lead data
+        const subject = this.replaceTemplateVariables(template.subject, lead);
+        const bodyText = this.replaceTemplateVariables(template.bodyText, lead);
+        const bodyHtml = template.bodyHtml 
+          ? this.replaceTemplateVariables(template.bodyHtml, lead)
+          : bodyText;
+
+        // Queue email for sending
+        await emailQueueService.addEmail({
+          leadId: lead.id,
+          campaignId: campaignId,
+          to: lead.email,
+          subject,
+          bodyText,
+          bodyHtml,
+          followUpStage: 'initial',
+          metadata: {
+            companyName: lead.companyName,
+            industry: lead.industry,
+          },
+        });
+
+        emailsQueued++;
+        logger.info('[CampaignsController] Email queued for lead', { 
+          leadId: lead.id, 
+          email: lead.email 
+        });
+
+        // Small delay to avoid overwhelming the queue
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error: any) {
+        logger.error('[CampaignsController] Error queuing email for lead', {
+          leadId: lead.id,
+          error: error.message,
+        });
+      }
+    }
+
+    // Update campaign metrics
+    await db
+      .update(campaigns)
+      .set({
+        emailsSent: (campaign.emailsSent || 0) + emailsQueued,
+        lastRunAt: new Date(),
+      })
+      .where(eq(campaigns.id, campaignId));
+
+    logger.info('[CampaignsController] Single template execution complete', {
+      campaignId,
+      emailsQueued,
+    });
   }
 
   /**
