@@ -1549,9 +1549,12 @@ export default function Leads() {
                         max="30"
                         value={createCampaignForm.daysBetweenEmails}
                         onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, daysBetweenEmails: parseInt(e.target.value) || 1 })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        disabled={!!createCampaignForm.workflowId}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
-                      <p className="text-xs text-gray-500 mt-1">For follow-up sequences</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {createCampaignForm.workflowId ? 'Managed by workflow' : 'For follow-up sequences'}
+                      </p>
                     </div>
 
                     <div>
@@ -1564,9 +1567,12 @@ export default function Leads() {
                         max="5"
                         value={createCampaignForm.followUpCount}
                         onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, followUpCount: parseInt(e.target.value) || 0 })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        disabled={!!createCampaignForm.workflowId}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
-                      <p className="text-xs text-gray-500 mt-1">0 = one-time send</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {createCampaignForm.workflowId ? 'Managed by workflow' : '0 = one-time send'}
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -52,6 +52,14 @@ interface Workflow {
   steps?: WorkflowStep[]
 }
 
+interface EmailTemplate {
+  id: string
+  name: string
+  subject: string
+  bodyText: string
+  bodyHtml: string | null
+}
+
 interface Campaign {
   id: string
   name: string
@@ -79,6 +87,7 @@ interface Campaign {
   createdAt: string
   updatedAt: string
   workflow?: Workflow
+  emailTemplate?: EmailTemplate
 }
 
 export default function CampaignDetail() {
@@ -619,6 +628,24 @@ export default function CampaignDetail() {
                           <p className="text-sm text-gray-600">
                             {campaign.workflow.stepsCount} email steps
                           </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!campaign.workflow && campaign.emailTemplate && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Template
+                      </label>
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1">Subject</p>
+                          <p className="text-sm font-medium text-gray-900">{campaign.emailTemplate.subject}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1">Body</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{campaign.emailTemplate.bodyText}</p>
                         </div>
                       </div>
                     </div>

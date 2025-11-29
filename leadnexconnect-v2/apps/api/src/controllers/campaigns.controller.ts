@@ -82,6 +82,20 @@ export class CampaignsController {
         }
       }
 
+      // Get email template data if campaign has emailTemplateId
+      let emailTemplateData = null;
+      if (campaignData.emailTemplateId) {
+        const emailTemplateResults = await db
+          .select()
+          .from(emailTemplates)
+          .where(eq(emailTemplates.id, campaignData.emailTemplateId))
+          .limit(1);
+
+        if (emailTemplateResults.length > 0) {
+          emailTemplateData = emailTemplateResults[0];
+        }
+      }
+
       // Get campaign leads via emails table
       const campaignEmails = await db
         .select()
@@ -94,6 +108,7 @@ export class CampaignsController {
         data: {
           ...campaignData,
           workflow: workflowData,
+          emailTemplate: emailTemplateData,
           leads: campaignEmails.map(e => e.leads),
         },
       });
@@ -627,14 +642,14 @@ export class CampaignsController {
           // Calculate delay: first step sends immediately, others wait
           const delayMinutes = (step.daysAfterPrevious || 0) * 24 * 60; // Convert days to minutes
 
-          // Queue email
+          // Queue email - let email sender service handle HTML conversion
           await emailQueueService.addEmail({
             leadId: lead.id,
             campaignId: campaignId,
             to: lead.email,
             subject,
             bodyText,
-            bodyHtml: bodyText, // Use same content for HTML
+            bodyHtml: undefined, // Let email sender convert to HTML
             followUpStage: step.stepNumber === 1 ? 'initial' : `follow_up_${step.stepNumber - 1}`,
             metadata: {
               companyName: lead.companyName,
@@ -714,9 +729,10 @@ export class CampaignsController {
         // Replace template variables with lead data
         const subject = this.replaceTemplateVariables(template.subject, lead);
         const bodyText = this.replaceTemplateVariables(template.bodyText, lead);
+        // Let email sender service handle HTML conversion
         const bodyHtml = template.bodyHtml 
           ? this.replaceTemplateVariables(template.bodyHtml, lead)
-          : bodyText;
+          : undefined;
 
         // Queue email for sending
         await emailQueueService.addEmail({
