@@ -165,6 +165,7 @@ export const campaigns = pgTable('campaigns', {
   // Configuration
   leadsPerDay: integer('leads_per_day').default(50),
   emailTemplateId: uuid('email_template_id'),
+  workflowId: uuid('workflow_id').references(() => workflows.id, { onDelete: 'set null' }),
   followUpEnabled: boolean('follow_up_enabled').default(true),
   followUp1DelayDays: integer('follow_up_1_delay_days').default(3),
   followUp2DelayDays: integer('follow_up_2_delay_days').default(5),
@@ -512,9 +513,13 @@ export const leadBatchesRelations = relations(leadBatches, ({ many }) => ({
   leads: many(leads),
 }));
 
-export const campaignsRelations = relations(campaigns, ({ many }) => ({
+export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   emails: many(emails),
   campaignLeads: many(campaignLeads),
+  workflow: one(workflows, {
+    fields: [campaigns.workflowId],
+    references: [workflows.id],
+  }),
 }));
 
 export const campaignLeadsRelations = relations(campaignLeads, ({ one }) => ({
@@ -548,6 +553,7 @@ export const leadSourceRoiRelations = relations(leadSourceRoi, ({ one }) => ({
 
 export const workflowsRelations = relations(workflows, ({ many }) => ({
   steps: many(workflowSteps),
+  campaigns: many(campaigns),
 }));
 
 export const workflowStepsRelations = relations(workflowSteps, ({ one }) => ({

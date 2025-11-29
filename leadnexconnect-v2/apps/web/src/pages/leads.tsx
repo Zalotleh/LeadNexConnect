@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import WorkflowSelector from '@/components/WorkflowSelector'
 import leadsService, { Lead } from '@/services/leads.service'
 import { leadsAPI, aiAPI } from '@/services/api'
 import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
@@ -289,6 +290,7 @@ export default function Leads() {
     startTime: '', // Optional start time for campaign
     daysBetweenEmails: 1, // Default 1 day between emails
     followUpCount: 0, // Default no follow-ups
+    workflowId: null as string | null, // Selected workflow ID
   })
 
   const handleGenerateAIContent = async () => {
@@ -323,22 +325,47 @@ export default function Leads() {
 
   const handleSubmitManualCampaign = async () => {
     try {
-      if (!createCampaignForm.name || !createCampaignForm.emailSubject || !createCampaignForm.emailBody) {
-        toast.error('Please fill in all required fields')
+      // Validate: need name and either workflow or custom email
+      if (!createCampaignForm.name) {
+        toast.error('Please enter a campaign name')
+        return
+      }
+
+      if (!createCampaignForm.workflowId && (!createCampaignForm.emailSubject || !createCampaignForm.emailBody)) {
+        toast.error('Please select a workflow or provide custom email template')
         return
       }
 
       toast.loading('Creating campaign...')
       
-      // Create campaign with email template data inline
-      const campaignResponse = await api.post('/campaigns', {
+      // Create campaign with email template data inline or workflow reference
+      const campaignData: any = {
         name: createCampaignForm.name,
         description: createCampaignForm.description,
         campaignType: 'manual',
         status: 'draft',
-        emailSubject: createCampaignForm.emailSubject,
-        emailBody: createCampaignForm.emailBody,
-      })
+      }
+
+      // Add workflow or custom email
+      if (createCampaignForm.workflowId) {
+        campaignData.workflowId = createCampaignForm.workflowId
+      } else {
+        campaignData.emailSubject = createCampaignForm.emailSubject
+        campaignData.emailBody = createCampaignForm.emailBody
+      }
+
+      // Add schedule if provided
+      if (createCampaignForm.startTime) {
+        campaignData.startTime = createCampaignForm.startTime
+      }
+      if (createCampaignForm.daysBetweenEmails) {
+        campaignData.daysBetweenEmails = createCampaignForm.daysBetweenEmails
+      }
+      if (createCampaignForm.followUpCount) {
+        campaignData.followUpCount = createCampaignForm.followUpCount
+      }
+
+      const campaignResponse = await api.post('/campaigns', campaignData)
 
       const campaignId = campaignResponse.data.data.id
 
@@ -360,6 +387,7 @@ export default function Leads() {
         startTime: '',
         daysBetweenEmails: 1,
         followUpCount: 0,
+        workflowId: null,
       })
       
     } catch (error: any) {
@@ -1430,49 +1458,68 @@ export default function Leads() {
                   />
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Email Subject *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleGenerateAIContent}
-                      disabled={aiGenerating}
-                      className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 flex items-center gap-1 disabled:opacity-50"
-                    >
-                      {aiGenerating ? (
-                        <Loader className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-3 h-3" />
-                      )}
-                      {aiGenerating ? 'Generating...' : 'Generate with AI'}
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={createCampaignForm.emailSubject}
-                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailSubject: e.target.value })}
-                    placeholder="e.g., Transform Your Booking Process with [Product]"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                {/* Workflow Selector */}
+                <div className="border-t pt-6">
+                  <WorkflowSelector
+                    selectedWorkflowId={createCampaignForm.workflowId}
+                    onSelect={(workflowId) => setCreateCampaignForm({ ...createCampaignForm, workflowId })}
+                    label="Email Workflow (Optional)"
+                    placeholder="Select a workflow or create custom emails below"
+                    required={false}
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Body *
-                  </label>
-                  <textarea
-                    value={createCampaignForm.emailBody}
-                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailBody: e.target.value })}
-                    placeholder="Hi {{contactName}},&#10;&#10;I noticed {{companyName}} and wanted to reach out...&#10;&#10;Use {{variable}} for personalization"
-                    rows={8}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
-                  />
-                  <p className="text-xs text-gray-500 mt-2">
-                    Available variables: {'{{companyName}}'}, {'{{contactName}}'}, {'{{website}}'}, {'{{industry}}'}
+                  <p className="text-xs text-blue-600 mt-2">
+                    💡 Tip: Use a workflow for multi-step sequences, or create a single email below
                   </p>
                 </div>
+
+                {/* Only show email fields if no workflow selected */}
+                {!createCampaignForm.workflowId && (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Email Subject *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleGenerateAIContent}
+                          disabled={aiGenerating}
+                          className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {aiGenerating ? (
+                            <Loader className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3 h-3" />
+                          )}
+                          {aiGenerating ? 'Generating...' : 'Generate with AI'}
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={createCampaignForm.emailSubject}
+                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailSubject: e.target.value })}
+                        placeholder="e.g., Transform Your Booking Process with [Product]"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email Body *
+                      </label>
+                      <textarea
+                        value={createCampaignForm.emailBody}
+                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailBody: e.target.value })}
+                        placeholder="Hi {{contactName}},&#10;&#10;I noticed {{companyName}} and wanted to reach out...&#10;&#10;Use {{variable}} for personalization"
+                        rows={8}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        Available variables: {'{{companyName}}'}, {'{{contactName}}'}, {'{{website}}'}, {'{{industry}}'}
+                      </p>
+                    </div>
+                  </>
+                )}
 
                 {/* Schedule Options */}
                 <div className="border-t pt-6">
@@ -1544,7 +1591,10 @@ export default function Leads() {
                 </button>
                 <button
                   onClick={handleSubmitManualCampaign}
-                  disabled={!createCampaignForm.name || !createCampaignForm.emailSubject || !createCampaignForm.emailBody}
+                  disabled={
+                    !createCampaignForm.name || 
+                    (!createCampaignForm.workflowId && (!createCampaignForm.emailSubject || !createCampaignForm.emailBody))
+                  }
                   className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4 inline mr-2" />
