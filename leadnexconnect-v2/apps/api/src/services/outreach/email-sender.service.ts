@@ -27,31 +27,55 @@ export class EmailSenderService {
    * Handles inline HTML elements (links, etc.) that should not be escaped
    */
   private convertTextToHtml(text: string): string {
-    // First, temporarily replace HTML link tags with placeholders to protect them
-    const linkPlaceholders: { [key: string]: string } = {};
-    let linkCounter = 0;
+    // First, temporarily replace HTML tags with placeholders to protect them
+    const htmlPlaceholders: { [key: string]: string } = {};
+    let placeholderCounter = 0;
+    
+    // Protect existing <table> tags (including all nested content)
+    text = text.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
+      const placeholder = `__TABLE_${placeholderCounter}__`;
+      htmlPlaceholders[placeholder] = match;
+      placeholderCounter++;
+      return placeholder;
+    });
     
     // Protect existing <a> tags
-    text = text.replace(/<a\s+[^>]*>.*?<\/a>/g, (match) => {
-      const placeholder = `__LINK_${linkCounter}__`;
-      linkPlaceholders[placeholder] = match;
-      linkCounter++;
+    text = text.replace(/<a\s+[^>]*>.*?<\/a>/gi, (match) => {
+      const placeholder = `__LINK_${placeholderCounter}__`;
+      htmlPlaceholders[placeholder] = match;
+      placeholderCounter++;
       return placeholder;
     });
     
     // Protect existing <br> tags
     text = text.replace(/<br\s*\/?>/gi, (match) => {
-      const placeholder = `__BR_${linkCounter}__`;
-      linkPlaceholders[placeholder] = match;
-      linkCounter++;
+      const placeholder = `__BR_${placeholderCounter}__`;
+      htmlPlaceholders[placeholder] = match;
+      placeholderCounter++;
       return placeholder;
     });
     
     // Protect existing <strong> tags
-    text = text.replace(/<strong>.*?<\/strong>/g, (match) => {
-      const placeholder = `__STRONG_${linkCounter}__`;
-      linkPlaceholders[placeholder] = match;
-      linkCounter++;
+    text = text.replace(/<strong>.*?<\/strong>/gi, (match) => {
+      const placeholder = `__STRONG_${placeholderCounter}__`;
+      htmlPlaceholders[placeholder] = match;
+      placeholderCounter++;
+      return placeholder;
+    });
+    
+    // Protect existing <span> tags
+    text = text.replace(/<span[^>]*>.*?<\/span>/gi, (match) => {
+      const placeholder = `__SPAN_${placeholderCounter}__`;
+      htmlPlaceholders[placeholder] = match;
+      placeholderCounter++;
+      return placeholder;
+    });
+    
+    // Protect existing <img> tags
+    text = text.replace(/<img[^>]*\/?>/gi, (match) => {
+      const placeholder = `__IMG_${placeholderCounter}__`;
+      htmlPlaceholders[placeholder] = match;
+      placeholderCounter++;
       return placeholder;
     });
 
@@ -64,7 +88,7 @@ export class EmailSenderService {
       .replace(/'/g, '&#039;');
 
     // Restore protected HTML elements
-    for (const [placeholder, original] of Object.entries(linkPlaceholders)) {
+    for (const [placeholder, original] of Object.entries(htmlPlaceholders)) {
       html = html.replace(placeholder, original);
     }
 
