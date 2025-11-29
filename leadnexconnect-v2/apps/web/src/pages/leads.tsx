@@ -1878,7 +1878,7 @@ export default function Leads() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       >
                         <option value="">Select Industry</option>
-                        {INDUSTRY_CATEGORIES.map(category => (
+                        {Object.values(INDUSTRY_CATEGORIES).map(category => (
                           <optgroup key={category} label={category}>
                             {getIndustriesByCategory(category).map((ind: IndustryOption) => (
                               <option key={ind.value} value={ind.value}>
