@@ -31,17 +31,17 @@ export class EmailSenderService {
     const htmlPlaceholders: { [key: string]: string } = {};
     let placeholderCounter = 0;
     
-    // Protect existing <table> tags (including all nested content)
-    text = text.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
-      const placeholder = `__TABLE_${placeholderCounter}__`;
+    // Protect existing <div> tags (including all nested content - must be before table to catch div with table inside)
+    text = text.replace(/<div[\s\S]*?<\/div>/gi, (match) => {
+      const placeholder = `__DIV_${placeholderCounter}__`;
       htmlPlaceholders[placeholder] = match;
       placeholderCounter++;
       return placeholder;
     });
     
-    // Protect existing <div> tags
-    text = text.replace(/<div[^>]*>.*?<\/div>/gi, (match) => {
-      const placeholder = `__DIV_${placeholderCounter}__`;
+    // Protect existing <table> tags (including all nested content)
+    text = text.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
+      const placeholder = `__TABLE_${placeholderCounter}__`;
       htmlPlaceholders[placeholder] = match;
       placeholderCounter++;
       return placeholder;
