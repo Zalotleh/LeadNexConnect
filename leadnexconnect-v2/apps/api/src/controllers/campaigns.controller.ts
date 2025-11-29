@@ -805,6 +805,15 @@ export class CampaignsController {
    * Replace template variables with lead data
    */
   private replaceTemplateVariables(text: string, lead: any): string {
+    // BookNex signature HTML
+    const signature = `
+<br><br>
+Best regards,<br>
+<strong>BookNex Solutions</strong><br>
+<a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none;">www.booknexsolutions.com</a><br>
+<a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none;">support@booknexsolutions.com</a>
+    `.trim();
+
     return text
       // Lead variables
       .replace(/\{\{companyName\}\}/g, lead.companyName || 'your company')
@@ -815,9 +824,18 @@ export class CampaignsController {
       .replace(/\{\{city\}\}/g, lead.city || '')
       .replace(/\{\{country\}\}/g, lead.country || '')
       .replace(/\{\{jobTitle\}\}/g, lead.jobTitle || '')
-      .replace(/\{\{companySize\}\}/g, lead.companySize || '');
-    // Note: BookNex company info and links are not variables - they're static text
-    // Users insert them directly from the dropdown
+      .replace(/\{\{companySize\}\}/g, lead.companySize || '')
+      // BookNex company info
+      .replace(/\{\{BookNex\}\}/g, '<a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none;">www.booknexsolutions.com</a>')
+      .replace(/\{\{ourCompanyName\}\}/g, 'BookNex Solutions')
+      .replace(/\{\{ourEmail\}\}/g, '<a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none;">support@booknexsolutions.com</a>')
+      // BookNex links (as clickable text)
+      .replace(/\{\{featuresLink\}\}/g, '<a href="https://booknexsolutions.com/features/" style="color: #2563eb; text-decoration: underline;">View Our Features</a>')
+      .replace(/\{\{howToStartLink\}\}/g, '<a href="https://booknexsolutions.com/how-to-start/" style="color: #2563eb; text-decoration: underline;">How To Get Started</a>')
+      .replace(/\{\{pricingLink\}\}/g, '<a href="https://booknexsolutions.com/pricing/" style="color: #2563eb; text-decoration: underline;">View Pricing Plans</a>')
+      .replace(/\{\{signUpLink\}\}/g, '<a href="https://booknexsolutions.com/sign-up/" style="color: #2563eb; text-decoration: underline;">Sign Up Now</a>')
+      // Signature
+      .replace(/\{\{signature\}\}/g, signature);
   }
 
   /**

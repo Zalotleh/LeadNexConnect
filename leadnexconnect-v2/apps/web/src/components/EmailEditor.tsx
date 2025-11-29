@@ -20,15 +20,19 @@ export const EMAIL_VARIABLES: EmailVariable[] = [
   { key: 'jobTitle', label: 'Job Title', value: '{{jobTitle}}', category: 'lead' },
   { key: 'companySize', label: 'Company Size', value: '{{companySize}}', category: 'lead' },
   
-  // BookNex Company Info
-  { key: 'ourWebsite', label: 'Our Website', value: 'www.booknexsolutions.com', category: 'company' },
-  { key: 'ourName', label: 'Our Company Name', value: 'BookNex Solutions', category: 'company' },
+  // BookNex Company Info (as variables)
+  { key: 'ourWebsite', label: 'Our Website', value: '{{ourWebsite}}', category: 'company' },
+  { key: 'ourCompanyName', label: 'Our Company Name', value: '{{ourCompanyName}}', category: 'company' },
+  { key: 'ourEmail', label: 'Our Email', value: '{{ourEmail}}', category: 'company' },
   
-  // BookNex Links
-  { key: 'featuresLink', label: 'Features Page', value: 'https://booknexsolutions.com/features/', category: 'link' },
-  { key: 'howToStartLink', label: 'How To Start', value: 'https://booknexsolutions.com/how-to-start/', category: 'link' },
-  { key: 'pricingLink', label: 'Pricing Plans', value: 'https://booknexsolutions.com/pricing/', category: 'link' },
-  { key: 'signUpLink', label: 'Sign Up Page', value: 'https://booknexsolutions.com/sign-up/', category: 'link' },
+  // BookNex Links (as variables with descriptive names)
+  { key: 'featuresLink', label: 'Features Page Link', value: '{{featuresLink}}', category: 'link' },
+  { key: 'howToStartLink', label: 'How To Start Link', value: '{{howToStartLink}}', category: 'link' },
+  { key: 'pricingLink', label: 'Pricing Plans Link', value: '{{pricingLink}}', category: 'link' },
+  { key: 'signUpLink', label: 'Sign Up Page Link', value: '{{signUpLink}}', category: 'link' },
+  
+  // Signature
+  { key: 'signature', label: 'Email Signature', value: '{{signature}}', category: 'company' },
 ]
 
 interface EmailEditorProps {
@@ -162,7 +166,7 @@ export default function EmailEditor({
                     >
                       <div className="flex-1 text-left">
                         <div className="font-medium">{variable.label}</div>
-                        <div className="text-xs text-blue-600">{variable.value}</div>
+                        <div className="text-xs text-gray-500 font-mono">{variable.value}</div>
                       </div>
                       <button
                         onClick={(e) => {
@@ -170,7 +174,7 @@ export default function EmailEditor({
                           copyVariable(variable)
                         }}
                         className="ml-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-opacity"
-                        title="Copy value"
+                        title="Copy variable"
                       >
                         {copiedVar === variable.key ? (
                           <Check className="w-4 h-4 text-green-600" />
@@ -196,7 +200,7 @@ export default function EmailEditor({
                     >
                       <div className="flex-1 text-left">
                         <div className="font-medium">{variable.label}</div>
-                        <div className="text-xs text-blue-600 truncate">{variable.value}</div>
+                        <div className="text-xs text-gray-500 font-mono">{variable.value}</div>
                       </div>
                       <button
                         onClick={(e) => {
@@ -204,7 +208,7 @@ export default function EmailEditor({
                           copyVariable(variable)
                         }}
                         className="ml-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-opacity"
-                        title="Copy link"
+                        title="Copy variable"
                       >
                         {copiedVar === variable.key ? (
                           <Check className="w-4 h-4 text-green-600" />
@@ -218,7 +222,7 @@ export default function EmailEditor({
 
                 <div className="p-3 border-t bg-gray-50">
                   <p className="text-xs text-gray-600">
-                    💡 <strong>Tip:</strong> Click to insert at cursor position, or copy and paste manually
+                    💡 <strong>Tip:</strong> Variables like {'{{ourWebsite}}'} will be replaced with actual values when sent
                   </p>
                 </div>
               </div>
