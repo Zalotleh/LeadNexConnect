@@ -419,6 +419,96 @@ export class LeadsController {
   }
 
   /**
+   * POST /api/leads - Create a new lead manually
+   */
+  async createLead(req: Request, res: Response) {
+    try {
+      const {
+        companyName,
+        contactName,
+        email,
+        phone,
+        website,
+        industry,
+        city,
+        country,
+        jobTitle,
+        companySize,
+        source,
+        status,
+        qualityScore,
+      } = req.body;
+
+      logger.info('[LeadsController] Creating lead', { companyName, email });
+
+      // Validate required fields
+      if (!companyName) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Company name is required' },
+        });
+      }
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Email is required' },
+        });
+      }
+
+      // Check if lead already exists by email
+      const existingLead = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.email, email))
+        .limit(1);
+
+      if (existingLead.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'A lead with this email already exists' },
+        });
+      }
+
+      // Create the lead
+      const newLead = await db
+        .insert(leads)
+        .values({
+          companyName,
+          contactName: contactName || null,
+          email,
+          phone: phone || null,
+          website: website || null,
+          industry: industry || 'Other',
+          city: city || null,
+          country: country || 'United States',
+          jobTitle: jobTitle || null,
+          companySize: companySize || null,
+          source: source || 'manual_entry',
+          sourceType: 'manual_import',
+          status: status || 'new',
+          qualityScore: qualityScore || 50,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      logger.info('[LeadsController] Lead created successfully', { id: newLead[0].id });
+
+      res.status(201).json({
+        success: true,
+        data: newLead[0],
+        message: 'Lead created successfully',
+      });
+    } catch (error: any) {
+      logger.error('[LeadsController] Error creating lead', { error: error.message });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
    * PUT /api/leads/:id - Update lead
    */
   async updateLead(req: Request, res: Response) {
