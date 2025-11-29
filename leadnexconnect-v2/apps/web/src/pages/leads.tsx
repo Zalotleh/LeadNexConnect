@@ -1878,15 +1878,18 @@ export default function Leads() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       >
                         <option value="">Select Industry</option>
-                        {Object.values(INDUSTRY_CATEGORIES).map(category => (
-                          <optgroup key={category} label={category}>
-                            {getIndustriesByCategory(category).map((ind: IndustryOption) => (
-                              <option key={ind.value} value={ind.value}>
-                                {ind.label}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
+                        {Object.values(INDUSTRY_CATEGORIES).map(category => {
+                          const industriesInCategory = INDUSTRIES.filter(ind => ind.category === category);
+                          return (
+                            <optgroup key={category} label={category}>
+                              {industriesInCategory.map((ind: IndustryOption) => (
+                                <option key={ind.value} value={ind.value}>
+                                  {ind.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          );
+                        })}
                       </select>
                     </div>
                     <div>
