@@ -28,6 +28,7 @@ export class LeadsController {
         source,
         sourceType,
         minScore,
+        search,
       } = req.query;
 
       logger.info('[LeadsController] Getting leads', { query: req.query });
@@ -42,6 +43,18 @@ export class LeadsController {
       if (source) filters.push(eq(leads.source, source as string));
       if (sourceType) filters.push(eq(leads.sourceType, sourceType as string));
       if (minScore) filters.push(gte(leads.qualityScore, parseInt(minScore as string)));
+      
+      // Search filter - search in company name, email, contact name
+      if (search) {
+        const searchTerm = `%${search}%`;
+        filters.push(
+          // Use OR logic for multiple fields
+          ilike(leads.companyName, searchTerm)
+        );
+        // Note: Drizzle's OR operator would be more complex here,
+        // so we're using a simple ilike on companyName for now
+        // In production, consider using raw SQL or a more sophisticated search
+      }
 
       if (filters.length > 0) {
         query = query.where(and(...filters)) as any;

@@ -15,6 +15,7 @@ import {
   Sparkles,
   Loader,
   X,
+  Search,
 } from 'lucide-react'
 
 interface WorkflowStep {
@@ -46,6 +47,7 @@ export default function Workflows() {
   const queryClient = useQueryClient()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   
   const [createForm, setCreateForm] = useState({
     name: '',
@@ -64,6 +66,18 @@ export default function Workflows() {
   })
 
   const workflows: Workflow[] = workflowsData?.data?.data || []
+
+  // Filter workflows based on search query
+  const filteredWorkflows = workflows.filter((workflow) => {
+    if (!searchQuery) return true
+    
+    const query = searchQuery.toLowerCase()
+    const matchesName = workflow.name?.toLowerCase().includes(query)
+    const matchesDescription = workflow.description?.toLowerCase().includes(query)
+    const matchesIndustry = workflow.industry?.toLowerCase().includes(query)
+    
+    return matchesName || matchesDescription || matchesIndustry
+  })
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -147,6 +161,22 @@ export default function Workflows() {
           </button>
         </div>
 
+        {/* Search Bar */}
+        {workflows.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search workflows by name, description, or industry..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Workflows Grid */}
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
@@ -171,7 +201,12 @@ export default function Workflows() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {workflows.map((workflow) => (
+            {filteredWorkflows.length === 0 ? (
+              <div className="col-span-full bg-white rounded-lg shadow p-8 text-center">
+                <p className="text-gray-600">No workflows match your search criteria</p>
+              </div>
+            ) : (
+              filteredWorkflows.map((workflow) => (
               <div
                 key={workflow.id}
                 onClick={() => window.location.href = `/workflows/${workflow.id}`}
@@ -242,7 +277,8 @@ export default function Workflows() {
                   </div>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         )}
 

@@ -227,6 +227,11 @@ export class EmailQueueService {
         to: data.to,
       });
 
+      // Check if this was the last email for the campaign
+      if (data.campaignId) {
+        await this.checkCampaignCompletion(data.campaignId);
+      }
+
       // Update job progress
       await job.progress(100);
     } catch (error: any) {
@@ -334,6 +339,47 @@ export class EmailQueueService {
   async clearQueue(): Promise<void> {
     logger.warn('[EmailQueue] Clearing queue');
     await this.queue.empty();
+  }
+
+  /**
+   * Check if all emails for a campaign have been sent and mark as complete
+   */
+  private async checkCampaignCompletion(campaignId: string): Promise<void> {
+    try {
+      // Get all waiting and delayed jobs for this campaign
+      const waitingJobs = await this.queue.getWaiting();
+      const delayedJobs = await this.queue.getDelayed();
+      const allPendingJobs = [...waitingJobs, ...delayedJobs];
+      
+      // Check if there are any pending jobs for this campaign
+      const hasPendingJobs = allPendingJobs.some(
+        job => job.data.campaignId === campaignId
+      );
+      
+      if (!hasPendingJobs) {
+        // No more pending emails - mark campaign as complete
+        logger.info('[EmailQueue] All emails sent for campaign, marking as complete', {
+          campaignId,
+        });
+        
+        await db
+          .update(campaigns)
+          .set({ 
+            status: 'completed',
+            endDate: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(campaigns.id, campaignId));
+        
+        logger.info('[EmailQueue] Campaign marked as completed', { campaignId });
+      }
+    } catch (error: any) {
+      logger.error('[EmailQueue] Error checking campaign completion', {
+        campaignId,
+        error: error.message,
+      });
+      // Don't throw - this shouldn't fail the email send
+    }
   }
 
   /**

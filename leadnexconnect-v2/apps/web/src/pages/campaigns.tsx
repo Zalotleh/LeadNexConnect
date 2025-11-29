@@ -1,7 +1,7 @@
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
-import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer } from 'lucide-react'
+import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
@@ -56,6 +56,8 @@ export default function Campaigns() {
   const [campaignToPause, setCampaignToPause] = useState<string | null>(null)
   const [isPausing, setIsPausing] = useState(false)
   const [newCountry, setNewCountry] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   
   const [formData, setFormData] = useState<CampaignFormData>({
     name: '',
@@ -260,6 +262,28 @@ export default function Campaigns() {
     return [...array, value]
   }
 
+  // Filter campaigns based on search and status
+  const filteredCampaigns = campaigns.filter((campaign) => {
+    // Status filter
+    if (statusFilter !== 'all' && campaign.status !== statusFilter) {
+      return false
+    }
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchesName = campaign.name?.toLowerCase().includes(query)
+      const matchesDescription = campaign.description?.toLowerCase().includes(query)
+      const matchesIndustry = campaign.industry?.toLowerCase().includes(query)
+      
+      if (!matchesName && !matchesDescription && !matchesIndustry) {
+        return false
+      }
+    }
+
+    return true
+  })
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -331,6 +355,43 @@ export default function Campaigns() {
           </div>
         )}
 
+        {/* Search and Filter */}
+        {campaigns.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-4 space-y-4">
+            <div className="flex items-center gap-4">
+              {/* Search Bar */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search campaigns by name, industry..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 mr-2">Status:</span>
+              {['all', 'active', 'paused', 'draft', 'completed'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                    statusFilter === status
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Campaign List */}
         {loading ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
@@ -353,7 +414,12 @@ export default function Campaigns() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {campaigns.map((campaign) => (
+            {filteredCampaigns.length === 0 ? (
+              <div className="col-span-full bg-white rounded-lg shadow p-8 text-center">
+                <p className="text-gray-600">No campaigns match your search criteria</p>
+              </div>
+            ) : (
+              filteredCampaigns.map((campaign) => (
               <div 
                 key={campaign.id} 
                 onClick={() => window.location.href = `/campaigns/${campaign.id}`}
@@ -501,7 +567,8 @@ export default function Campaigns() {
                   </div>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         )}
 
