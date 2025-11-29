@@ -23,6 +23,123 @@ export class EmailSenderService {
   private currentConfig: SMTPConfig | null = null;
 
   /**
+   * Convert plain text to HTML with proper formatting
+   */
+  private convertTextToHtml(text: string): string {
+    // Escape HTML characters
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+    // Convert bullet points (lines starting with -, *, or •)
+    html = html.replace(/^[\-\*•]\s+(.+)$/gm, '<li>$1</li>');
+    
+    // Wrap consecutive list items in ul tags
+    html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul style="margin: 10px 0; padding-left: 20px;">$1</ul>');
+    
+    // Convert numbered lists (lines starting with 1., 2., etc.)
+    html = html.replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>');
+    html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, function(match) {
+      // Check if it's already wrapped in ul (bullet points)
+      if (match.includes('<ul')) return match;
+      return '<ol style="margin: 10px 0; padding-left: 20px;">' + match + '</ol>';
+    });
+
+    // Convert double line breaks to paragraph breaks
+    html = html.split('\n\n').map(para => {
+      if (para.trim() && !para.includes('<ul') && !para.includes('<ol') && !para.includes('<li>')) {
+        return '<p style="margin: 10px 0; line-height: 1.6;">' + para.replace(/\n/g, '<br>') + '</p>';
+      }
+      return para;
+    }).join('\n');
+
+    // Convert remaining single line breaks to <br>
+    html = html.replace(/\n/g, '<br>');
+
+    // Bold text (text between **text** or __text__)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+    // Italic text (text between *text* or _text_)
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+
+    // Links [text](url)
+    html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" style="color: #0066cc; text-decoration: none;">$1</a>');
+
+    return html;
+  }
+
+  /**
+   * Wrap HTML content in a professional email template
+   */
+  private wrapInEmailTemplate(content: string): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .email-container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        ul, ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        strong {
+            font-weight: 600;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        ${content}
+    </div>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
    * Get SMTP configuration from database settings or environment
    */
   private async getSMTPConfig(): Promise<SMTPConfig> {
@@ -215,7 +332,7 @@ export class EmailSenderService {
       const trackingPixel = `<img src="${process.env.API_BASE_URL}/api/emails/track/open/${params.leadId}" width="1" height="1" alt="" />`;
       const bodyHtmlWithTracking = params.bodyHtml 
         ? `${params.bodyHtml}${trackingPixel}`
-        : `${params.bodyText.replace(/\n/g, '<br>')}${trackingPixel}`;
+        : this.wrapInEmailTemplate(this.convertTextToHtml(params.bodyText)) + trackingPixel;
 
       // Send email
       const info = await this.transporter.sendMail({
