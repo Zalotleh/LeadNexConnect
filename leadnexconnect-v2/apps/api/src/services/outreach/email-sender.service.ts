@@ -39,6 +39,14 @@ export class EmailSenderService {
       return placeholder;
     });
     
+    // Protect existing <div> tags
+    text = text.replace(/<div[^>]*>.*?<\/div>/gi, (match) => {
+      const placeholder = `__DIV_${placeholderCounter}__`;
+      htmlPlaceholders[placeholder] = match;
+      placeholderCounter++;
+      return placeholder;
+    });
+    
     // Protect existing <a> tags
     text = text.replace(/<a\s+[^>]*>.*?<\/a>/gi, (match) => {
       const placeholder = `__LINK_${placeholderCounter}__`;

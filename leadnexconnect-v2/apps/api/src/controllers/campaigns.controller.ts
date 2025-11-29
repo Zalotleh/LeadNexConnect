@@ -821,9 +821,11 @@ export class CampaignsController {
   private replaceTemplateVariables(text: string, lead: any): string {
     // BookNex signature HTML with logo and professional design
     const signature = `
-<br><br>
-Best regards,<br><br>
-<table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333333;">
+<br>
+<div style="margin-top: 20px;">
+Best regards,<br>
+</div>
+<table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; margin-top: 10px;">
   <tr>
     <td style="padding-right: 15px; vertical-align: top; border-right: 2px solid #2563eb;">
       <img src="https://booknexsolutions.com/wp-content/uploads/2025/08/Logo-Png-Clean-1.png" alt="BookNex Solutions" width="120" style="display: block;">
