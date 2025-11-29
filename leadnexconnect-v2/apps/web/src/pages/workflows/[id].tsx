@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import EmailEditor from '@/components/EmailEditor'
 import api from '@/services/api'
 import { toast } from 'react-hot-toast'
 import {
@@ -436,25 +437,27 @@ export default function WorkflowDetail() {
 
                     {/* Body */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Body
-                      </label>
                       {isEditing ? (
-                        <textarea
+                        <EmailEditor
+                          label="Email Body"
                           value={editForm.steps[index].body}
-                          onChange={(e) => updateStep(index, 'body', e.target.value)}
-                          rows={8}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                          onChange={(value) => updateStep(index, 'body', value)}
                           placeholder="Email body..."
+                          rows={8}
                         />
                       ) : (
-                        <div className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-200 font-mono text-sm">
-                          {step.body}
-                        </div>
+                        <>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Email Body
+                          </label>
+                          <div className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg border border-gray-200 font-mono text-sm">
+                            {step.body}
+                          </div>
+                        </>
                       )}
                     </div>
 
-                    {/* Variables Info */}
+                    {/* Variables Info - Only show when not editing */}
                     {!isEditing && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <p className="text-sm text-blue-800 font-medium mb-1">

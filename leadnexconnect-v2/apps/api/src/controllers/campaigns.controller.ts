@@ -806,12 +806,18 @@ export class CampaignsController {
    */
   private replaceTemplateVariables(text: string, lead: any): string {
     return text
+      // Lead variables
       .replace(/\{\{companyName\}\}/g, lead.companyName || 'your company')
       .replace(/\{\{contactName\}\}/g, lead.contactName || 'there')
+      .replace(/\{\{email\}\}/g, lead.email || '')
       .replace(/\{\{website\}\}/g, lead.website || '')
       .replace(/\{\{industry\}\}/g, lead.industry || '')
       .replace(/\{\{city\}\}/g, lead.city || '')
-      .replace(/\{\{country\}\}/g, lead.country || '');
+      .replace(/\{\{country\}\}/g, lead.country || '')
+      .replace(/\{\{jobTitle\}\}/g, lead.jobTitle || '')
+      .replace(/\{\{companySize\}\}/g, lead.companySize || '');
+    // Note: BookNex company info and links are not variables - they're static text
+    // Users insert them directly from the dropdown
   }
 
   /**

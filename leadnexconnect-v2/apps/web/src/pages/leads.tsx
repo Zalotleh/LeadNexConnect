@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
+import EmailEditor from '@/components/EmailEditor'
 import leadsService, { Lead } from '@/services/leads.service'
 import { leadsAPI, aiAPI } from '@/services/api'
 import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
@@ -1493,21 +1494,14 @@ export default function Leads() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Body *
-                      </label>
-                      <textarea
-                        value={createCampaignForm.emailBody}
-                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailBody: e.target.value })}
-                        placeholder="Hi {{contactName}},&#10;&#10;I noticed {{companyName}} and wanted to reach out...&#10;&#10;Use {{variable}} for personalization"
-                        rows={8}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
-                      />
-                      <p className="text-xs text-gray-500 mt-2">
-                        Available variables: {'{{companyName}}'}, {'{{contactName}}'}, {'{{website}}'}, {'{{industry}}'}
-                      </p>
-                    </div>
+                    <EmailEditor
+                      label="Email Body"
+                      value={createCampaignForm.emailBody}
+                      onChange={(value) => setCreateCampaignForm({ ...createCampaignForm, emailBody: value })}
+                      placeholder="Hi {{contactName}},&#10;&#10;I noticed {{companyName}} and wanted to reach out...&#10;&#10;Click 'Insert Variable' above to add personalization"
+                      rows={8}
+                      required
+                    />
                   </>
                 )}
 
