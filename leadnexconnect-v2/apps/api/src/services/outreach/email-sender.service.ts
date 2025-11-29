@@ -418,6 +418,25 @@ export class EmailSenderService {
         externalId: info.messageId,
       });
 
+      // Update campaign emailsSent counter
+      if (params.campaignId) {
+        const { campaigns } = await import('@leadnex/database');
+        const campaign = await db
+          .select()
+          .from(campaigns)
+          .where(eq(campaigns.id, params.campaignId))
+          .limit(1);
+        
+        if (campaign[0]) {
+          await db
+            .update(campaigns)
+            .set({
+              emailsSent: (campaign[0].emailsSent || 0) + 1,
+            })
+            .where(eq(campaigns.id, params.campaignId));
+        }
+      }
+
       // Update lead status
       if (lead[0]) {
         await db

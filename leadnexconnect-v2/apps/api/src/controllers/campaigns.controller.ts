@@ -715,18 +715,18 @@ export class CampaignsController {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Update campaign metrics
+    // Update campaign last run time
+    // Note: emailsSent counter will be updated by email queue service when emails are actually sent
     await db
       .update(campaigns)
       .set({
-        emailsSent: (campaign.emailsSent || 0) + totalEmailsQueued,
         lastRunAt: new Date(),
       })
       .where(eq(campaigns.id, campaignId));
 
     logger.info('[CampaignsController] Workflow execution complete', {
       campaignId,
-      totalEmailsQueued,
+      totalEmailsScheduled: totalEmailsQueued,
       leadsProcessed: campaignLeadsList.length,
       stepsPerLead: steps.length,
     });
@@ -800,18 +800,18 @@ export class CampaignsController {
       }
     }
 
-    // Update campaign metrics
+    // Update campaign last run time
+    // Note: emailsSent counter will be updated by email sender service when emails are actually sent
     await db
       .update(campaigns)
       .set({
-        emailsSent: (campaign.emailsSent || 0) + emailsQueued,
         lastRunAt: new Date(),
       })
       .where(eq(campaigns.id, campaignId));
 
     logger.info('[CampaignsController] Single template execution complete', {
       campaignId,
-      emailsQueued,
+      emailsScheduled: emailsQueued,
     });
   }
 
@@ -1018,11 +1018,11 @@ Best regards,<br><br>
       }
 
       // 5. Update campaign metrics
+      // Note: emailsSent counter will be updated by email sender service when emails are actually sent
       await db
         .update(campaigns)
         .set({
           leadsGenerated: (campaign.leadsGenerated || 0) + allQualifiedLeads.length,
-          emailsSent: (campaign.emailsSent || 0) + emailsQueued,
           lastRunAt: new Date(),
         })
         .where(eq(campaigns.id, campaignId));
@@ -1030,7 +1030,7 @@ Best regards,<br><br>
       logger.info('[CampaignsController] Campaign execution completed', {
         campaignId,
         leadsGenerated: allQualifiedLeads.length,
-        emailsQueued,
+        emailsScheduled: emailsQueued,
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error executing automated campaign', {
