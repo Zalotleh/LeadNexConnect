@@ -31,6 +31,20 @@ export default function Leads() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [leadToDelete, setLeadToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showCreateLeadModal, setShowCreateLeadModal] = useState(false)
+  const [createLeadForm, setCreateLeadForm] = useState({
+    companyName: '',
+    contactName: '',
+    email: '',
+    phone: '',
+    website: '',
+    industry: '',
+    city: '',
+    country: 'United States',
+    jobTitle: '',
+    companySize: '',
+  })
+  const [isCreatingLead, setIsCreatingLead] = useState(false)
   const [filters, setFilters] = useState({
     industry: 'all',
     minScore: 0,
@@ -343,6 +357,67 @@ export default function Leads() {
     }
   }
 
+  const handleCreateLead = async () => {
+    try {
+      if (!createLeadForm.companyName || !createLeadForm.email) {
+        toast.error('Company name and email are required')
+        return
+      }
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(createLeadForm.email)) {
+        toast.error('Please enter a valid email address')
+        return
+      }
+
+      setIsCreatingLead(true)
+      toast.loading('Creating lead...')
+
+      const response = await api.post('/leads', {
+        companyName: createLeadForm.companyName,
+        contactName: createLeadForm.contactName || null,
+        email: createLeadForm.email,
+        phone: createLeadForm.phone || null,
+        website: createLeadForm.website || null,
+        industry: createLeadForm.industry || 'Other',
+        city: createLeadForm.city || null,
+        country: createLeadForm.country || 'United States',
+        jobTitle: createLeadForm.jobTitle || null,
+        companySize: createLeadForm.companySize || null,
+        source: 'manual_entry',
+        status: 'new',
+        qualityScore: 50, // Default score for manual entries
+      })
+
+      toast.dismiss()
+      toast.success('Lead created successfully!')
+      
+      // Refresh leads
+      await refetch()
+      
+      // Close modal and reset form
+      setShowCreateLeadModal(false)
+      setCreateLeadForm({
+        companyName: '',
+        contactName: '',
+        email: '',
+        phone: '',
+        website: '',
+        industry: '',
+        city: '',
+        country: 'United States',
+        jobTitle: '',
+        companySize: '',
+      })
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.response?.data?.error?.message || 'Failed to create lead')
+    } finally {
+      setIsCreatingLead(false)
+    }
+  }
+
   const handleViewLead = (lead: Lead) => {
     setSelectedLead(lead)
     setShowViewModal(true)
@@ -408,6 +483,13 @@ export default function Leads() {
             <p className="text-gray-600 mt-2">Manage and track your leads</p>
           </div>
           <div className="flex items-center space-x-3">
+            <button 
+              onClick={() => setShowCreateLeadModal(true)}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+            >
+              <Plus className="w-4 h-4 inline mr-2" />
+              Create Lead
+            </button>
             <button 
               onClick={() => setShowGenerateModal(true)}
               className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
@@ -1735,6 +1817,228 @@ export default function Leads() {
                   className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Lead Modal */}
+        {showCreateLeadModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
+                <h2 className="text-2xl font-bold text-gray-900">Create New Lead</h2>
+                <button
+                  onClick={() => {
+                    setShowCreateLeadModal(false)
+                    setCreateLeadForm({
+                      companyName: '',
+                      contactName: '',
+                      email: '',
+                      phone: '',
+                      website: '',
+                      industry: '',
+                      city: '',
+                      country: 'United States',
+                      jobTitle: '',
+                      companySize: '',
+                    })
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6">
+                {/* Company Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Company Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={createLeadForm.companyName}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, companyName: e.target.value })}
+                        placeholder="e.g., Acme Corporation"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                      <select
+                        value={createLeadForm.industry}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, industry: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="">Select Industry</option>
+                        {INDUSTRY_CATEGORIES.map(category => (
+                          <optgroup key={category} label={category}>
+                            {getIndustriesByCategory(category).map((ind: IndustryOption) => (
+                              <option key={ind.value} value={ind.value}>
+                                {ind.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Size</label>
+                      <select
+                        value={createLeadForm.companySize}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, companySize: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      >
+                        <option value="">Select Size</option>
+                        <option value="1-10">1-10 employees</option>
+                        <option value="11-50">11-50 employees</option>
+                        <option value="51-200">51-200 employees</option>
+                        <option value="201-500">201-500 employees</option>
+                        <option value="501+">501+ employees</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                      <input
+                        type="url"
+                        value={createLeadForm.website}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, website: e.target.value })}
+                        placeholder="https://example.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                      <input
+                        type="text"
+                        value={createLeadForm.contactName}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, contactName: e.target.value })}
+                        placeholder="John Doe"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                      <input
+                        type="text"
+                        value={createLeadForm.jobTitle}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, jobTitle: e.target.value })}
+                        placeholder="CEO"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        value={createLeadForm.email}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, email: e.target.value })}
+                        placeholder="john@example.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <input
+                        type="tel"
+                        value={createLeadForm.phone}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, phone: e.target.value })}
+                        placeholder="+1 (555) 123-4567"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                      <input
+                        type="text"
+                        value={createLeadForm.city}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, city: e.target.value })}
+                        placeholder="New York"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                      <input
+                        type="text"
+                        value={createLeadForm.country}
+                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, country: e.target.value })}
+                        placeholder="United States"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Tip:</strong> Use this to create test leads for email campaigns. Make sure to use a real email address you have access to for testing.
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end p-6 border-t space-x-3">
+                <button
+                  onClick={() => {
+                    setShowCreateLeadModal(false)
+                    setCreateLeadForm({
+                      companyName: '',
+                      contactName: '',
+                      email: '',
+                      phone: '',
+                      website: '',
+                      industry: '',
+                      city: '',
+                      country: 'United States',
+                      jobTitle: '',
+                      companySize: '',
+                    })
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  disabled={isCreatingLead}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateLead}
+                  disabled={!createLeadForm.companyName || !createLeadForm.email || isCreatingLead}
+                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isCreatingLead ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Create Lead
+                    </>
+                  )}
                 </button>
               </div>
             </div>
