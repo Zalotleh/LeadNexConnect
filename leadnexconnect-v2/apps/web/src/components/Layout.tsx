@@ -1,7 +1,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Home, Users, Mail, TrendingUp, Settings, Search } from 'lucide-react'
+import { Home, Users, Mail, TrendingUp, Settings, Search, Workflow } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -14,6 +14,7 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Leads', href: '/leads', icon: Users },
     { name: 'Campaigns', href: '/campaigns', icon: Mail },
+    { name: 'Workflows', href: '/workflows', icon: Workflow },
     { name: 'Analytics', href: '/analytics', icon: TrendingUp },
     { name: 'Settings', href: '/settings', icon: Settings },
   ]

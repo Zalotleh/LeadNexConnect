@@ -453,6 +453,50 @@ export const leadBatches = pgTable('lead_batches', {
   completedAt: timestamp('completed_at'),
 });
 
+// Workflows - Multi-step email sequences
+export const workflows = pgTable('workflows', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  // Basic Information
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  
+  // Configuration
+  stepsCount: integer('steps_count').default(1), // Number of emails in sequence
+  industry: varchar('industry', { length: 100 }), // Target industry
+  country: varchar('country', { length: 100 }), // Target country
+  aiInstructions: text('ai_instructions'), // Extra instructions for AI generation
+  
+  // Metadata
+  isActive: boolean('is_active').default(true),
+  usageCount: integer('usage_count').default(0), // How many campaigns use this
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Workflow Steps - Individual emails in a workflow sequence
+export const workflowSteps = pgTable('workflow_steps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  // Relationships
+  workflowId: uuid('workflow_id')
+    .references(() => workflows.id, { onDelete: 'cascade' })
+    .notNull(),
+  
+  // Step Configuration
+  stepNumber: integer('step_number').notNull(), // 1, 2, 3, etc.
+  daysAfterPrevious: integer('days_after_previous').default(0), // 0 for first email, N days for subsequent
+  
+  // Email Content
+  subject: varchar('subject', { length: 500 }).notNull(),
+  body: text('body').notNull(),
+  
+  // Metadata
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // Relations
 export const leadsRelations = relations(leads, ({ many, one }) => ({
   emails: many(emails),
@@ -499,5 +543,16 @@ export const leadSourceRoiRelations = relations(leadSourceRoi, ({ one }) => ({
   lead: one(leads, {
     fields: [leadSourceRoi.leadId],
     references: [leads.id],
+  }),
+}));
+
+export const workflowsRelations = relations(workflows, ({ many }) => ({
+  steps: many(workflowSteps),
+}));
+
+export const workflowStepsRelations = relations(workflowSteps, ({ one }) => ({
+  workflow: one(workflows, {
+    fields: [workflowSteps.workflowId],
+    references: [workflows.id],
   }),
 }));
