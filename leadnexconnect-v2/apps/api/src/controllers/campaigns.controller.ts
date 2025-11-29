@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
-import { campaigns, leads, emails, emailTemplates } from '@leadnex/database';
+import { campaigns, leads, emails, emailTemplates, campaignLeads } from '@leadnex/database';
 import { eq, desc, and, gte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
@@ -359,6 +359,7 @@ export class CampaignsController {
       logger.info('[CampaignsController] Executing campaign', {
         campaignId,
         name: campaign.name,
+        campaignType: campaign.campaignType,
         usesApollo: campaign.usesApollo,
         usesGooglePlaces: campaign.usesGooglePlaces,
         industry: campaign.industry,
@@ -366,6 +367,168 @@ export class CampaignsController {
         targetCities: campaign.targetCities,
       });
 
+      // Check if this is a manual campaign with pre-selected leads
+      if (campaign.campaignType === 'manual') {
+        await this.executeManualCampaign(campaignId, campaign);
+        return;
+      }
+
+      // Otherwise, execute automated campaign (generate new leads)
+      await this.executeAutomatedCampaign(campaignId, campaign);
+    } catch (error: any) {
+      logger.error('[CampaignsController] Fatal error executing campaign', {
+        campaignId,
+        error: error.message,
+        stack: error.stack,
+      });
+      
+      // Update campaign status to error
+      await db
+        .update(campaigns)
+        .set({ status: 'paused' })
+        .where(eq(campaigns.id, campaignId));
+    }
+  }
+
+  /**
+   * Execute manual campaign: Send emails to pre-selected leads
+   */
+  private async executeManualCampaign(campaignId: string, campaign: any) {
+    try {
+      logger.info('[CampaignsController] Executing manual campaign', { campaignId });
+
+      // Get leads enrolled in this campaign
+      const campaignLeadRecords = await db
+        .select()
+        .from(campaignLeads)
+        .where(eq(campaignLeads.campaignId, campaignId));
+
+      if (campaignLeadRecords.length === 0) {
+        logger.warn('[CampaignsController] No leads enrolled in manual campaign');
+        return;
+      }
+
+      logger.info(`[CampaignsController] Found ${campaignLeadRecords.length} leads in campaign`);
+
+      // Fetch lead details
+      const leadIds = campaignLeadRecords.map(cl => cl.leadId);
+      const campaignLeadsList = [];
+      
+      for (const leadId of leadIds) {
+        const leadResults = await db
+          .select()
+          .from(leads)
+          .where(eq(leads.id, leadId))
+          .limit(1);
+        
+        if (leadResults.length > 0) {
+          campaignLeadsList.push(leadResults[0]);
+        }
+      }
+
+      logger.info(`[CampaignsController] Fetched ${campaignLeadsList.length} lead details`);
+
+      // Get email template for the campaign
+      const templateResults = await db
+        .select()
+        .from(emailTemplates)
+        .where(eq(emailTemplates.id, campaign.emailTemplateId))
+        .limit(1);
+
+      if (!templateResults[0]) {
+        logger.error('[CampaignsController] Email template not found for manual campaign');
+        return;
+      }
+
+      const template = templateResults[0];
+      let emailsQueued = 0;
+
+      // Send emails to each lead
+      for (const lead of campaignLeadsList) {
+        try {
+          if (!lead.email) {
+            logger.warn('[CampaignsController] Lead has no email', { leadId: lead.id });
+            continue;
+          }
+
+          // Replace template variables with lead data
+          const subject = this.replaceTemplateVariables(template.subject, lead);
+          const bodyText = this.replaceTemplateVariables(template.bodyText, lead);
+          const bodyHtml = template.bodyHtml 
+            ? this.replaceTemplateVariables(template.bodyHtml, lead)
+            : bodyText;
+
+          // Queue email for sending
+          await emailQueueService.addEmail({
+            leadId: lead.id,
+            campaignId: campaignId,
+            to: lead.email,
+            subject,
+            bodyText,
+            bodyHtml,
+            followUpStage: 'initial',
+            metadata: {
+              companyName: lead.companyName,
+              industry: lead.industry,
+            },
+          });
+
+          emailsQueued++;
+          logger.info('[CampaignsController] Email queued for lead', { 
+            leadId: lead.id, 
+            email: lead.email 
+          });
+
+          // Small delay to avoid overwhelming the queue
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error: any) {
+          logger.error('[CampaignsController] Error queuing email for lead', {
+            leadId: lead.id,
+            error: error.message,
+          });
+        }
+      }
+
+      // Update campaign metrics
+      await db
+        .update(campaigns)
+        .set({
+          emailsSent: (campaign.emailsSent || 0) + emailsQueued,
+          lastRunAt: new Date(),
+        })
+        .where(eq(campaigns.id, campaignId));
+
+      logger.info('[CampaignsController] Manual campaign execution completed', {
+        campaignId,
+        emailsQueued,
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error executing manual campaign', {
+        campaignId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Replace template variables with lead data
+   */
+  private replaceTemplateVariables(text: string, lead: any): string {
+    return text
+      .replace(/\{\{companyName\}\}/g, lead.companyName || 'your company')
+      .replace(/\{\{contactName\}\}/g, lead.contactName || 'there')
+      .replace(/\{\{website\}\}/g, lead.website || '')
+      .replace(/\{\{industry\}\}/g, lead.industry || '')
+      .replace(/\{\{city\}\}/g, lead.city || '')
+      .replace(/\{\{country\}\}/g, lead.country || '');
+  }
+
+  /**
+   * Execute automated campaign: Generate new leads and send emails
+   */
+  private async executeAutomatedCampaign(campaignId: string, campaign: any) {
+    try {
       const rawLeads: any[] = [];
       const leadsPerSource = Math.ceil((campaign.leadsPerDay || 50) / this.countActiveSources(campaign));
 
@@ -526,17 +689,11 @@ export class CampaignsController {
         emailsQueued,
       });
     } catch (error: any) {
-      logger.error('[CampaignsController] Fatal error executing campaign', {
+      logger.error('[CampaignsController] Error executing automated campaign', {
         campaignId,
         error: error.message,
-        stack: error.stack,
       });
-      
-      // Update campaign status to error
-      await db
-        .update(campaigns)
-        .set({ status: 'paused' })
-        .where(eq(campaigns.id, campaignId));
+      throw error;
     }
   }
 
