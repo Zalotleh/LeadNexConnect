@@ -59,6 +59,8 @@ interface Campaign {
   campaignType: string
   status: string
   industry: string | null
+  targetCountries: string[] | null
+  companySize: string | null
   leadsPerDay: number
   emailTemplateId: string | null
   workflowId: string | null
@@ -88,12 +90,16 @@ export default function CampaignDetail() {
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
+    industry: '',
+    targetCountries: [] as string[],
+    companySize: '',
     workflowId: null as string | null,
     emailSubject: '',
     emailBody: '',
   })
   const [enrolledLeads, setEnrolledLeads] = useState<Lead[]>([])
   const [loadingLeads, setLoadingLeads] = useState(false)
+  const [newCountry, setNewCountry] = useState('')
 
   // Fetch campaign details
   const { data: campaignData, isLoading } = useQuery({
@@ -132,6 +138,9 @@ export default function CampaignDetail() {
       setEditForm({
         name: campaign.name,
         description: campaign.description || '',
+        industry: campaign.industry || '',
+        targetCountries: campaign.targetCountries || [],
+        companySize: campaign.companySize || '',
         workflowId: campaign.workflowId,
         emailSubject: '',
         emailBody: '',
@@ -205,6 +214,9 @@ export default function CampaignDetail() {
     updateMutation.mutate({
       name: editForm.name,
       description: editForm.description,
+      industry: editForm.industry,
+      targetCountries: editForm.targetCountries,
+      companySize: editForm.companySize,
       workflowId: editForm.workflowId,
     })
   }
@@ -315,7 +327,19 @@ export default function CampaignDetail() {
             ) : (
               <>
                 <button
-                  onClick={() => setIsEditing(true)}
+                  onClick={() => {
+                    setEditForm({
+                      name: campaign.name,
+                      description: campaign.description || '',
+                      industry: campaign.industry || '',
+                      targetCountries: campaign.targetCountries || [],
+                      companySize: campaign.companySize || '',
+                      workflowId: campaign.workflowId,
+                      emailSubject: '',
+                      emailBody: '',
+                    })
+                    setIsEditing(true)
+                  }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   <Edit className="w-4 h-4 inline mr-2" />
@@ -437,6 +461,140 @@ export default function CampaignDetail() {
                 )}
               </div>
 
+              {/* Industry Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Industry
+                </label>
+                {isEditing ? (
+                  <select
+                    value={editForm.industry}
+                    onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select Industry</option>
+                    <option value="Technology">Technology</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Real Estate">Real Estate</option>
+                    <option value="Retail">Retail</option>
+                    <option value="Manufacturing">Manufacturing</option>
+                    <option value="Education">Education</option>
+                    <option value="Hospitality">Hospitality</option>
+                    <option value="Construction">Construction</option>
+                    <option value="Other">Other</option>
+                  </select>
+                ) : (
+                  <p className="text-gray-900">{campaign.industry || 'Not specified'}</p>
+                )}
+              </div>
+
+              {/* Target Countries */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Target Countries
+                </label>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newCountry}
+                        onChange={(e) => setNewCountry(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter' && newCountry.trim()) {
+                            e.preventDefault()
+                            setEditForm({
+                              ...editForm,
+                              targetCountries: [...editForm.targetCountries, newCountry.trim()]
+                            })
+                            setNewCountry('')
+                          }
+                        }}
+                        placeholder="Add country and press Enter"
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newCountry.trim()) {
+                            setEditForm({
+                              ...editForm,
+                              targetCountries: [...editForm.targetCountries, newCountry.trim()]
+                            })
+                            setNewCountry('')
+                          }
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {editForm.targetCountries.map((country, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                        >
+                          {country}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditForm({
+                                ...editForm,
+                                targetCountries: editForm.targetCountries.filter((_, i) => i !== index)
+                              })
+                            }}
+                            className="hover:text-blue-900"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {campaign.targetCountries && campaign.targetCountries.length > 0 ? (
+                      campaign.targetCountries.map((country, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                        >
+                          {country}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-gray-600">No target countries specified</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Company Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Company Size
+                </label>
+                {isEditing ? (
+                  <select
+                    value={editForm.companySize}
+                    onChange={(e) => setEditForm({ ...editForm, companySize: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select Company Size</option>
+                    <option value="1-10">1-10 employees</option>
+                    <option value="11-50">11-50 employees</option>
+                    <option value="51-200">51-200 employees</option>
+                    <option value="201-500">201-500 employees</option>
+                    <option value="501-1000">501-1000 employees</option>
+                    <option value="1000+">1000+ employees</option>
+                  </select>
+                ) : (
+                  <p className="text-gray-900">{campaign.companySize || 'Not specified'}</p>
+                )}
+              </div>
+
               {isEditing ? (
                 <div>
                   <WorkflowSelector
@@ -467,14 +625,6 @@ export default function CampaignDetail() {
                   )}
 
                   <div className="grid grid-cols-2 gap-4">
-                    {campaign.industry && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Industry
-                        </label>
-                        <p className="text-gray-900">{campaign.industry}</p>
-                      </div>
-                    )}
                     {campaign.scheduleType && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
