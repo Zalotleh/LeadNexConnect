@@ -19,12 +19,12 @@ export class DailyOutreachJob {
    * Start the cron job
    */
   start() {
-    // Run every day at 9:00 AM
-    this.cronJob = cron.schedule('0 9 * * *', async () => {
+    // Run every hour to check for campaigns that should send emails
+    this.cronJob = cron.schedule('0 * * * *', async () => {
       await this.execute();
     });
 
-    logger.info('📅 Daily Outreach Job scheduled (9:00 AM)');
+    logger.info('📅 Daily Outreach Job scheduled (runs hourly, checks campaign schedules)');
   }
 
   /**
@@ -59,6 +59,27 @@ export class DailyOutreachJob {
 
       // Process each campaign
       for (const campaign of activeCampaigns) {
+        // Only process campaigns with daily schedule
+        if (campaign.scheduleType !== 'daily') {
+          continue;
+        }
+
+        // Check if we should run based on schedule time
+        const now = new Date();
+        const currentHour = now.getHours();
+        
+        // Parse campaign schedule time (format: "HH:MM")
+        if (campaign.scheduleTime) {
+          const [scheduleHour] = campaign.scheduleTime.split(':').map(Number);
+          
+          // Only run if current hour matches
+          if (currentHour !== scheduleHour) {
+            continue;
+          }
+          
+          logger.info(`[DailyOutreach] Processing campaign ${campaign.id} at scheduled time ${campaign.scheduleTime}`);
+        }
+
         try {
           await this.sendOutreachForCampaign(campaign);
         } catch (error: any) {

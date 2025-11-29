@@ -1,5 +1,6 @@
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import WorkflowSelector from '@/components/WorkflowSelector'
 import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
@@ -18,10 +19,8 @@ interface CampaignFormData {
   usesApollo: boolean
   usesPeopleDL: boolean
   usesGooglePlaces: boolean
+  workflowId: string | null
   emailTemplateId: string
-  followUpEnabled: boolean
-  followUp1DelayDays: number
-  followUp2DelayDays: number
   scheduleType: 'manual' | 'daily'
   scheduleTime: string
 }
@@ -56,6 +55,7 @@ export default function Campaigns() {
   const [showPauseConfirm, setShowPauseConfirm] = useState(false)
   const [campaignToPause, setCampaignToPause] = useState<string | null>(null)
   const [isPausing, setIsPausing] = useState(false)
+  const [newCountry, setNewCountry] = useState('')
   
   const [formData, setFormData] = useState<CampaignFormData>({
     name: '',
@@ -69,10 +69,8 @@ export default function Campaigns() {
     usesApollo: true,
     usesPeopleDL: false,
     usesGooglePlaces: true,
+    workflowId: null,
     emailTemplateId: '',
-    followUpEnabled: true,
-    followUp1DelayDays: 3,
-    followUp2DelayDays: 5,
     scheduleType: 'manual',
     scheduleTime: '09:00',
   })
@@ -121,10 +119,8 @@ export default function Campaigns() {
       usesApollo: true,
       usesPeopleDL: false,
       usesGooglePlaces: true,
+      workflowId: null,
       emailTemplateId: '',
-      followUpEnabled: true,
-      followUp1DelayDays: 3,
-      followUp2DelayDays: 5,
       scheduleType: 'manual',
       scheduleTime: '09:00',
     })
@@ -616,21 +612,92 @@ export default function Campaigns() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Target Countries
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {countries.map((country) => (
-                          <label key={country} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={formData.targetCountries.includes(country)}
-                              onChange={() => setFormData({
-                                ...formData,
-                                targetCountries: toggleArrayValue(formData.targetCountries, country)
-                              })}
-                              className="rounded text-primary-600"
-                            />
-                            <span className="text-sm text-gray-700">{country}</span>
-                          </label>
-                        ))}
+                      <div className="space-y-3">
+                        {/* Input to add custom country */}
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newCountry}
+                            onChange={(e) => setNewCountry(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && newCountry.trim()) {
+                                e.preventDefault()
+                                if (!formData.targetCountries.includes(newCountry.trim())) {
+                                  setFormData({
+                                    ...formData,
+                                    targetCountries: [...formData.targetCountries, newCountry.trim()]
+                                  })
+                                }
+                                setNewCountry('')
+                              }
+                            }}
+                            placeholder="Type country name and press Enter"
+                            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newCountry.trim() && !formData.targetCountries.includes(newCountry.trim())) {
+                                setFormData({
+                                  ...formData,
+                                  targetCountries: [...formData.targetCountries, newCountry.trim()]
+                                })
+                                setNewCountry('')
+                              }
+                            }}
+                            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                          >
+                            Add
+                          </button>
+                        </div>
+
+                        {/* Display selected countries as chips */}
+                        {formData.targetCountries.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {formData.targetCountries.map((country, index) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                              >
+                                {country}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData({
+                                      ...formData,
+                                      targetCountries: formData.targetCountries.filter((_, i) => i !== index)
+                                    })
+                                  }}
+                                  className="hover:text-blue-900"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Quick select popular countries */}
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2">Quick select:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {countries.map((country) => (
+                              !formData.targetCountries.includes(country) && (
+                                <button
+                                  key={country}
+                                  type="button"
+                                  onClick={() => setFormData({
+                                    ...formData,
+                                    targetCountries: [...formData.targetCountries, country]
+                                  })}
+                                  className="px-3 py-1 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                                >
+                                  + {country}
+                                </button>
+                              )
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -777,51 +844,24 @@ export default function Campaigns() {
                           onChange={(e) => setFormData({ ...formData, scheduleTime: e.target.value })}
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Campaign will automatically generate leads and send emails at this time daily
+                        </p>
                       </div>
                     )}
 
                     <div className="pt-4 border-t">
-                      <label className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          checked={formData.followUpEnabled}
-                          onChange={(e) => setFormData({ ...formData, followUpEnabled: e.target.checked })}
-                          className="rounded text-primary-600"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Enable Follow-ups</span>
-                      </label>
+                      <WorkflowSelector
+                        selectedWorkflowId={formData.workflowId}
+                        onSelect={(workflowId) => setFormData({ ...formData, workflowId })}
+                        label="Email Workflow (Optional)"
+                        placeholder="Select an email workflow"
+                        required={false}
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        Choose a workflow to send automated email sequences. If no workflow is selected, you'll need to configure emails manually.
+                      </p>
                     </div>
-
-                    {formData.followUpEnabled && (
-                      <div className="grid grid-cols-2 gap-4 ml-6">
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-2">
-                            Follow-up 1 (days)
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.followUp1DelayDays}
-                            onChange={(e) => setFormData({ ...formData, followUp1DelayDays: parseInt(e.target.value) || 0 })}
-                            min="1"
-                            max="30"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-700 mb-2">
-                            Follow-up 2 (days)
-                          </label>
-                          <input
-                            type="number"
-                            value={formData.followUp2DelayDays}
-                            onChange={(e) => setFormData({ ...formData, followUp2DelayDays: parseInt(e.target.value) || 0 })}
-                            min="1"
-                            max="30"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

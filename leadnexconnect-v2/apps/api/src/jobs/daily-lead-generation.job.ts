@@ -21,12 +21,12 @@ export class DailyLeadGenerationJob {
    * Start the cron job
    */
   start() {
-    // Run every day at 9:00 AM
-    this.cronJob = cron.schedule('0 9 * * *', async () => {
+    // Run every hour to check for campaigns that should run
+    this.cronJob = cron.schedule('0 * * * *', async () => {
       await this.execute();
     });
 
-    logger.info('📅 Daily Lead Generation Job scheduled (9:00 AM)');
+    logger.info('📅 Daily Lead Generation Job scheduled (runs hourly, checks campaign schedules)');
   }
 
   /**
@@ -61,18 +61,37 @@ export class DailyLeadGenerationJob {
 
       // Process each campaign
       for (const campaign of activeCampaigns) {
-        // Only process campaigns with daily schedule or if it's time to run
+        // Only process campaigns with daily schedule
         if (campaign.scheduleType !== 'daily') {
           continue;
         }
 
         // Check if we should run based on schedule time
         const now = new Date();
-        const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
         
-        if (campaign.scheduleTime && campaign.scheduleTime !== currentTime) {
-          logger.info(`[DailyLeadGeneration] Skipping campaign ${campaign.id} - not scheduled for ${currentTime}`);
-          continue;
+        // Parse campaign schedule time (format: "HH:MM")
+        if (campaign.scheduleTime) {
+          const [scheduleHour, scheduleMinute] = campaign.scheduleTime.split(':').map(Number);
+          
+          // Only run if current hour matches AND we haven't run in the last hour
+          if (currentHour !== scheduleHour) {
+            continue;
+          }
+          
+          // Check if already ran today
+          if (campaign.lastRunAt) {
+            const lastRun = new Date(campaign.lastRunAt);
+            const hoursSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
+            
+            if (hoursSinceLastRun < 23) {
+              logger.info(`[DailyLeadGeneration] Skipping campaign ${campaign.id} - already ran today`);
+              continue;
+            }
+          }
+          
+          logger.info(`[DailyLeadGeneration] Running campaign ${campaign.id} at scheduled time ${campaign.scheduleTime}`);
         }
 
         try {
