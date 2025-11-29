@@ -358,7 +358,11 @@ export default function Campaigns() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {campaigns.map((campaign) => (
-              <div key={campaign.id} className="bg-white rounded-lg shadow hover:shadow-xl transition-shadow flex flex-col">
+              <div 
+                key={campaign.id} 
+                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                className="bg-white rounded-lg shadow hover:shadow-xl transition-shadow flex flex-col cursor-pointer"
+              >
                 <div className="p-6 flex-1">
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">

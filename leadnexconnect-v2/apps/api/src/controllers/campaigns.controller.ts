@@ -55,6 +55,33 @@ export class CampaignsController {
         });
       }
 
+      const campaignData = campaign[0];
+
+      // Get workflow data if campaign has workflowId
+      let workflowData = null;
+      if (campaignData.workflowId) {
+        const { workflows, workflowSteps } = await import('@leadnex/database');
+        
+        const workflowResults = await db
+          .select()
+          .from(workflows)
+          .where(eq(workflows.id, campaignData.workflowId))
+          .limit(1);
+
+        if (workflowResults.length > 0) {
+          const steps = await db
+            .select()
+            .from(workflowSteps)
+            .where(eq(workflowSteps.workflowId, campaignData.workflowId))
+            .orderBy(workflowSteps.stepNumber);
+
+          workflowData = {
+            ...workflowResults[0],
+            steps,
+          };
+        }
+      }
+
       // Get campaign leads via emails table
       const campaignEmails = await db
         .select()
@@ -65,12 +92,68 @@ export class CampaignsController {
       res.json({
         success: true,
         data: {
-          ...campaign[0],
+          ...campaignData,
+          workflow: workflowData,
           leads: campaignEmails.map(e => e.leads),
         },
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error getting campaign', { error: error.message });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * GET /api/campaigns/:id/leads - Get enrolled leads for a campaign
+   */
+  async getCampaignLeads(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      // Get leads enrolled in this campaign via campaignLeads table
+      const campaignLeadRecords = await db
+        .select()
+        .from(campaignLeads)
+        .where(eq(campaignLeads.campaignId, id));
+
+      const leadIds = campaignLeadRecords.map(cl => cl.leadId);
+      
+      if (leadIds.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+        });
+      }
+
+      // Fetch lead details
+      const enrolledLeads = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.id, leadIds[0]));
+
+      // Fetch all leads (need to query each separately or use IN clause)
+      const allLeads = [];
+      for (const leadId of leadIds) {
+        const leadResults = await db
+          .select()
+          .from(leads)
+          .where(eq(leads.id, leadId))
+          .limit(1);
+        
+        if (leadResults.length > 0) {
+          allLeads.push(leadResults[0]);
+        }
+      }
+
+      res.json({
+        success: true,
+        data: allLeads,
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error getting campaign leads', { error: error.message });
       res.status(500).json({
         success: false,
         error: { message: error.message },
@@ -248,6 +331,53 @@ export class CampaignsController {
     } catch (error: any) {
       logger.error('[CampaignsController] Error adding leads to campaign', {
         error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * POST /api/campaigns/:id/execute - Manually execute a campaign
+   */
+  async executeCampaignEndpoint(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      // Get campaign
+      const campaignResults = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .limit(1);
+
+      if (!campaignResults[0]) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Campaign not found' },
+        });
+      }
+
+      const campaign = campaignResults[0];
+
+      // Execute campaign
+      await this.executeCampaign(id, campaign);
+
+      // Update campaign status to active
+      await db
+        .update(campaigns)
+        .set({ status: 'active', updatedAt: new Date() })
+        .where(eq(campaigns.id, id));
+
+      res.json({
+        success: true,
+        message: 'Campaign execution started',
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error executing campaign endpoint', { 
+        error: error.message 
       });
       res.status(500).json({
         success: false,
