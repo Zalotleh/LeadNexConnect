@@ -104,18 +104,32 @@ export default function Leads() {
 
   // Fetch batches for batch view
   const { data: batchesData, isLoading: batchesLoading, refetch: refetchBatches } = useQuery({
-    queryKey: ['batches'],
+    queryKey: ['batches', activeTab],
     queryFn: async () => {
       const result = await leadsAPI.getBatches()
       return result.data // Return the unwrapped data
     },
     enabled: viewMode === 'batches' || generating, // Enable when in batch view or generating
     staleTime: 0, // Always fetch fresh data
-    cacheTime: 0, // Don't cache
   })
 
   const leads: Lead[] = data?.data || []
-  const batches = Array.isArray(batchesData?.data) ? batchesData.data : []
+  const allBatches = Array.isArray(batchesData?.data) ? batchesData.data : []
+  
+  // Filter batches based on activeTab
+  const batches = allBatches.filter((batch: any) => {
+    if (activeTab === 'all') return true
+    if (activeTab === 'imported') {
+      return batch.source === 'csv_import' || batch.source === 'manual_import'
+    }
+    if (activeTab === 'generated') {
+      return batch.source === 'apollo' || 
+             batch.source === 'google_places' || 
+             batch.source === 'peopledatalabs' ||
+             batch.source === 'automated'
+    }
+    return true
+  })
 
   // Client-side filtering for score and tier
   const filteredLeads = leads.filter(lead => {
