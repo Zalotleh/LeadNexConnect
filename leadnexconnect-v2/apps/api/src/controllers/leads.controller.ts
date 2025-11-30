@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
-import { leads, leadBatches } from '@leadnex/database';
+import { leads, leadBatches, emails, campaigns } from '@leadnex/database';
 import { eq, and, gte, lte, ilike, desc } from 'drizzle-orm';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
@@ -351,6 +351,137 @@ export class LeadsController {
       });
     } catch (error: any) {
       logger.error('[LeadsController] Error getting batches', {
+        error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * GET /api/leads/batches/:id/analytics - Get batch performance analytics
+   */
+  async getBatchAnalytics(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      logger.info('[LeadsController] Getting batch analytics', { batchId: id });
+
+      // Get batch details
+      const batch = await db
+        .select()
+        .from(leadBatches)
+        .where(eq(leadBatches.id, id))
+        .limit(1);
+
+      if (batch.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Batch not found' },
+        });
+      }
+
+      const batchData = batch[0];
+
+      // Get all leads from this batch
+      const batchLeads = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.batchId, id));
+
+      // Get all emails sent to leads in this batch
+      const leadIds = batchLeads.map(l => l.id);
+      let allEmails: any[] = [];
+      
+      if (leadIds.length > 0) {
+        // Query emails for each lead (workaround for IN operator)
+        for (const leadId of leadIds) {
+          const leadEmails = await db
+            .select()
+            .from(emails)
+            .where(eq(emails.leadId, leadId));
+          allEmails.push(...leadEmails);
+        }
+      }
+
+      // Calculate metrics
+      const totalLeads = batchLeads.length;
+      const emailsSent = allEmails.filter(e => e.status === 'sent' || e.status === 'delivered' || e.status === 'opened').length;
+      const emailsOpened = allEmails.filter(e => e.openedAt !== null).length;
+      const emailsClicked = allEmails.filter(e => e.clickedAt !== null).length;
+      const emailsBounced = allEmails.filter(e => e.status === 'bounced').length;
+      
+      // Calculate conversion rates
+      const openRate = emailsSent > 0 ? (emailsOpened / emailsSent) * 100 : 0;
+      const clickRate = emailsSent > 0 ? (emailsClicked / emailsSent) * 100 : 0;
+      const bounceRate = emailsSent > 0 ? (emailsBounced / emailsSent) * 100 : 0;
+      const clickToOpenRate = emailsOpened > 0 ? (emailsClicked / emailsOpened) * 100 : 0;
+
+      // Get campaigns using this batch
+      const batchCampaigns = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.batchId, id));
+
+      // Calculate lead quality breakdown
+      const hotLeads = batchLeads.filter(l => (l.qualityScore || 0) >= 80).length;
+      const warmLeads = batchLeads.filter(l => {
+        const score = l.qualityScore || 0;
+        return score >= 60 && score < 80;
+      }).length;
+      const coldLeads = batchLeads.filter(l => (l.qualityScore || 0) < 60).length;
+
+      // Lead status breakdown
+      const statusBreakdown: any = {};
+      batchLeads.forEach(lead => {
+        const status = lead.status || 'new';
+        statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+      });
+
+      res.json({
+        success: true,
+        data: {
+          batch: {
+            id: batchData.id,
+            name: batchData.name,
+            createdAt: batchData.createdAt,
+            uploadedBy: batchData.uploadedBy,
+            importSettings: batchData.importSettings,
+          },
+          metrics: {
+            totalLeads,
+            successfulImports: batchData.successfulImports,
+            failedImports: batchData.failedImports,
+            duplicatesSkipped: batchData.duplicatesSkipped,
+            emailsSent,
+            emailsOpened,
+            emailsClicked,
+            emailsBounced,
+            openRate: Math.round(openRate * 100) / 100,
+            clickRate: Math.round(clickRate * 100) / 100,
+            bounceRate: Math.round(bounceRate * 100) / 100,
+            clickToOpenRate: Math.round(clickToOpenRate * 100) / 100,
+          },
+          leadQuality: {
+            hot: hotLeads,
+            warm: warmLeads,
+            cold: coldLeads,
+          },
+          statusBreakdown,
+          campaigns: batchCampaigns.map(c => ({
+            id: c.id,
+            name: c.name,
+            status: c.status,
+            emailsSent: c.emailsSent,
+            emailsOpened: c.emailsOpened,
+            emailsClicked: c.emailsClicked,
+          })),
+        },
+      });
+    } catch (error: any) {
+      logger.error('[LeadsController] Error getting batch analytics', {
         error: error.message,
       });
       res.status(500).json({

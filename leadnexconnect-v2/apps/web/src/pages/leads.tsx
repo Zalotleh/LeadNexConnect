@@ -5,7 +5,7 @@ import ConfirmDialog from '@/components/ConfirmDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
 import EmailEditor from '@/components/EmailEditor'
 import leadsService, { Lead } from '@/services/leads.service'
-import { leadsAPI, aiAPI } from '@/services/api'
+import { leadsAPI, aiAPI, campaignsAPI } from '@/services/api'
 import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
@@ -47,6 +47,10 @@ export default function Leads() {
     companySize: '',
   })
   const [isCreatingLead, setIsCreatingLead] = useState(false)
+  const [showBatchCampaignModal, setShowBatchCampaignModal] = useState(false)
+  const [selectedBatchForCampaign, setSelectedBatchForCampaign] = useState<any>(null)
+  const [showBatchAnalyticsModal, setShowBatchAnalyticsModal] = useState(false)
+  const [selectedBatchForAnalytics, setSelectedBatchForAnalytics] = useState<any>(null)
   const [filters, setFilters] = useState({
     industry: 'all',
     minScore: 0,
@@ -1049,19 +1053,19 @@ export default function Leads() {
                       return (
                         <div key={batch.id} className="border border-gray-200 rounded-lg overflow-hidden">
                           {/* Batch Header */}
-                          <div
-                            onClick={() => {
-                              const newExpanded = new Set(expandedBatches)
-                              if (isExpanded) {
-                                newExpanded.delete(batch.id)
-                              } else {
-                                newExpanded.add(batch.id)
-                              }
-                              setExpandedBatches(newExpanded)
-                            }}
-                            className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors"
-                          >
-                            <div className="flex items-center gap-4 flex-1">
+                          <div className="flex items-center justify-between p-4 bg-gray-50">
+                            <div
+                              onClick={() => {
+                                const newExpanded = new Set(expandedBatches)
+                                if (isExpanded) {
+                                  newExpanded.delete(batch.id)
+                                } else {
+                                  newExpanded.add(batch.id)
+                                }
+                                setExpandedBatches(newExpanded)
+                              }}
+                              className="flex items-center gap-4 flex-1 cursor-pointer hover:bg-gray-100 -m-4 p-4 rounded-l-lg transition-colors"
+                            >
                               {isExpanded ? (
                                 <ChevronDown className="w-5 h-5 text-gray-500" />
                               ) : (
@@ -1091,6 +1095,31 @@ export default function Leads() {
                                   </div>
                                 </>
                               )}
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-2 ml-4">
+                                <button
+                                  onClick={() => {
+                                    setSelectedBatchForCampaign(batch)
+                                    setShowBatchCampaignModal(true)
+                                  }}
+                                  className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
+                                  title="Start Campaign"
+                                >
+                                  <Zap className="w-4 h-4" />
+                                  Start Campaign
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedBatchForAnalytics(batch)
+                                    setShowBatchAnalyticsModal(true)
+                                  }}
+                                  className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                                  title="View Analytics"
+                                >
+                                  <TrendingUp className="w-4 h-4" />
+                                  Analytics
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -2112,7 +2141,380 @@ export default function Leads() {
             </div>
           </div>
         )}
+
+        {/* Batch Campaign Modal */}
+        {showBatchCampaignModal && selectedBatchForCampaign && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Start Campaign from Batch</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Create a campaign for: <span className="font-semibold">{selectedBatchForCampaign.name}</span>
+                  </p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowBatchCampaignModal(false)
+                    setSelectedBatchForCampaign(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Package className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Batch Info</p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        {selectedBatchForCampaign.leadCount} leads • 
+                        Created {new Date(selectedBatchForCampaign.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Campaign Name *
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={`Campaign - ${selectedBatchForCampaign.name}`}
+                    id="batchCampaignName"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="e.g., NYC Hotels Outreach - March 2024"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    id="batchCampaignDescription"
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="Describe your campaign objectives..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Workflow (Optional)
+                  </label>
+                  <select
+                    id="batchCampaignWorkflow"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  >
+                    <option value="">No workflow (single email)</option>
+                    <option value="workflow-1">Follow-up Sequence (3 emails)</option>
+                    <option value="workflow-2">Nurture Campaign (5 emails)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select a workflow to send multiple emails over time
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Note:</strong> Emails will be personalized using AI based on each lead's information.
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end p-6 border-t space-x-3">
+                <button
+                  onClick={() => {
+                    setShowBatchCampaignModal(false)
+                    setSelectedBatchForCampaign(null)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const name = (document.getElementById('batchCampaignName') as HTMLInputElement).value
+                    const description = (document.getElementById('batchCampaignDescription') as HTMLTextAreaElement).value
+                    const workflowId = (document.getElementById('batchCampaignWorkflow') as HTMLSelectElement).value
+
+                    if (!name.trim()) {
+                      toast.error('Please enter a campaign name')
+                      return
+                    }
+
+                    try {
+                      toast.loading('Creating campaign...')
+                      await campaignsAPI.createCampaignFromBatch({
+                        name,
+                        description: description || undefined,
+                        batchId: selectedBatchForCampaign.id,
+                        workflowId: workflowId || undefined,
+                        startImmediately: false,
+                      })
+                      toast.dismiss()
+                      toast.success('Campaign created successfully!')
+                      setShowBatchCampaignModal(false)
+                      setSelectedBatchForCampaign(null)
+                      // Optionally redirect to campaigns page
+                      window.location.href = '/campaigns'
+                    } catch (error: any) {
+                      toast.dismiss()
+                      toast.error(error.response?.data?.error?.message || 'Failed to create campaign')
+                    }
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center gap-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  Create Campaign
+                </button>
+                <button
+                  onClick={async () => {
+                    const name = (document.getElementById('batchCampaignName') as HTMLInputElement).value
+                    const description = (document.getElementById('batchCampaignDescription') as HTMLTextAreaElement).value
+                    const workflowId = (document.getElementById('batchCampaignWorkflow') as HTMLSelectElement).value
+
+                    if (!name.trim()) {
+                      toast.error('Please enter a campaign name')
+                      return
+                    }
+
+                    try {
+                      toast.loading('Creating and starting campaign...')
+                      await campaignsAPI.createCampaignFromBatch({
+                        name,
+                        description: description || undefined,
+                        batchId: selectedBatchForCampaign.id,
+                        workflowId: workflowId || undefined,
+                        startImmediately: true,
+                      })
+                      toast.dismiss()
+                      toast.success('Campaign started successfully!')
+                      setShowBatchCampaignModal(false)
+                      setSelectedBatchForCampaign(null)
+                      window.location.href = '/campaigns'
+                    } catch (error: any) {
+                      toast.dismiss()
+                      toast.error(error.response?.data?.error?.message || 'Failed to start campaign')
+                    }
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  Start Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Batch Analytics Modal - Coming in next step */}
+        {showBatchAnalyticsModal && selectedBatchForAnalytics && (
+          <BatchAnalyticsModal
+            batch={selectedBatchForAnalytics}
+            onClose={() => {
+              setShowBatchAnalyticsModal(false)
+              setSelectedBatchForAnalytics(null)
+            }}
+          />
+        )}
+
       </div>
     </Layout>
+  )
+}
+
+// Batch Analytics Modal Component
+function BatchAnalyticsModal({ batch, onClose }: { batch: any; onClose: () => void }) {
+  const { data: analyticsData, isLoading } = useQuery({
+    queryKey: ['batchAnalytics', batch.id],
+    queryFn: async () => await leadsAPI.getBatchAnalytics(batch.id),
+  })
+
+  const analytics = analyticsData?.data
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Batch Analytics</h2>
+            <p className="text-sm text-gray-600 mt-1">{batch.name}</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 space-y-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader className="w-8 h-8 animate-spin text-primary-600" />
+            </div>
+          ) : analytics ? (
+            <>
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4 text-blue-600" />
+                    <p className="text-sm font-medium text-blue-900">Total Leads</p>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-900">{analytics.metrics.totalLeads}</p>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="w-4 h-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-900">Successful</p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-900">{analytics.metrics.successfulImports}</p>
+                </div>
+
+                <div className="bg-yellow-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="w-4 h-4 text-yellow-600" />
+                    <p className="text-sm font-medium text-yellow-900">Duplicates</p>
+                  </div>
+                  <p className="text-2xl font-bold text-yellow-900">{analytics.metrics.duplicatesSkipped}</p>
+                </div>
+
+                <div className="bg-red-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <X className="w-4 h-4 text-red-600" />
+                    <p className="text-sm font-medium text-red-900">Failed</p>
+                  </div>
+                  <p className="text-2xl font-bold text-red-900">{analytics.metrics.failedImports}</p>
+                </div>
+              </div>
+
+              {/* Email Performance */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Email Performance</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Emails Sent</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.emailsSent}</p>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Open Rate</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.openRate}%</p>
+                    <p className="text-xs text-gray-500 mt-1">{analytics.metrics.emailsOpened} opened</p>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Click Rate</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.clickRate}%</p>
+                    <p className="text-xs text-gray-500 mt-1">{analytics.metrics.emailsClicked} clicked</p>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-1">Bounce Rate</p>
+                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.bounceRate}%</p>
+                    <p className="text-xs text-gray-500 mt-1">{analytics.metrics.emailsBounced} bounced</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lead Quality Breakdown */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Quality</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-red-900 mb-2">🔥 Hot Leads</p>
+                    <p className="text-3xl font-bold text-red-900">{analytics.leadQuality.hot}</p>
+                    <p className="text-xs text-red-700 mt-1">Score 80-100</p>
+                  </div>
+
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-yellow-900 mb-2">⚡ Warm Leads</p>
+                    <p className="text-3xl font-bold text-yellow-900">{analytics.leadQuality.warm}</p>
+                    <p className="text-xs text-yellow-700 mt-1">Score 60-79</p>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-blue-900 mb-2">❄️ Cold Leads</p>
+                    <p className="text-3xl font-bold text-blue-900">{analytics.leadQuality.cold}</p>
+                    <p className="text-xs text-blue-700 mt-1">Score 0-59</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Breakdown */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Status</h3>
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                  {Object.entries(analytics.statusBreakdown).map(([status, count]: [string, any]) => (
+                    <div key={status} className="border border-gray-200 rounded-lg p-3">
+                      <p className="text-xs text-gray-600 mb-1 capitalize">{status.replace('_', ' ')}</p>
+                      <p className="text-xl font-bold text-gray-900">{count}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Campaigns Using This Batch */}
+              {analytics.campaigns && analytics.campaigns.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaigns Using This Batch</h3>
+                  <div className="space-y-3">
+                    {analytics.campaigns.map((campaign: any) => (
+                      <div key={campaign.id} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-gray-900">{campaign.name}</h4>
+                          <p className="text-sm text-gray-600">Status: <span className="capitalize">{campaign.status}</span></p>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <div className="text-center">
+                            <p className="font-semibold text-gray-900">{campaign.emailsSent}</p>
+                            <p className="text-xs text-gray-500">Sent</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-semibold text-gray-900">{campaign.emailsOpened}</p>
+                            <p className="text-xs text-gray-500">Opened</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-semibold text-gray-900">{campaign.emailsClicked}</p>
+                            <p className="text-xs text-gray-500">Clicked</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              No analytics data available
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="flex items-center justify-end p-6 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

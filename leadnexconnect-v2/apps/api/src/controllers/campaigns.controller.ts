@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
-import { campaigns, leads, emails, emailTemplates, campaignLeads } from '@leadnex/database';
+import { campaigns, leads, emails, emailTemplates, campaignLeads, leadBatches } from '@leadnex/database';
 import { eq, desc, and, gte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
@@ -292,6 +292,145 @@ export class CampaignsController {
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error creating campaign', {
+        error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * POST /api/campaigns/from-batch - Create campaign from a batch
+   */
+  async createCampaignFromBatch(req: Request, res: Response) {
+    try {
+      const {
+        name,
+        description,
+        batchId,
+        workflowId,
+        emailTemplateId,
+        startImmediately = false,
+      } = req.body;
+
+      if (!batchId) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'batchId is required' },
+        });
+      }
+
+      logger.info('[CampaignsController] Creating campaign from batch', {
+        batchId,
+        startImmediately,
+      });
+
+      // Get batch details
+      const batch = await db
+        .select()
+        .from(leadBatches)
+        .where(eq(leadBatches.id, batchId))
+        .limit(1);
+
+      if (batch.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Batch not found' },
+        });
+      }
+
+      const batchData = batch[0];
+
+      // Get leads from this batch
+      const batchLeads = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.batchId, batchId));
+
+      if (batchLeads.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'No leads found in this batch' },
+        });
+      }
+
+      logger.info(`[CampaignsController] Found ${batchLeads.length} leads in batch ${batchId}`);
+
+      // Extract industry and location from batch settings or leads
+      const importSettings = batchData.importSettings as any;
+      const industry = importSettings?.industry || batchLeads[0].industry;
+      const targetCountries = importSettings?.countries || [batchLeads[0].country].filter(Boolean);
+      const targetCities = importSettings?.cities || [batchLeads[0].city].filter(Boolean);
+
+      // Create campaign
+      const campaignData: any = {
+        name: name || `Campaign - ${batchData.name}`,
+        description: description || `Campaign created from batch: ${batchData.name}`,
+        campaignType: 'manual', // Batch campaigns are manual since leads are pre-generated
+        batchId: batchId, // Link to the batch
+        industry: industry,
+        targetCountries: targetCountries.length > 0 ? targetCountries : null,
+        targetCities: targetCities.length > 0 ? targetCities : null,
+        status: startImmediately ? 'active' : 'draft',
+        scheduleType: 'manual',
+        leadsGenerated: batchLeads.length,
+        emailsSent: 0,
+        emailsOpened: 0,
+        emailsClicked: 0,
+        responsesReceived: 0,
+      };
+
+      if (workflowId) {
+        campaignData.workflowId = workflowId;
+      }
+
+      if (emailTemplateId) {
+        campaignData.emailTemplateId = emailTemplateId;
+      }
+
+      const newCampaign = await db
+        .insert(campaigns)
+        .values(campaignData)
+        .returning();
+
+      const campaignId = newCampaign[0].id;
+
+      // Link all batch leads to the campaign
+      const campaignLeadRecords = batchLeads.map(lead => ({
+        campaignId,
+        leadId: lead.id,
+      }));
+
+      await db.insert(campaignLeads).values(campaignLeadRecords);
+
+      logger.info(`[CampaignsController] Campaign created from batch`, {
+        campaignId,
+        batchId,
+        leadsLinked: batchLeads.length,
+      });
+
+      // If starting immediately, execute the campaign
+      if (startImmediately) {
+        // Execute in background
+        this.executeCampaign(campaignId, newCampaign[0]).catch(error => {
+          logger.error('[CampaignsController] Error executing campaign after creation', {
+            campaignId,
+            error: error.message,
+          });
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          campaign: newCampaign[0],
+          leadsLinked: batchLeads.length,
+        },
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error creating campaign from batch', {
         error: error.message,
       });
       res.status(500).json({
@@ -873,10 +1012,32 @@ export class CampaignsController {
    */
   private async executeAutomatedCampaign(campaignId: string, campaign: any) {
     try {
+      // Create batch record first
+      const batchName = `${campaign.name} - ${new Date().toLocaleDateString()}`;
+      const batch = await db.insert(leadBatches).values({
+        name: batchName,
+        uploadedBy: 'system',
+        totalLeads: 0,
+        successfulImports: 0,
+        failedImports: 0,
+        duplicatesSkipped: 0,
+        importSettings: {
+          campaignId: campaignId,
+          industry: campaign.industry,
+          countries: campaign.targetCountries,
+          cities: campaign.targetCities,
+          sources: this.getActiveSources(campaign),
+        }
+      }).returning();
+
+      const batchId = batch[0].id;
+      logger.info(`[CampaignsController] Created batch: ${batchId} - ${batchName}`);
+
       const rawLeads: any[] = [];
       const leadsPerSource = Math.ceil((campaign.leadsPerDay || 50) / this.countActiveSources(campaign));
 
       logger.info('[CampaignsController] Lead generation config', {
+        batchId,
         leadsPerDay: campaign.leadsPerDay || 50,
         activeSources: this.countActiveSources(campaign),
         leadsPerSource,
@@ -918,9 +1079,12 @@ export class CampaignsController {
         return;
       }
 
+      // Assign batchId to all raw leads
+      const leadsWithBatch = rawLeads.map(lead => ({ ...lead, batchId }));
+
       // 2. Enrich leads through pipeline
-      logger.info(`[CampaignsController] Enriching ${rawLeads.length} leads`);
-      const enrichmentResults = await enrichmentPipelineService.enrichBatch(rawLeads);
+      logger.info(`[CampaignsController] Enriching ${leadsWithBatch.length} leads`);
+      const enrichmentResults = await enrichmentPipelineService.enrichBatch(leadsWithBatch);
       
       // Extract successfully enriched lead IDs
       const successfulLeadIds = enrichmentResults
@@ -1017,20 +1181,39 @@ export class CampaignsController {
         }
       }
 
-      // 5. Update campaign metrics
+      // 5. Update batch metrics
+      const duplicateCount = enrichmentResults.filter(r => r.isDuplicate).length;
+      const failedCount = enrichmentResults.filter(r => !r.success && !r.isDuplicate).length;
+
+      await db
+        .update(leadBatches)
+        .set({
+          totalLeads: rawLeads.length,
+          successfulImports: successfulLeadIds.length,
+          failedImports: failedCount,
+          duplicatesSkipped: duplicateCount,
+        })
+        .where(eq(leadBatches.id, batchId));
+
+      // 6. Update campaign metrics and link to batch
       // Note: emailsSent counter will be updated by email sender service when emails are actually sent
       await db
         .update(campaigns)
         .set({
           leadsGenerated: (campaign.leadsGenerated || 0) + allQualifiedLeads.length,
           lastRunAt: new Date(),
+          batchId, // Link campaign to the batch used
         })
         .where(eq(campaigns.id, campaignId));
 
       logger.info('[CampaignsController] Campaign execution completed', {
         campaignId,
+        batchId,
+        batchName,
         leadsGenerated: allQualifiedLeads.length,
         emailsScheduled: emailsQueued,
+        duplicates: duplicateCount,
+        failed: failedCount,
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error executing automated campaign', {
@@ -1051,6 +1234,18 @@ export class CampaignsController {
     if (campaign.usesPeopleDL) count++;
     if (campaign.usesLinkedin) count++;
     return Math.max(count, 1); // At least 1 to avoid division by zero
+  }
+
+  /**
+   * Get list of active lead sources for a campaign
+   */
+  private getActiveSources(campaign: any): string[] {
+    const sources: string[] = [];
+    if (campaign.usesApollo) sources.push('apollo');
+    if (campaign.usesGooglePlaces) sources.push('google_places');
+    if (campaign.usesPeopleDL) sources.push('peopledatalabs');
+    if (campaign.usesLinkedin) sources.push('linkedin');
+    return sources;
   }
 
   /**

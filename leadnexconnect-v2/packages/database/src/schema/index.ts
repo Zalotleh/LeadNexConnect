@@ -155,6 +155,7 @@ export const campaigns = pgTable('campaigns', {
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
   campaignType: varchar('campaign_type', { length: 50 }).default('automated'), // 'automated' or 'manual'
+  batchId: uuid('batch_id'), // References leadBatches - tracks which batch was used for lead generation
   
   // Target Criteria
   industry: varchar('industry', { length: 100 }),

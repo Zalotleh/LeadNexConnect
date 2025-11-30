@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import { db, campaigns } from '@leadnex/database';
+import { db, campaigns, leadBatches, leads } from '@leadnex/database';
 import { eq } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
@@ -123,6 +123,27 @@ export class DailyLeadGenerationJob {
   private async generateLeadsForCampaign(campaign: any) {
     logger.info(`[DailyLeadGeneration] Generating leads for campaign: ${campaign.name}`);
 
+    // Create batch record first
+    const batchName = `${campaign.name} - Daily ${new Date().toLocaleDateString()}`;
+    const batch = await db.insert(leadBatches).values({
+      name: batchName,
+      uploadedBy: 'system',
+      totalLeads: 0,
+      successfulImports: 0,
+      failedImports: 0,
+      duplicatesSkipped: 0,
+      importSettings: {
+        campaignId: campaign.id,
+        industry: campaign.industry,
+        countries: campaign.targetCountries,
+        cities: campaign.targetCities,
+        sources: this.getActiveSources(campaign),
+      }
+    }).returning();
+
+    const batchId = batch[0].id;
+    logger.info(`[DailyLeadGeneration] Created batch: ${batchId} - ${batchName}`);
+
     const rawLeads: any[] = [];
     const targetCount = campaign.leadsPerDay || 50;
     const activeSources = this.countActiveSources(campaign);
@@ -205,6 +226,7 @@ export class DailyLeadGenerationJob {
       
       return {
         ...lead,
+        batchId, // Assign batch ID to each lead
         qualityScore,
         digitalMaturityScore,
         bookingPotential,
@@ -217,6 +239,7 @@ export class DailyLeadGenerationJob {
 
     const successCount = enrichmentResults.filter(r => r.success && !r.isDuplicate).length;
     const duplicateCount = enrichmentResults.filter(r => r.isDuplicate).length;
+    const failedCount = enrichmentResults.filter(r => !r.success && !r.isDuplicate).length;
     
     // Track API performance
     for (const [source, metrics] of Object.entries(apiMetrics)) {
@@ -239,19 +262,34 @@ export class DailyLeadGenerationJob {
     const warmLeads = scoredLeads.filter(l => l.qualityScore >= 60 && l.qualityScore < 80).length;
     const coldLeads = scoredLeads.filter(l => l.qualityScore < 60).length;
 
-    // Update campaign metrics
+    // Update batch metrics
+    await db
+      .update(leadBatches)
+      .set({
+        totalLeads: rawLeads.length,
+        successfulImports: successCount,
+        failedImports: failedCount,
+        duplicatesSkipped: duplicateCount,
+      })
+      .where(eq(leadBatches.id, batchId));
+
+    // Update campaign metrics and link to batch
     await db
       .update(campaigns)
       .set({
         leadsGenerated: (campaign.leadsGenerated || 0) + successCount,
         lastRunAt: new Date(),
+        batchId, // Link campaign to the batch used
       })
       .where(eq(campaigns.id, campaign.id));
 
     logger.info(`[DailyLeadGeneration] Campaign ${campaign.name} completed`, {
+      batchId,
+      batchName,
       rawLeads: rawLeads.length,
       enriched: successCount,
       duplicates: duplicateCount,
+      failed: failedCount,
       tiers: { hot: hotLeads, warm: warmLeads, cold: coldLeads },
     });
   }
@@ -266,6 +304,18 @@ export class DailyLeadGenerationJob {
     if (campaign.usesPeopleDL) count++;
     if (campaign.usesLinkedin) count++;
     return Math.max(count, 1);
+  }
+
+  /**
+   * Get list of active lead sources
+   */
+  private getActiveSources(campaign: any): string[] {
+    const sources: string[] = [];
+    if (campaign.usesApollo) sources.push('apollo');
+    if (campaign.usesGooglePlaces) sources.push('google_places');
+    if (campaign.usesPeopleDL) sources.push('peopledatalabs');
+    if (campaign.usesLinkedin) sources.push('linkedin');
+    return sources;
   }
 }
 

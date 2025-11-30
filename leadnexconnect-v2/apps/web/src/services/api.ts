@@ -65,7 +65,22 @@ export const leadsAPI = {
     industry?: string
   }) => api.get('/leads', { params }),
   getBatches: () => api.get('/leads/batches'),
+  getBatchAnalytics: (batchId: string) => api.get(`/leads/batches/${batchId}/analytics`),
   getLeadById: (id: string) => api.get(`/leads/${id}`),
+}
+
+// Campaigns endpoints
+export const campaignsAPI = {
+  createCampaignFromBatch: (data: {
+    name: string
+    description?: string
+    batchId: string
+    workflowId?: string
+    emailTemplateId?: string
+    startImmediately?: boolean
+  }) => api.post('/campaigns/from-batch', data),
+  getCampaigns: () => api.get('/campaigns'),
+  getCampaign: (id: string) => api.get(`/campaigns/${id}`),
 }
 
 // AI endpoints
