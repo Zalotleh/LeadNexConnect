@@ -3,10 +3,10 @@ import { X, Plus, Loader } from 'lucide-react';
 
 // Lead interface
 interface Lead {
-  id: number;
+  id: string;
   companyName: string;
   contactName?: string;
-  email?: string;
+  email: string;
   phone?: string;
   website?: string;
   industry?: string;
@@ -18,6 +18,7 @@ interface Lead {
   source?: string;
   sourceType?: string;
   qualityScore?: number;
+  createdAt?: string;
 }
 
 // Interface for lead form data

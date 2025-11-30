@@ -2,21 +2,22 @@ import React from 'react';
 import { Users, Zap } from 'lucide-react';
 
 interface Lead {
-  id: number;
+  id: string;
   companyName: string;
   website?: string;
   contactName?: string;
-  email?: string;
+  email: string;
   industry?: string;
   status: string;
   qualityScore?: number;
   score?: number;
+  createdAt?: string;
 }
 
 interface LeadsTableViewProps {
   leads: Lead[];
   filteredLeads: Lead[];
-  selectedLeads: Set<number>;
+  selectedLeads: Set<string>;
   isLoading: boolean;
   searchQuery: string;
   filters: {
@@ -24,7 +25,7 @@ interface LeadsTableViewProps {
     source: string;
   };
   onSelectAll: () => void;
-  onSelectLead: (id: number) => void;
+  onSelectLead: (id: string) => void;
   onViewLead: (lead: Lead) => void;
   onEditLead: (lead: Lead) => void;
   onGenerateClick: () => void;

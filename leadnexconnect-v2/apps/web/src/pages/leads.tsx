@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
-import WorkflowSelector from '@/components/WorkflowSelector'
-import EmailEditor from '@/components/EmailEditor'
 import leadsService, { Lead } from '@/services/leads.service'
-import { leadsAPI, aiAPI, campaignsAPI } from '@/services/api'
-import { Plus, Filter, Download, Upload, Users, Zap, X, Search, Loader, TrendingUp, Target, Package, List, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { aiAPI, campaignsAPI, leadsAPI } from '@/services/api'
+import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, TrendingUp, Target } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
+
+// Extracted Components
+import { useLeadsData } from '@/hooks/useLeadsData'
+import ImportCSVDialog from '@/components/leads/ImportCSVDialog'
+import { GenerateLeadsModal } from '@/components/leads/GenerateLeadsModal'
+import { CreateCampaignModal } from '@/components/leads/CreateCampaignModal'
+import { LeadModals } from '@/components/leads/LeadModals'
+import { BatchModals } from '@/components/leads/BatchModals'
+import { LeadsTableView } from '@/components/leads/LeadsTableView'
+import { BatchesView } from '@/components/leads/BatchesView'
 
 export default function Leads() {
   const router = useRouter()
@@ -85,54 +93,18 @@ export default function Leads() {
     maxResults: 50,
   })
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['leads', statusFilter, filters, searchQuery, activeTab],
-    queryFn: async () => {
-      const params: any = {}
-      if (statusFilter !== 'all') params.status = statusFilter
-      if (filters.industry !== 'all') params.industry = filters.industry
-      if (filters.source !== 'all') params.source = filters.source
-      if (searchQuery) params.search = searchQuery
-      
-      // Filter by source type based on active tab
-      if (activeTab === 'imported') params.sourceType = 'manual_import'
-      if (activeTab === 'generated') params.sourceType = 'automated'
-      
-      return await leadsService.getAll(params)
-    },
-  })
-
-  // Fetch batches for batch view
-  const { data: batchesData, isLoading: batchesLoading, refetch: refetchBatches } = useQuery({
-    queryKey: ['batches', activeTab],
-    queryFn: async () => {
-      const result = await leadsAPI.getBatches()
-      return result.data // Return the unwrapped data
-    },
-    enabled: viewMode === 'batches' || generating, // Enable when in batch view or generating
-    staleTime: 0, // Always fetch fresh data
-  })
-
-  const leads: Lead[] = data?.data || []
-  const allBatches = Array.isArray(batchesData?.data) ? batchesData.data : []
-  
-  // Filter batches based on activeTab
-  const batches = allBatches.filter((batch: any) => {
-    if (activeTab === 'all') return true
-    if (activeTab === 'imported') {
-      return batch.source === 'csv_import' || batch.source === 'manual_import'
-    }
-    if (activeTab === 'generated') {
-      return batch.source === 'apollo' || 
-             batch.source === 'google_places' || 
-             batch.source === 'peopledatalabs' ||
-             batch.source === 'automated'
-    }
-    return true
+  // Use custom hook for data fetching
+  const { leads, batches, isLoading, batchesLoading, refetch, refetchBatches } = useLeadsData({
+    statusFilter,
+    filters,
+    searchQuery,
+    activeTab,
+    viewMode,
+    generating,
   })
 
   // Client-side filtering for score and tier
-  const filteredLeads = leads.filter(lead => {
+  const filteredLeads = leads.filter((lead: any) => {
     const score = lead.qualityScore || lead.score || 0
     
     // Score range filter
@@ -369,7 +341,7 @@ export default function Leads() {
     if (selectedLeads.size === filteredLeads.length) {
       setSelectedLeads(new Set())
     } else {
-      setSelectedLeads(new Set(filteredLeads.map(lead => lead.id)))
+      setSelectedLeads(new Set(filteredLeads.map((lead: any) => lead.id)))
     }
   }
 
@@ -589,6 +561,28 @@ export default function Leads() {
     }
   }
 
+  const confirmDelete = async () => {
+    if (!leadToDelete) return
+
+    try {
+      setIsDeleting(true)
+      toast.loading('Deleting lead...')
+      
+      await api.delete(`/leads/${leadToDelete}`)
+      
+      toast.dismiss()
+      toast.success('Lead deleted successfully')
+      setShowDeleteConfirm(false)
+      setLeadToDelete(null)
+      refetch()
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.response?.data?.error?.message || 'Failed to delete lead')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       new: 'bg-blue-100 text-blue-800',
@@ -607,122 +601,239 @@ export default function Leads() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
-            <p className="text-gray-600 mt-2">Manage and track your leads</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button 
-              onClick={() => setShowCreateLeadModal(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Create Lead
-            </button>
-            <button 
-              onClick={() => setShowGenerateModal(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-            >
-              <Zap className="w-4 h-4 inline mr-2" />
-              Generate Leads
-            </button>
-            <button 
-              onClick={handleImport}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <Upload className="w-4 h-4 inline mr-2" />
-              Import CSV
-            </button>
-            <button 
-              onClick={handleExport}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <Download className="w-4 h-4 inline mr-2" />
-              Export {viewMode === 'batches' ? 'Batches' : 'Leads'}
-            </button>
+            <h1 className="text-3xl font-bold text-gray-900">Leads Management</h1>
+            <p className="text-gray-600 mt-2">Manage and track your leads and batches</p>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Leads</p>
-                <p className="text-2xl font-bold text-gray-900">{leads.length}</p>
-              </div>
-              <Users className="w-8 h-8 text-blue-500" />
-            </div>
-          </div>
-          <div 
-            className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setTierFilter(tierFilter === 'hot' ? 'all' : 'hot')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Hot Leads</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {leads.filter(l => (l.qualityScore || l.score || 0) >= 80).length}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Score 80+</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-red-600" />
-              </div>
-            </div>
-          </div>
-          <div 
-            className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setTierFilter(tierFilter === 'warm' ? 'all' : 'warm')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Warm Leads</p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {leads.filter(l => {
-                    const score = l.qualityScore || l.score || 0
-                    return score >= 60 && score < 80
-                  }).length}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Score 60-79</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                <Target className="w-5 h-5 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-          <div 
-            className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setTierFilter(tierFilter === 'cold' ? 'all' : 'cold')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Cold Leads</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {leads.filter(l => (l.qualityScore || l.score || 0) < 60).length}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Score &lt;60</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-600" />
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Qualified</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {leads.filter(l => l.status === 'qualified' || l.status === 'interested').length}
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                <span className="text-green-600 font-bold">Q</span>
-              </div>
-            </div>
+        {/* View Mode Tabs */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px">
+              <button
+                onClick={() => {
+                  setViewMode('table')
+                  setSelectedLeads(new Set())
+                  setStatusFilter('all')
+                  setTierFilter('all')
+                }}
+                className={`px-8 py-4 border-b-2 font-medium text-base ${
+                  viewMode === 'table'
+                    ? 'border-primary-500 text-primary-600 bg-primary-50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <List className="w-5 h-5 inline mr-2" />
+                Leads View
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('batches')
+                  setSelectedLeads(new Set())
+                  setActiveTab('all')
+                  setStatusFilter('all')
+                }}
+                className={`px-8 py-4 border-b-2 font-medium text-base ${
+                  viewMode === 'batches'
+                    ? 'border-primary-500 text-primary-600 bg-primary-50'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Package className="w-5 h-5 inline mr-2" />
+                Batch View
+              </button>
+            </nav>
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Action Buttons - Different for each view */}
+        <div className="flex items-center justify-end space-x-3">
+          {viewMode === 'table' ? (
+            <>
+              <button 
+                onClick={() => setShowCreateLeadModal(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+              >
+                <Plus className="w-4 h-4 inline mr-2" />
+                Create Lead
+              </button>
+              <button 
+                onClick={() => setShowGenerateModal(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+              >
+                <Zap className="w-4 h-4 inline mr-2" />
+                Generate Leads Batch
+              </button>
+              <button 
+                onClick={handleImport}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <Upload className="w-4 h-4 inline mr-2" />
+                Import CSV
+              </button>
+              <button 
+                onClick={handleExport}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <Download className="w-4 h-4 inline mr-2" />
+                Export Leads
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                onClick={() => setShowGenerateModal(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+              >
+                <Zap className="w-4 h-4 inline mr-2" />
+                Generate Leads
+              </button>
+              <button 
+                onClick={handleImport}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <Upload className="w-4 h-4 inline mr-2" />
+                Import CSV
+              </button>
+              <button 
+                onClick={handleExport}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <Download className="w-4 h-4 inline mr-2" />
+                Export Batches
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Stats Cards - Different for each view */}
+        {viewMode === 'table' ? (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Leads</p>
+                  <p className="text-2xl font-bold text-gray-900">{leads.length}</p>
+                </div>
+                <Users className="w-8 h-8 text-blue-500" />
+              </div>
+            </div>
+            <div 
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setTierFilter(tierFilter === 'hot' ? 'all' : 'hot')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Hot Leads</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {leads.filter((l: any) => (l.qualityScore || l.score || 0) >= 80).length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Score 80+</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-red-600" />
+                </div>
+              </div>
+            </div>
+            <div 
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setTierFilter(tierFilter === 'warm' ? 'all' : 'warm')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Warm Leads</p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {leads.filter((l: any) => {
+                      const score = l.qualityScore || l.score || 0
+                      return score >= 60 && score < 80
+                    }).length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Score 60-79</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-yellow-600" />
+                </div>
+              </div>
+            </div>
+            <div 
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setTierFilter(tierFilter === 'cold' ? 'all' : 'cold')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Cold Leads</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {leads.filter((l: any) => (l.qualityScore || l.score || 0) < 60).length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Score &lt;60</p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Qualified</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {leads.filter((l: any) => l.status === 'qualified' || l.status === 'interested').length}
+                  </p>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                  <span className="text-green-600 font-bold">Q</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Batches</p>
+                  <p className="text-2xl font-bold text-gray-900">{batches.length}</p>
+                </div>
+                <Package className="w-8 h-8 text-blue-500" />
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Leads in Batches</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {batches.reduce((sum: number, batch: any) => sum + (batch.leadsCount || 0), 0)}
+                  </p>
+                </div>
+                <Users className="w-8 h-8 text-green-500" />
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Avg Leads per Batch</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {batches.length > 0 ? Math.round(batches.reduce((sum: number, batch: any) => sum + (batch.leadsCount || 0), 0) / batches.length) : 0}
+                  </p>
+                </div>
+                <TrendingUp className="w-8 h-8 text-purple-500" />
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Active Campaigns</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {batches.filter((b: any) => b.campaignStatus === 'active').length}
+                  </p>
+                </div>
+                <Zap className="w-8 h-8 text-orange-500" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Category Tabs - Different for each view */}
         <div className="bg-white rounded-lg shadow">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
@@ -734,9 +845,9 @@ export default function Leads() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
-                All Leads
+                {viewMode === 'table' ? 'All Leads' : 'All Batches'}
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
-                  {leads.length}
+                  {viewMode === 'table' ? leads.length : batches.length}
                 </span>
               </button>
               <button
@@ -750,7 +861,10 @@ export default function Leads() {
                 <Upload className="w-4 h-4 inline mr-2" />
                 Imported
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">
-                  {leads.filter(l => l.sourceType === 'manual_import').length}
+                  {viewMode === 'table' 
+                    ? leads.filter((l: any) => l.sourceType === 'manual_import').length
+                    : batches.filter((b: any) => b.sourceType === 'manual_import').length
+                  }
                 </span>
               </button>
               <button
@@ -764,7 +878,10 @@ export default function Leads() {
                 <Zap className="w-4 h-4 inline mr-2" />
                 Generated
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">
-                  {leads.filter(l => l.sourceType === 'automated' || !l.sourceType).length}
+                  {viewMode === 'table'
+                    ? leads.filter((l: any) => l.sourceType === 'automated' || !l.sourceType).length
+                    : batches.filter((b: any) => b.sourceType === 'automated' || !b.sourceType).length
+                  }
                 </span>
               </button>
             </nav>
@@ -799,41 +916,13 @@ export default function Leads() {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-4 space-y-4">
-          {/* View Mode Toggle */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('table')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
-                  viewMode === 'table'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                Table View
-              </button>
-              <button
-                onClick={() => setViewMode('batches')}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
-                  viewMode === 'batches'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Package className="w-4 h-4" />
-                Batch View
-              </button>
-            </div>
-          </div>
-
-          {/* Search Bar and Status Filters */}
+          {/* Search Bar and Advanced Filters Toggle */}
           <div className="flex items-center gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by company name, email, or contact..."
+                placeholder={viewMode === 'table' ? "Search by company name, email, or contact..." : "Search batches by name or industry..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -852,23 +941,25 @@ export default function Leads() {
             </button>
           </div>
 
-          {/* Status Filter Buttons */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 mr-2">Status:</span>
-            {['all', 'new', 'contacted', 'qualified', 'responded', 'interested', 'unqualified'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  statusFilter === status
-                    ? 'bg-primary-600 text-white'
-                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-              </button>
-            ))}
-          </div>
+          {/* Status Filter Buttons - Only show for Leads View */}
+          {viewMode === 'table' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 mr-2">Status:</span>
+              {['all', 'new', 'contacted', 'qualified', 'responded', 'interested', 'unqualified'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                    statusFilter === status
+                      ? 'bg-primary-600 text-white'
+                      : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                  }`}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Advanced Filters Panel */}
           {showAdvancedFilters && (
@@ -957,1746 +1048,159 @@ export default function Leads() {
           )}
         </div>
 
-        {/* Leads Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-96">
-              <div className="text-lg text-gray-500">Loading leads...</div>
-            </div>
-          ) : filteredLeads.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-96 text-center">
-              <Users className="w-16 h-16 text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No leads found</h3>
-              <p className="text-gray-600 mb-6">
-                {searchQuery || filters.industry !== 'all' || filters.source !== 'all'
-                  ? 'Try adjusting your filters'
-                  : 'Get started by importing or generating your first leads'}
-              </p>
-              <button 
-                onClick={() => setShowGenerateModal(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-              >
-                <Zap className="w-4 h-4 inline mr-2" />
-                Generate Leads
-              </button>
-            </div>
-          ) : (
-            <>
-              {viewMode === 'table' ? (
-                // Table View
-                <>
-                  <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                    <p className="text-sm text-gray-700">
-                      Showing <span className="font-medium">{filteredLeads.length}</span> of <span className="font-medium">{leads.length}</span> leads
-                    </p>
-                  </div>
-                  <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedLeads.size === filteredLeads.length && filteredLeads.length > 0}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Company
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Industry
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tier
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Score
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLeads.map((lead) => {
-                  const score = lead.qualityScore || lead.score || 0
-                  const tierBadge = getTierBadge(score)
-                  return (
-                  <tr key={lead.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={selectedLeads.has(lead.id)}
-                        onChange={() => handleSelectLead(lead.id)}
-                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{lead.companyName}</div>
-                      <div className="text-sm text-gray-500">{lead.website || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{lead.contactName}</div>
-                      <div className="text-sm text-gray-500">{lead.email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {lead.industry || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(
-                          lead.status
-                        )}`}
-                      >
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${tierBadge.className}`}
-                      >
-                        {tierBadge.label}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <div className="text-sm font-medium text-gray-900">{score}/100</div>
-                        <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              score >= 80 ? 'bg-red-500' : score >= 60 ? 'bg-yellow-500' : 'bg-blue-500'
-                            }`}
-                            style={{ width: `${score}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <button 
-                        onClick={() => handleViewLead(lead)}
-                        className="text-primary-600 hover:text-primary-900 mr-3"
-                      >
-                        View
-                      </button>
-                      <button 
-                        onClick={() => handleEditLead(lead)}
-                        className="text-gray-600 hover:text-gray-900"
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-                </>
-              ) : (
-                // Batch View
-                <div className="p-6 space-y-4">
-                  {/* Loading Card - Show when generating */}
-                  {generating && (
-                    <div className="border-2 border-primary-500 rounded-lg overflow-hidden bg-primary-50 animate-pulse">
-                      <div className="flex items-center justify-between p-6">
-                        <div className="flex items-center gap-4 flex-1">
-                          <div className="relative">
-                            <Loader className="w-8 h-8 animate-spin text-primary-600" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-primary-900 flex items-center gap-2">
-                              <Zap className="w-5 h-5" />
-                              Generating: {generateForm.batchName}
-                            </h3>
-                            <p className="text-sm text-primary-700 mt-1">
-                              {generationProgress || 'Preparing to generate leads...'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-center">
-                            <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
-                              <Loader className="w-8 h-8 animate-spin text-primary-600" />
-                            </div>
-                            <p className="text-xs text-primary-700 mt-2">Processing...</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {batchesLoading ? (
-                    <div className="flex justify-center items-center py-12">
-                      <Loader className="w-8 h-8 animate-spin text-primary-600" />
-                    </div>
-                  ) : batches.length === 0 && !generating ? (
-                    <div className="text-center py-12">
-                      <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Batches Yet</h3>
-                      <p className="text-gray-600">Generate leads with batch names to see them organized here</p>
-                    </div>
-                  ) : (
-                    batches.map((batch: any) => {
-                      return (
-                        <div key={batch.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                          {/* Batch Header */}
-                          <div 
-                            className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => router.push(`/batches/${batch.id}`)}
-                          >
-                            <div className="flex items-center gap-4 flex-1">
-                              <Package className="w-5 h-5 text-primary-600" />
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900">
-                                  {batch.name}
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                  Generated on {new Date(batch.createdAt).toLocaleDateString()} at {new Date(batch.createdAt).toLocaleTimeString()}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-6">
-                              <div className="text-center">
-                                <p className="text-2xl font-bold text-primary-600">{batch.leadCount}</p>
-                                <p className="text-xs text-gray-600">Total Leads</p>
-                              </div>
-                              {batch.totalLeads && (
-                                <>
-                                  <div className="text-center">
-                                    <p className="text-2xl font-bold text-green-600">{batch.successfulImports}</p>
-                                    <p className="text-xs text-gray-600">Successful</p>
-                                  </div>
-                                  <div className="text-center">
-                                    <p className="text-2xl font-bold text-yellow-600">{batch.duplicatesSkipped}</p>
-                                    <p className="text-xs text-gray-600">Duplicates</p>
-                                  </div>
-                                </>
-                              )}
-                              {/* Action Buttons */}
-                              <div className="flex items-center gap-2 ml-4">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedBatchForCampaign(batch)
-                                    setShowBatchCampaignModal(true)
-                                  }}
-                                  className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
-                                  title="Start Campaign"
-                                >
-                                  <Zap className="w-4 h-4" />
-                                  Start Campaign
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelectedBatchForAnalytics(batch)
-                                    setShowBatchAnalyticsModal(true)
-                                  }}
-                                  className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-                                  title="View Analytics"
-                                >
-                                  <TrendingUp className="w-4 h-4" />
-                                  Analytics
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Lead Generation Modal */}
-        {showGenerateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Generate Leads</h2>
-                  <p className="text-sm text-gray-600 mt-1">Select source and configure filters</p>
-                </div>
-                <button 
-                  onClick={() => setShowGenerateModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                  disabled={generating}
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-6">
-                {/* Source Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Lead Source *
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      generateForm.source === 'apollo' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
-                    }`}>
-                      <input
-                        type="radio"
-                        checked={generateForm.source === 'apollo'}
-                        onChange={() => setGenerateForm({ ...generateForm, source: 'apollo' })}
-                        className="mt-1"
-                        disabled={generating}
-                      />
-                      <div>
-                        <p className="font-medium text-gray-900">Apollo.io</p>
-                        <p className="text-sm text-gray-600">B2B contact database</p>
-                        <p className="text-xs text-gray-500 mt-1">100 leads/day limit</p>
-                      </div>
-                    </label>
-
-                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      generateForm.source === 'google_places' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
-                    }`}>
-                      <input
-                        type="radio"
-                        checked={generateForm.source === 'google_places'}
-                        onChange={() => setGenerateForm({ ...generateForm, source: 'google_places' })}
-                        className="mt-1"
-                        disabled={generating}
-                      />
-                      <div>
-                        <p className="font-medium text-gray-900">Google Places</p>
-                        <p className="text-sm text-gray-600">Local businesses</p>
-                        <p className="text-xs text-gray-500 mt-1">Unlimited</p>
-                      </div>
-                    </label>
-
-                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      generateForm.source === 'peopledatalabs' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
-                    }`}>
-                      <input
-                        type="radio"
-                        checked={generateForm.source === 'peopledatalabs'}
-                        onChange={() => setGenerateForm({ ...generateForm, source: 'peopledatalabs' })}
-                        className="mt-1"
-                        disabled={generating}
-                      />
-                      <div>
-                        <p className="font-medium text-gray-900">People Data Labs</p>
-                        <p className="text-sm text-gray-600">Contact enrichment</p>
-                        <p className="text-xs text-gray-500 mt-1">1,000 credits/month</p>
-                      </div>
-                    </label>
-
-                    <label className={`flex items-start space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                      generateForm.source === 'linkedin' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-primary-300'
-                    }`}>
-                      <input
-                        type="radio"
-                        checked={generateForm.source === 'linkedin'}
-                        onChange={() => setGenerateForm({ ...generateForm, source: 'linkedin' })}
-                        className="mt-1"
-                        disabled={generating}
-                      />
-                      <div>
-                        <p className="font-medium text-gray-900">LinkedIn CSV</p>
-                        <p className="text-sm text-gray-600">Sales Navigator</p>
-                        <p className="text-xs text-gray-500 mt-1">Manual upload</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Batch Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Batch Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={generateForm.batchName}
-                    onChange={(e) => setGenerateForm({ ...generateForm, batchName: e.target.value })}
-                    placeholder="e.g., NYC Hotels - March 2024"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    disabled={generating}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Give this batch a descriptive name to organize your leads
-                  </p>
-                </div>
-
-                {/* Industry Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Industry *
-                  </label>
-                  <select
-                    value={generateForm.industry}
-                    onChange={(e) => setGenerateForm({ ...generateForm, industry: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    disabled={generating}
-                  >
-                    <option value="">Select industry...</option>
-                    {Object.entries(industriesByCategory).map(([category, items]) => (
-                      <optgroup key={category} label={category}>
-                        {items.map((industry) => (
-                          <option key={industry.value} value={industry.value}>
-                            {industry.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Choose the specific business type for better targeting
-                  </p>
-                </div>
-
-                {/* Location Filters */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Country
-                    </label>
-                    <select
-                      value={generateForm.country}
-                      onChange={(e) => setGenerateForm({ ...generateForm, country: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      disabled={generating}
-                    >
-                      {countries.map((country) => (
-                        <option key={country} value={country}>{country}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      City (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={generateForm.city}
-                      onChange={(e) => setGenerateForm({ ...generateForm, city: e.target.value })}
-                      placeholder="e.g., New York"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      disabled={generating}
-                    />
-                  </div>
-                </div>
-
-                {/* Max Results */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Maximum Results
-                  </label>
-                  <input
-                    type="number"
-                    value={generateForm.maxResults}
-                    onChange={(e) => setGenerateForm({ ...generateForm, maxResults: parseInt(e.target.value) || 0 })}
-                    min="1"
-                    max="500"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    disabled={generating}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Note: Actual results may be lower based on API limits and data availability
-                  </p>
-                </div>
-
-                {/* Progress Indicator */}
-                {generating && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-3">
-                      <Loader className="w-5 h-5 text-blue-600 animate-spin" />
-                      <div>
-                        <p className="text-sm font-medium text-blue-900">Generating leads...</p>
-                        <p className="text-xs text-blue-700 mt-1">{generationProgress}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-between p-6 border-t">
-                <button
-                  onClick={() => setShowGenerateModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                  disabled={generating}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleGenerateLeads}
-                  disabled={generating || !generateForm.industry}
-                  className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {generating ? (
-                    <>
-                      <Loader className="w-4 h-4 inline mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-4 h-4 inline mr-2" />
-                      Generate Leads
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Create Campaign from Selected Leads Modal */}
-        {showCreateCampaignModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Create Manual Campaign</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Campaign will be created with {selectedLeads.size} selected lead{selectedLeads.size !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowCreateCampaignModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Campaign Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={createCampaignForm.name}
-                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, name: e.target.value })}
-                    placeholder="e.g., Imported Leads Q4 Outreach"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    value={createCampaignForm.description}
-                    onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, description: e.target.value })}
-                    placeholder="Describe the campaign purpose..."
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                {/* Workflow Selector */}
-                <div className="border-t pt-6">
-                  <WorkflowSelector
-                    selectedWorkflowId={createCampaignForm.workflowId}
-                    onSelect={(workflowId) => setCreateCampaignForm({ ...createCampaignForm, workflowId })}
-                    label="Email Workflow (Optional)"
-                    placeholder="Select a workflow or create custom emails below"
-                    required={false}
-                  />
-                  <p className="text-xs text-blue-600 mt-2">
-                    💡 Tip: Use a workflow for multi-step sequences, or create a single email below
-                  </p>
-                </div>
-
-                {/* Only show email fields if no workflow selected */}
-                {!createCampaignForm.workflowId && (
-                  <>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Email Subject *
-                        </label>
-                        <button
-                          type="button"
-                          onClick={handleGenerateAIContent}
-                          disabled={aiGenerating}
-                          className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 flex items-center gap-1 disabled:opacity-50"
-                        >
-                          {aiGenerating ? (
-                            <Loader className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Sparkles className="w-3 h-3" />
-                          )}
-                          {aiGenerating ? 'Generating...' : 'Generate with AI'}
-                        </button>
-                      </div>
-                      <input
-                        type="text"
-                        value={createCampaignForm.emailSubject}
-                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, emailSubject: e.target.value })}
-                        placeholder="e.g., Transform Your Booking Process with [Product]"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-
-                    <EmailEditor
-                      label="Email Body"
-                      value={createCampaignForm.emailBody}
-                      onChange={(value) => setCreateCampaignForm({ ...createCampaignForm, emailBody: value })}
-                      placeholder="Hi {{contactName}},&#10;&#10;I noticed {{companyName}} and wanted to reach out...&#10;&#10;Click 'Insert Variable' above to add personalization"
-                      rows={8}
-                      required
-                    />
-                  </>
-                )}
-
-                {/* Schedule Options */}
-                <div className="border-t pt-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Schedule Options</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Start Time (Optional)
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={createCampaignForm.startTime}
-                        onChange={(e) => setCreateCampaignForm({ ...createCampaignForm, startTime: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Leave empty to start immediately</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-blue-900 mb-2">Next Steps:</h4>
-                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                    <li>Campaign will be created in draft status</li>
-                    <li>All {selectedLeads.size} selected leads will be linked</li>
-                    <li>Go to Campaigns page to start sending emails</li>
-                  </ol>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-between p-6 border-t">
-                <button
-                  onClick={() => setShowCreateCampaignModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmitManualCampaign}
-                  disabled={
-                    !createCampaignForm.name || 
-                    (!createCampaignForm.workflowId && (!createCampaignForm.emailSubject || !createCampaignForm.emailBody))
-                  }
-                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus className="w-4 h-4 inline mr-2" />
-                  Create Campaign
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* View Lead Modal */}
-        {showViewModal && selectedLead && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b">
-                <h2 className="text-2xl font-bold text-gray-900">Lead Details</h2>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false)
-                    setSelectedLead(null)
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-6">
-                {/* Company Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Company Name</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.companyName || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Industry</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.industry || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Website</label>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {selectedLead.website ? (
-                          <a href={selectedLead.website} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                            {selectedLead.website}
-                          </a>
-                        ) : '-'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Company Size</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.companySize || '-'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Contact Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Contact Name</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.contactName || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Job Title</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.jobTitle || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Email</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.email || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Phone</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.phone || '-'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Location */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">City</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.city || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Country</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.country || '-'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Lead Metrics */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Metrics</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Quality Score</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.qualityScore || 0}/100</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Status</label>
-                      <p className="mt-1">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedLead.status)}`}>
-                          {selectedLead.status?.toUpperCase()}
-                        </span>
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Source</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedLead.source || '-'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">Source Type</label>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {selectedLead.sourceType === 'manual_import' ? 'Imported' : 'Generated'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end p-6 border-t space-x-3">
-                <button
-                  onClick={() => {
-                    setShowViewModal(false)
-                    handleEditLead(selectedLead)
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-                >
-                  Edit Lead
-                </button>
-                <button
-                  onClick={() => {
-                    setShowViewModal(false)
-                    setSelectedLead(null)
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Edit Lead Modal */}
-        {showEditModal && selectedLead && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b">
-                <h2 className="text-2xl font-bold text-gray-900">Edit Lead</h2>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false)
-                    setSelectedLead(null)
-                    setEditForm({})
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-6">
-                {/* Company Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
-                      <input
-                        type="text"
-                        value={editForm.companyName || ''}
-                        onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
-                      <input
-                        type="text"
-                        value={editForm.industry || ''}
-                        onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                      <input
-                        type="url"
-                        value={editForm.website || ''}
-                        onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
-                        placeholder="https://example.com"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Size</label>
-                      <select
-                        value={editForm.companySize || ''}
-                        onChange={(e) => setEditForm({ ...editForm, companySize: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="">Select size</option>
-                        <option value="1-10">1-10</option>
-                        <option value="11-50">11-50</option>
-                        <option value="51-200">51-200</option>
-                        <option value="201-500">201-500</option>
-                        <option value="501-1000">501-1000</option>
-                        <option value="1000+">1000+</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Contact Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
-                      <input
-                        type="text"
-                        value={editForm.contactName || ''}
-                        onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-                      <input
-                        type="text"
-                        value={editForm.jobTitle || ''}
-                        onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={editForm.email || ''}
-                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        value={editForm.phone || ''}
-                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Location */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                      <input
-                        type="text"
-                        value={editForm.city || ''}
-                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                      <input
-                        type="text"
-                        value={editForm.country || ''}
-                        onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Status</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                      <select
-                        value={editForm.status || ''}
-                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="qualified">Qualified</option>
-                        <option value="unqualified">Unqualified</option>
-                        <option value="responded">Responded</option>
-                        <option value="interested">Interested</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end p-6 border-t space-x-3">
-                <button
-                  onClick={() => {
-                    setShowEditModal(false)
-                    setSelectedLead(null)
-                    setEditForm({})
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={!editForm.companyName}
-                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Create Lead Modal */}
-        {showCreateLeadModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
-                <h2 className="text-2xl font-bold text-gray-900">Create New Lead</h2>
-                <button
-                  onClick={() => {
-                    setShowCreateLeadModal(false)
-                    setCreateLeadForm({
-                      companyName: '',
-                      contactName: '',
-                      email: '',
-                      phone: '',
-                      website: '',
-                      industry: '',
-                      city: '',
-                      country: 'United States',
-                      jobTitle: '',
-                      companySize: '',
-                    })
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-6">
-                {/* Company Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Company Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={createLeadForm.companyName}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, companyName: e.target.value })}
-                        placeholder="e.g., Acme Corporation"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
-                      <select
-                        value={createLeadForm.industry}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, industry: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="">Select Industry</option>
-                        {Object.values(INDUSTRY_CATEGORIES).map(category => {
-                          const industriesInCategory = INDUSTRIES.filter(ind => ind.category === category);
-                          return (
-                            <optgroup key={category} label={category}>
-                              {industriesInCategory.map((ind: IndustryOption) => (
-                                <option key={ind.value} value={ind.value}>
-                                  {ind.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                          );
-                        })}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Size</label>
-                      <select
-                        value={createLeadForm.companySize}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, companySize: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="">Select Size</option>
-                        <option value="1-10">1-10 employees</option>
-                        <option value="11-50">11-50 employees</option>
-                        <option value="51-200">51-200 employees</option>
-                        <option value="201-500">201-500 employees</option>
-                        <option value="501+">501+ employees</option>
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
-                      <input
-                        type="url"
-                        value={createLeadForm.website}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, website: e.target.value })}
-                        placeholder="https://example.com"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Contact Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
-                      <input
-                        type="text"
-                        value={createLeadForm.contactName}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, contactName: e.target.value })}
-                        placeholder="John Doe"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-                      <input
-                        type="text"
-                        value={createLeadForm.jobTitle}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, jobTitle: e.target.value })}
-                        placeholder="CEO"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        value={createLeadForm.email}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, email: e.target.value })}
-                        placeholder="john@example.com"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        value={createLeadForm.phone}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, phone: e.target.value })}
-                        placeholder="+1 (555) 123-4567"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Location */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Location</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                      <input
-                        type="text"
-                        value={createLeadForm.city}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, city: e.target.value })}
-                        placeholder="New York"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                      <input
-                        type="text"
-                        value={createLeadForm.country}
-                        onChange={(e) => setCreateLeadForm({ ...createLeadForm, country: e.target.value })}
-                        placeholder="United States"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>Tip:</strong> Use this to create test leads for email campaigns. Make sure to use a real email address you have access to for testing.
-                  </p>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end p-6 border-t space-x-3">
-                <button
-                  onClick={() => {
-                    setShowCreateLeadModal(false)
-                    setCreateLeadForm({
-                      companyName: '',
-                      contactName: '',
-                      email: '',
-                      phone: '',
-                      website: '',
-                      industry: '',
-                      city: '',
-                      country: 'United States',
-                      jobTitle: '',
-                      companySize: '',
-                    })
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                  disabled={isCreatingLead}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCreateLead}
-                  disabled={!createLeadForm.companyName || !createLeadForm.email || isCreatingLead}
-                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {isCreatingLead ? (
-                    <>
-                      <Loader className="w-4 h-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4" />
-                      Create Lead
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Batch Campaign Modal */}
-        {showBatchCampaignModal && selectedBatchForCampaign && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Start Campaign from Batch</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Create a campaign for: <span className="font-semibold">{selectedBatchForCampaign.name}</span>
-                  </p>
-                </div>
-                <button 
-                  onClick={() => {
-                    setShowBatchCampaignModal(false)
-                    setSelectedBatchForCampaign(null)
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-6 space-y-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <Package className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">Batch Info</p>
-                      <p className="text-sm text-blue-700 mt-1">
-                        {selectedBatchForCampaign.leadCount} leads • 
-                        Created {new Date(selectedBatchForCampaign.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Campaign Name *
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={`Campaign - ${selectedBatchForCampaign.name}`}
-                    id="batchCampaignName"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="e.g., NYC Hotels Outreach - March 2024"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    id="batchCampaignDescription"
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="Describe your campaign objectives..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Workflow (Optional)
-                  </label>
-                  <select
-                    id="batchCampaignWorkflow"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  >
-                    <option value="">No workflow (single email)</option>
-                    <option value="workflow-1">Follow-up Sequence (3 emails)</option>
-                    <option value="workflow-2">Nurture Campaign (5 emails)</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Select a workflow to send multiple emails over time
-                  </p>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Note:</strong> Emails will be personalized using AI based on each lead's information.
-                  </p>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end p-6 border-t space-x-3">
-                <button
-                  onClick={() => {
-                    setShowBatchCampaignModal(false)
-                    setSelectedBatchForCampaign(null)
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    const name = (document.getElementById('batchCampaignName') as HTMLInputElement).value
-                    const description = (document.getElementById('batchCampaignDescription') as HTMLTextAreaElement).value
-                    const workflowId = (document.getElementById('batchCampaignWorkflow') as HTMLSelectElement).value
-
-                    if (!name.trim()) {
-                      toast.error('Please enter a campaign name')
-                      return
-                    }
-
-                    try {
-                      toast.loading('Creating campaign...')
-                      await campaignsAPI.createCampaignFromBatch({
-                        name,
-                        description: description || undefined,
-                        batchId: selectedBatchForCampaign.id,
-                        workflowId: workflowId || undefined,
-                        startImmediately: false,
-                      })
-                      toast.dismiss()
-                      toast.success('Campaign created successfully!')
-                      setShowBatchCampaignModal(false)
-                      setSelectedBatchForCampaign(null)
-                      // Optionally redirect to campaigns page
-                      window.location.href = '/campaigns'
-                    } catch (error: any) {
-                      toast.dismiss()
-                      toast.error(error.response?.data?.error?.message || 'Failed to create campaign')
-                    }
-                  }}
-                  className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center gap-2"
-                >
-                  <Zap className="w-4 h-4" />
-                  Create Campaign
-                </button>
-                <button
-                  onClick={async () => {
-                    const name = (document.getElementById('batchCampaignName') as HTMLInputElement).value
-                    const description = (document.getElementById('batchCampaignDescription') as HTMLTextAreaElement).value
-                    const workflowId = (document.getElementById('batchCampaignWorkflow') as HTMLSelectElement).value
-
-                    if (!name.trim()) {
-                      toast.error('Please enter a campaign name')
-                      return
-                    }
-
-                    try {
-                      toast.loading('Creating and starting campaign...')
-                      await campaignsAPI.createCampaignFromBatch({
-                        name,
-                        description: description || undefined,
-                        batchId: selectedBatchForCampaign.id,
-                        workflowId: workflowId || undefined,
-                        startImmediately: true,
-                      })
-                      toast.dismiss()
-                      toast.success('Campaign started successfully!')
-                      setShowBatchCampaignModal(false)
-                      setSelectedBatchForCampaign(null)
-                      window.location.href = '/campaigns'
-                    } catch (error: any) {
-                      toast.dismiss()
-                      toast.error(error.response?.data?.error?.message || 'Failed to start campaign')
-                    }
-                  }}
-                  className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
-                  <Zap className="w-4 h-4" />
-                  Start Now
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Batch Analytics Modal - Coming in next step */}
-        {showBatchAnalyticsModal && selectedBatchForAnalytics && (
-          <BatchAnalyticsModal
-            batch={selectedBatchForAnalytics}
-            onClose={() => {
-              setShowBatchAnalyticsModal(false)
-              setSelectedBatchForAnalytics(null)
+        {/* Leads View - Table or Batches */}
+        {viewMode === 'table' ? (
+          <LeadsTableView
+            leads={leads}
+            filteredLeads={filteredLeads}
+            selectedLeads={selectedLeads}
+            isLoading={isLoading}
+            searchQuery={searchQuery}
+            filters={filters}
+            onSelectAll={handleSelectAll}
+            onSelectLead={handleSelectLead}
+            onViewLead={handleViewLead}
+            onEditLead={handleEditLead}
+            onGenerateClick={() => setShowGenerateModal(true)}
+            getStatusColor={getStatusColor}
+            getTierBadge={getTierBadge}
+          />
+        ) : (
+          <BatchesView
+            batches={batches}
+            batchesLoading={batchesLoading}
+            generating={generating}
+            generateForm={generateForm}
+            generationProgress={generationProgress}
+            onBatchClick={(batchId) => router.push(`/batches/${batchId}`)}
+            onStartCampaign={(batch) => {
+              setSelectedBatchForCampaign(batch)
+              setShowBatchCampaignModal(true)
+            }}
+            onViewAnalytics={(batch) => {
+              setSelectedBatchForAnalytics(batch)
+              setShowBatchAnalyticsModal(true)
             }}
           />
         )}
 
-        {/* Import CSV Dialog */}
-        {showImportDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Import Leads from CSV</h2>
-                  <p className="text-sm text-gray-600 mt-1">Configure your import settings</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowImportDialog(false);
-                    setImportFile(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+        {/* Modals */}
+        <GenerateLeadsModal
+          show={showGenerateModal}
+          generateForm={generateForm}
+          generating={generating}
+          generationProgress={generationProgress}
+          industriesByCategory={industriesByCategory}
+          countries={countries}
+          onClose={() => setShowGenerateModal(false)}
+          onFormChange={setGenerateForm}
+          onSubmit={handleGenerateLeads}
+        />
 
-              {/* Content */}
-              <div className="p-6 space-y-6">
-                {/* File Info */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start space-x-3">
-                  <Upload className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-blue-900">Selected File</p>
-                    <p className="text-sm text-blue-700 truncate">{importFile?.name}</p>
-                    <p className="text-xs text-blue-600 mt-1">
-                      {importFile ? `${(importFile.size / 1024).toFixed(2)} KB` : ''}
-                    </p>
-                  </div>
-                </div>
+        <ImportCSVDialog
+          show={showImportDialog}
+          importFile={importFile}
+          importForm={importForm}
+          isImporting={isImporting}
+          onClose={() => {
+            setShowImportDialog(false)
+            setImportFile(null)
+            setImportForm({ batchName: '', industry: 'Other', enrichEmail: true })
+          }}
+          onFormChange={setImportForm}
+          onSubmit={handleImportSubmit}
+        />
 
-                {/* Batch Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Batch Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={importForm.batchName}
-                    onChange={(e) => setImportForm({ ...importForm, batchName: e.target.value })}
-                    placeholder="e.g., Q4 Lead Import"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Give this import batch a descriptive name for easy identification</p>
-                </div>
+        <CreateCampaignModal
+          show={showCreateCampaignModal}
+          selectedLeadsCount={selectedLeads.size}
+          createCampaignForm={createCampaignForm}
+          aiGenerating={aiGenerating}
+          onClose={() => setShowCreateCampaignModal(false)}
+          onFormChange={setCreateCampaignForm}
+          onSubmit={handleSubmitManualCampaign}
+          onGenerateAI={handleGenerateAIContent}
+        />
 
-                {/* Industry */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Industry
-                  </label>
-                  <select
-                    value={importForm.industry}
-                    onChange={(e) => setImportForm({ ...importForm, industry: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  >
-                    <option value="Other">Other</option>
-                    {INDUSTRIES.map((industry) => (
-                      <option key={industry} value={industry}>
-                        {industry}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">Select the primary industry for these leads</p>
-                </div>
+        <LeadModals
+          showViewModal={showViewModal}
+          selectedLead={selectedLead}
+          onCloseView={() => {
+            setShowViewModal(false)
+            setSelectedLead(null)
+          }}
+          onEditFromView={(lead) => {
+            setShowViewModal(false)
+            handleEditLead(lead)
+          }}
+          getStatusColor={getStatusColor}
+          showEditModal={showEditModal}
+          editForm={editForm}
+          onCloseEdit={() => {
+            setShowEditModal(false)
+            setSelectedLead(null)
+            setEditForm({})
+          }}
+          onEditFormChange={setEditForm}
+          onSaveEdit={handleSaveEdit}
+          showCreateModal={showCreateLeadModal}
+          createForm={createLeadForm}
+          isCreating={isCreatingLead}
+          onCloseCreate={() => {
+            setShowCreateLeadModal(false)
+            setCreateLeadForm({
+              companyName: '',
+              contactName: '',
+              email: '',
+              phone: '',
+              website: '',
+              industry: '',
+              city: '',
+              country: 'United States',
+              jobTitle: '',
+              companySize: '',
+            })
+          }}
+          onCreateFormChange={(form) => setCreateLeadForm(form as any)}
+          onCreateLead={handleCreateLead}
+          industriesByCategory={industriesByCategory}
+        />
 
-                {/* Email Enrichment */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      id="enrichEmail"
-                      checked={importForm.enrichEmail}
-                      onChange={(e) => setImportForm({ ...importForm, enrichEmail: e.target.checked })}
-                      className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                    />
-                    <div className="flex-1">
-                      <label htmlFor="enrichEmail" className="text-sm font-medium text-gray-900 cursor-pointer flex items-center">
-                        <Sparkles className="w-4 h-4 text-green-600 mr-2" />
-                        Enable Email Enrichment
-                      </label>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Automatically find and add missing email addresses using Hunter.io. This may take a few extra seconds.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+        <BatchModals
+          showAnalyticsModal={showBatchAnalyticsModal}
+          selectedBatchForAnalytics={selectedBatchForAnalytics}
+          onCloseAnalytics={() => {
+            setShowBatchAnalyticsModal(false)
+            setSelectedBatchForAnalytics(null)
+          }}
+          showCampaignModal={showBatchCampaignModal}
+          selectedBatchForCampaign={selectedBatchForCampaign}
+          onCloseCampaign={() => {
+            setShowBatchCampaignModal(false)
+            setSelectedBatchForCampaign(null)
+          }}
+          onCreateCampaign={async (data: any) => {
+            await campaignsAPI.createCampaignFromBatch({
+              ...data,
+              batchId: String(data.batchId)
+            })
+          }}
+        />
 
-                {/* Import Info */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
-                    <Target className="w-4 h-4 mr-2 text-gray-600" />
-                    What happens during import?
-                  </h3>
-                  <ul className="space-y-2 text-xs text-gray-600">
-                    <li className="flex items-start">
-                      <span className="text-primary-600 mr-2">•</span>
-                      <span>Duplicate leads (by email or company name) will be automatically skipped</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-primary-600 mr-2">•</span>
-                      <span>Quality scores will be calculated based on data completeness</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-primary-600 mr-2">•</span>
-                      <span>All leads will be grouped in a single batch for easy management</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-primary-600 mr-2">•</span>
-                      <span>You can view the batch details in the "Batch View" tab after import</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
-                <button
-                  onClick={() => {
-                    setShowImportDialog(false);
-                    setImportFile(null);
-                  }}
-                  disabled={isImporting}
-                  className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleImportSubmit}
-                  disabled={isImporting || !importForm.batchName.trim()}
-                  className="px-6 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
-                >
-                  {isImporting ? (
-                    <>
-                      <Loader className="w-4 h-4 mr-2 animate-spin" />
-                      Importing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4 mr-2" />
-                      Import Leads
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false)
+            setLeadToDelete(null)
+          }}
+          onConfirm={confirmDelete}
+          title="Delete Lead"
+          message="Are you sure you want to delete this lead? This action cannot be undone."
+          confirmText="Delete"
+          isLoading={isDeleting}
+        />
       </div>
     </Layout>
-  )
-}
-
-// Batch Analytics Modal Component
-function BatchAnalyticsModal({ batch, onClose }: { batch: any; onClose: () => void }) {
-  const { data: analyticsData, isLoading } = useQuery({
-    queryKey: ['batchAnalytics', batch.id],
-    queryFn: async () => {
-      const result = await leadsAPI.getBatchAnalytics(batch.id)
-      return result.data // Unwrap Axios response
-    },
-  })
-
-  const analytics = analyticsData?.data
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Batch Analytics</h2>
-            <p className="text-sm text-gray-600 mt-1">{batch.name}</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="p-6 space-y-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader className="w-8 h-8 animate-spin text-primary-600" />
-            </div>
-          ) : analytics ? (
-            <>
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="w-4 h-4 text-blue-600" />
-                    <p className="text-sm font-medium text-blue-900">Total Leads</p>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-900">{analytics.metrics.totalLeads}</p>
-                </div>
-
-                <div className="bg-green-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-4 h-4 text-green-600" />
-                    <p className="text-sm font-medium text-green-900">Successful</p>
-                  </div>
-                  <p className="text-2xl font-bold text-green-900">{analytics.metrics.successfulImports}</p>
-                </div>
-
-                <div className="bg-yellow-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Package className="w-4 h-4 text-yellow-600" />
-                    <p className="text-sm font-medium text-yellow-900">Duplicates</p>
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-900">{analytics.metrics.duplicatesSkipped}</p>
-                </div>
-
-                <div className="bg-red-50 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <X className="w-4 h-4 text-red-600" />
-                    <p className="text-sm font-medium text-red-900">Failed</p>
-                  </div>
-                  <p className="text-2xl font-bold text-red-900">{analytics.metrics.failedImports}</p>
-                </div>
-              </div>
-
-              {/* Email Performance */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Email Performance</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Emails Sent</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.emailsSent}</p>
-                  </div>
-
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Open Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.openRate}%</p>
-                    <p className="text-xs text-gray-500 mt-1">{analytics.metrics.emailsOpened} opened</p>
-                  </div>
-
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Click Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.clickRate}%</p>
-                    <p className="text-xs text-gray-500 mt-1">{analytics.metrics.emailsClicked} clicked</p>
-                  </div>
-
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <p className="text-sm text-gray-600 mb-1">Bounce Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.metrics.bounceRate}%</p>
-                    <p className="text-xs text-gray-500 mt-1">{analytics.metrics.emailsBounced} bounced</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Lead Quality Breakdown */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Quality</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-sm font-medium text-red-900 mb-2">🔥 Hot Leads</p>
-                    <p className="text-3xl font-bold text-red-900">{analytics.leadQuality.hot}</p>
-                    <p className="text-xs text-red-700 mt-1">Score 80-100</p>
-                  </div>
-
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-sm font-medium text-yellow-900 mb-2">⚡ Warm Leads</p>
-                    <p className="text-3xl font-bold text-yellow-900">{analytics.leadQuality.warm}</p>
-                    <p className="text-xs text-yellow-700 mt-1">Score 60-79</p>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm font-medium text-blue-900 mb-2">❄️ Cold Leads</p>
-                    <p className="text-3xl font-bold text-blue-900">{analytics.leadQuality.cold}</p>
-                    <p className="text-xs text-blue-700 mt-1">Score 0-59</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Breakdown */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Status</h3>
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-                  {Object.entries(analytics.statusBreakdown).map(([status, count]: [string, any]) => (
-                    <div key={status} className="border border-gray-200 rounded-lg p-3">
-                      <p className="text-xs text-gray-600 mb-1 capitalize">{status.replace('_', ' ')}</p>
-                      <p className="text-xl font-bold text-gray-900">{count}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Campaigns Using This Batch */}
-              {analytics.campaigns && analytics.campaigns.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Campaigns Using This Batch</h3>
-                  <div className="space-y-3">
-                    {analytics.campaigns.map((campaign: any) => (
-                      <div key={campaign.id} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold text-gray-900">{campaign.name}</h4>
-                          <p className="text-sm text-gray-600">Status: <span className="capitalize">{campaign.status}</span></p>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="text-center">
-                            <p className="font-semibold text-gray-900">{campaign.emailsSent}</p>
-                            <p className="text-xs text-gray-500">Sent</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-semibold text-gray-900">{campaign.emailsOpened}</p>
-                            <p className="text-xs text-gray-500">Opened</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-semibold text-gray-900">{campaign.emailsClicked}</p>
-                            <p className="text-xs text-gray-500">Clicked</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12 text-gray-500">
-              No analytics data available
-            </div>
-          )}
-        </div>
-
-        {/* Modal Footer */}
-        <div className="flex items-center justify-end p-6 border-t bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }

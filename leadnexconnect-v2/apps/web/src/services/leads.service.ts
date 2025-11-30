@@ -3,7 +3,7 @@ import api from './api'
 export interface Lead {
   id: string
   companyName: string
-  contactName: string
+  contactName?: string
   email: string
   phone?: string
   website?: string
@@ -35,7 +35,7 @@ export interface Lead {
   source?: string
   sourceType?: string
   batchId?: string
-  createdAt: string
+  createdAt?: string
 }
 
 export const leadsService = {
