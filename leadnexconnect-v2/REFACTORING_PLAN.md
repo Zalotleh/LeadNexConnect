@@ -39,17 +39,17 @@
 - Batch campaign creation modal
 - ~390 lines ✅
 
-## Components To Create
-
-### 7. **LeadsTableView** (`/components/leads/LeadsTableView.tsx`)
+### 7. **LeadsTableView Component** (`/components/leads/LeadsTableView.tsx`)
 - Complete table view for leads
-- Search, filters, bulk actions
-- ~500 lines
+- Search, filters, bulk actions, status badges
+- Quality scores with visual indicators
+- ~200 lines ✅
 
-### 8. **BatchesView** (`/components/leads/BatchesView.tsx`)
-- Batch cards view
-- Batch operations (analytics, campaigns)
-- ~400 lines
+### 8. **BatchesView Component** (`/components/leads/BatchesView.tsx`)
+- Batch cards display with metrics
+- Loading and empty states
+- Action buttons (campaign, analytics)
+- ~160 lines ✅
 
 ## Main Page Structure (`/pages/leads.tsx`)
 
@@ -79,17 +79,19 @@ After refactoring, the main file should be ~300-400 lines:
 4. ✅ Extract Create Campaign Modal
 5. ✅ Extract Lead Modals (View, Edit, Create)
 6. ✅ Extract Batch Modals (Analytics, Campaign)
-7. ⏳ Extract Table View
-8. ⏳ Extract Batches View
+7. ✅ Extract Leads Table View
+8. ✅ Extract Batches View
 9. ⏳ Refactor main leads.tsx to use all components
 10. ⏳ Test thoroughly
-11. ⏳ Remove old code
+11. ⏳ Remove old code and cleanup
 
 ## Progress Summary
 
-**Completed**: 6 of 8 components (~1,715 lines extracted)
-**Remaining**: 2 components + main file integration (~900 lines + refactoring)
-**Status**: ~64% complete
+**Completed**: 8 of 8 components (~2,075 lines extracted)
+**Remaining**: Main file integration and testing
+**Status**: 100% component extraction complete! 🎉
+
+Next Phase: Integrate all components into main leads.tsx file
 
 ## File Size Reduction
 
