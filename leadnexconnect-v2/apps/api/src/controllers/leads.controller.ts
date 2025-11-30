@@ -29,6 +29,7 @@ export class LeadsController {
         sourceType,
         minScore,
         search,
+        batchId,
       } = req.query;
 
       logger.info('[LeadsController] Getting leads', { query: req.query });
@@ -43,6 +44,7 @@ export class LeadsController {
       if (source) filters.push(eq(leads.source, source as string));
       if (sourceType) filters.push(eq(leads.sourceType, sourceType as string));
       if (minScore) filters.push(gte(leads.qualityScore, parseInt(minScore as string)));
+      if (batchId) filters.push(eq(leads.batchId, batchId as string));
       
       // Search filter - search in company name, email, contact name
       if (search) {
@@ -496,7 +498,7 @@ export class LeadsController {
    */
   async importLinkedIn(req: Request, res: Response) {
     try {
-      const { csvData, industry, enrichEmail = true } = req.body;
+      const { csvData, industry, enrichEmail = true, batchName } = req.body;
 
       logger.info('[LeadsController] Importing LinkedIn CSV');
 
@@ -519,9 +521,114 @@ export class LeadsController {
         }
       }
 
+      // Create a batch for imported leads
+      const currentDate = new Date().toISOString().split('T')[0];
+      const finalBatchName = batchName || `CSV Import - ${currentDate}`;
+      
+      const [batch] = await db.insert(leadBatches).values({
+        name: finalBatchName,
+        description: `Imported ${leadsData.length} leads from CSV`,
+        source: 'csv_import',
+        totalLeads: leadsData.length,
+        successfulImports: 0,
+        failedImports: 0,
+        duplicatesSkipped: 0,
+        importSettings: {
+          industry: industry || 'Other',
+          enrichEmail,
+        },
+      }).returning();
+
+      logger.info('[LeadsController] Created batch for CSV import', { batchId: batch.id });
+
+      // Save leads to database with batch ID
+      const saved = [];
+      const duplicates = [];
+
+      for (const leadData of leadsData) {
+        try {
+          // Check for duplicates (by email or company name)
+          const existingLead = await db
+            .select()
+            .from(leads)
+            .where(
+              leadData.email 
+                ? eq(leads.email, leadData.email)
+                : eq(leads.companyName, leadData.companyName)
+            )
+            .limit(1);
+
+          if (existingLead.length > 0) {
+            duplicates.push(leadData);
+            continue;
+          }
+
+          // Calculate quality score
+          let qualityScore = 50;
+          if (leadData.email) qualityScore += 30;
+          if (leadData.phone) qualityScore += 10;
+          if (leadData.website) qualityScore += 10;
+
+          const [savedLead] = await db.insert(leads).values({
+            companyName: leadData.companyName,
+            contactName: leadData.contactName,
+            email: leadData.email,
+            phone: leadData.phone,
+            website: leadData.website,
+            industry: leadData.industry || industry || 'Other',
+            city: leadData.city,
+            country: leadData.country,
+            jobTitle: leadData.jobTitle,
+            companySize: leadData.companySize,
+            source: 'csv_import',
+            sourceType: 'manual_import',
+            status: 'new',
+            qualityScore,
+            tier: qualityScore >= 80 ? 'hot' : qualityScore >= 60 ? 'warm' : 'cold',
+            batchId: batch.id,
+          }).returning();
+
+          saved.push(savedLead);
+        } catch (err: any) {
+          logger.error('[LeadsController] Failed to save imported lead', {
+            error: err.message,
+            companyName: leadData.companyName,
+          });
+        }
+      }
+
+      // Update batch with final counts
+      await db
+        .update(leadBatches)
+        .set({
+          successfulImports: saved.length,
+          duplicatesSkipped: duplicates.length,
+          failedImports: leadsData.length - saved.length - duplicates.length,
+          completedAt: new Date(),
+        })
+        .where(eq(leadBatches.id, batch.id));
+
+      logger.info('[LeadsController] CSV import completed', {
+        batchId: batch.id,
+        total: leadsData.length,
+        saved: saved.length,
+        duplicates: duplicates.length,
+      });
+
       res.json({
         success: true,
-        data: { leads: leadsData, count: leadsData.length },
+        data: { 
+          leads: saved,
+          batch: {
+            id: batch.id,
+            name: batch.name,
+            totalLeads: leadsData.length,
+            imported: saved.length,
+            duplicates: duplicates.length,
+          },
+          count: saved.length,
+          imported: saved.length,
+        },
       });
     } catch (error: any) {
       logger.error('[LeadsController] Error importing LinkedIn', {

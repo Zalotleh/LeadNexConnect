@@ -63,10 +63,14 @@ export const leadsAPI = {
     tier?: string
     source?: string
     industry?: string
+    batchId?: string
   }) => api.get('/leads', { params }),
   getBatches: () => api.get('/leads/batches'),
   getBatchAnalytics: (batchId: string) => api.get(`/leads/batches/${batchId}/analytics`),
   getLeadById: (id: string) => api.get(`/leads/${id}`),
+  deleteLead: (id: string) => api.delete(`/leads/${id}`),
+  updateLead: (id: string, data: any) => api.put(`/leads/${id}`, data),
+  createLead: (data: any) => api.post('/leads', data),
 }
 
 // Campaigns endpoints

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -12,9 +13,17 @@ import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
 
 export default function Leads() {
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')
   const [viewMode, setViewMode] = useState<'table' | 'batches'>('table')
+  
+  // Check if URL has view=batches query parameter
+  useEffect(() => {
+    if (router.query.view === 'batches') {
+      setViewMode('batches')
+    }
+  }, [router.query.view])
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [tierFilter, setTierFilter] = useState<string>('all')
@@ -51,6 +60,14 @@ export default function Leads() {
   const [selectedBatchForCampaign, setSelectedBatchForCampaign] = useState<any>(null)
   const [showBatchAnalyticsModal, setShowBatchAnalyticsModal] = useState(false)
   const [selectedBatchForAnalytics, setSelectedBatchForAnalytics] = useState<any>(null)
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importForm, setImportForm] = useState({
+    batchName: '',
+    industry: 'Other',
+    enrichEmail: true,
+  })
+  const [isImporting, setIsImporting] = useState(false)
   const [filters, setFilters] = useState({
     industry: 'all',
     minScore: 0,
@@ -88,8 +105,13 @@ export default function Leads() {
   // Fetch batches for batch view
   const { data: batchesData, isLoading: batchesLoading, refetch: refetchBatches } = useQuery({
     queryKey: ['batches'],
-    queryFn: async () => await leadsAPI.getBatches(),
+    queryFn: async () => {
+      const result = await leadsAPI.getBatches()
+      return result.data // Return the unwrapped data
+    },
     enabled: viewMode === 'batches' || generating, // Enable when in batch view or generating
+    staleTime: 0, // Always fetch fresh data
+    cacheTime: 0, // Don't cache
   })
 
   const leads: Lead[] = data?.data || []
@@ -206,22 +228,51 @@ export default function Leads() {
 
   const handleExport = async () => {
     try {
-      // Build query params from current filters
-      const params = new URLSearchParams();
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (filters.industry !== 'all') params.append('industry', filters.industry);
-      if (filters.source !== 'all') params.append('source', filters.source);
-      if (filters.minScore > 0) params.append('minScore', filters.minScore.toString());
-      if (filters.maxScore < 100) params.append('maxScore', filters.maxScore.toString());
+      if (viewMode === 'batches') {
+        // Export batches as CSV
+        const batchesData = batches || [];
+        const csvContent = [
+          ['Batch Name', 'Source', 'Total Leads', 'Successful', 'Duplicates', 'Status', 'Created Date'].join(','),
+          ...batchesData.map((batch: any) => [
+            `"${batch.name}"`,
+            batch.source,
+            batch.totalLeads,
+            batch.successfulImports,
+            batch.duplicatesSkipped,
+            batch.status || 'completed',
+            new Date(batch.createdAt).toLocaleDateString(),
+          ].join(','))
+        ].join('\n');
 
-      const queryString = params.toString();
-      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/leads/export${queryString ? '?' + queryString : ''}`;
-      
-      // Download file
-      window.location.href = url;
-      toast.success('Exporting leads...');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `batches-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        toast.success('Batches exported successfully!');
+      } else {
+        // Export leads from table view
+        const params = new URLSearchParams();
+        if (statusFilter !== 'all') params.append('status', statusFilter);
+        if (filters.industry !== 'all') params.append('industry', filters.industry);
+        if (filters.source !== 'all') params.append('source', filters.source);
+        if (filters.minScore > 0) params.append('minScore', filters.minScore.toString());
+        if (filters.maxScore < 100) params.append('maxScore', filters.maxScore.toString());
+
+        const queryString = params.toString();
+        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/leads/export${queryString ? '?' + queryString : ''}`;
+        
+        // Download file
+        window.location.href = url;
+        toast.success('Exporting leads...');
+      }
     } catch (error) {
-      toast.error('Failed to export leads');
+      toast.error('Failed to export');
     }
   }
 
@@ -233,32 +284,61 @@ export default function Leads() {
       const file = e.target.files[0];
       if (!file) return;
 
-      try {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const csvData = event.target?.result as string;
-          
-          toast.loading('Importing leads...');
-          
+      // Set file and show dialog
+      setImportFile(file);
+      setImportForm({
+        batchName: `CSV Import - ${new Date().toLocaleDateString()}`,
+        industry: 'Other',
+        enrichEmail: true,
+      });
+      setShowImportDialog(true);
+    };
+    input.click();
+  }
+
+  const handleImportSubmit = async () => {
+    if (!importFile) return;
+
+    setIsImporting(true);
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const csvData = event.target?.result as string;
+        
+        try {
           const response = await api.post('/leads/import', {
             csvData,
-            industry: 'Other', // Can be enhanced with a modal to select industry
-            enrichEmail: true,
+            industry: importForm.industry,
+            enrichEmail: importForm.enrichEmail,
+            batchName: importForm.batchName,
           });
 
           if (response.data.success) {
-            toast.dismiss();
-            toast.success(`Imported ${response.data.data.imported} leads successfully!`);
+            toast.success(`Imported ${response.data.data.imported} leads successfully! ${response.data.data.duplicates > 0 ? `(${response.data.data.duplicates} duplicates skipped)` : ''}`);
             refetch();
+            refetchBatches();
+            
+            // Switch to batch view to see the new batch
+            if (viewMode !== 'batches') {
+              setViewMode('batches');
+            }
+            
+            // Close dialog
+            setShowImportDialog(false);
+            setImportFile(null);
           }
-        };
-        reader.readAsText(file);
-      } catch (error: any) {
-        toast.dismiss();
-        toast.error(error.response?.data?.error?.message || 'Failed to import leads');
-      }
-    };
-    input.click();
+        } catch (error: any) {
+          toast.error(error.response?.data?.error?.message || 'Failed to import leads');
+        } finally {
+          setIsImporting(false);
+        }
+      };
+      reader.readAsText(importFile);
+    } catch (error: any) {
+      toast.error('Failed to read file');
+      setIsImporting(false);
+    }
   }
 
   const handleSelectLead = (leadId: string) => {
@@ -543,7 +623,7 @@ export default function Leads() {
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
             >
               <Download className="w-4 h-4 inline mr-2" />
-              Export
+              Export {viewMode === 'batches' ? 'Batches' : 'Leads'}
             </button>
           </div>
         </div>
@@ -1049,30 +1129,19 @@ export default function Leads() {
                     </div>
                   ) : (
                     batches.map((batch: any) => {
-                      const isExpanded = expandedBatches.has(batch.id)
                       return (
-                        <div key={batch.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div key={batch.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                           {/* Batch Header */}
-                          <div className="flex items-center justify-between p-4 bg-gray-50">
-                            <div
-                              onClick={() => {
-                                const newExpanded = new Set(expandedBatches)
-                                if (isExpanded) {
-                                  newExpanded.delete(batch.id)
-                                } else {
-                                  newExpanded.add(batch.id)
-                                }
-                                setExpandedBatches(newExpanded)
-                              }}
-                              className="flex items-center gap-4 flex-1 cursor-pointer hover:bg-gray-100 -m-4 p-4 rounded-l-lg transition-colors"
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="w-5 h-5 text-gray-500" />
-                              ) : (
-                                <ChevronUp className="w-5 h-5 text-gray-500" />
-                              )}
+                          <div 
+                            className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                            onClick={() => router.push(`/batches/${batch.id}`)}
+                          >
+                            <div className="flex items-center gap-4 flex-1">
+                              <Package className="w-5 h-5 text-primary-600" />
                               <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900">{batch.name}</h3>
+                                <h3 className="text-lg font-semibold text-gray-900">
+                                  {batch.name}
+                                </h3>
                                 <p className="text-sm text-gray-600">
                                   Generated on {new Date(batch.createdAt).toLocaleDateString()} at {new Date(batch.createdAt).toLocaleTimeString()}
                                 </p>
@@ -1098,7 +1167,8 @@ export default function Leads() {
                               {/* Action Buttons */}
                               <div className="flex items-center gap-2 ml-4">
                                 <button
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation()
                                     setSelectedBatchForCampaign(batch)
                                     setShowBatchCampaignModal(true)
                                   }}
@@ -1109,7 +1179,8 @@ export default function Leads() {
                                   Start Campaign
                                 </button>
                                 <button
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation()
                                     setSelectedBatchForAnalytics(batch)
                                     setShowBatchAnalyticsModal(true)
                                   }}
@@ -1122,65 +1193,6 @@ export default function Leads() {
                               </div>
                             </div>
                           </div>
-
-                          {/* Expanded Batch Content */}
-                          {isExpanded && (
-                            <div className="p-4 bg-white">
-                              {batch.sampleLeads && batch.sampleLeads.length > 0 ? (
-                                <>
-                                  <div className="mb-4">
-                                    <h4 className="text-sm font-medium text-gray-700 mb-2">Settings Used:</h4>
-                                    <div className="bg-gray-50 rounded p-3 text-sm space-y-1">
-                                      {batch.settings && (
-                                        <>
-                                          {batch.settings.industry && (
-                                            <p><span className="font-medium">Industry:</span> {batch.settings.industry}</p>
-                                          )}
-                                          {batch.settings.location && (
-                                            <p><span className="font-medium">Location:</span> {batch.settings.location}</p>
-                                          )}
-                                          {batch.settings.source && (
-                                            <p><span className="font-medium">Source:</span> {batch.settings.source}</p>
-                                          )}
-                                          {batch.settings.count && (
-                                            <p><span className="font-medium">Count:</span> {batch.settings.count}</p>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <h4 className="text-sm font-medium text-gray-700 mb-3">Leads in this Batch:</h4>
-                                  <div className="space-y-2">
-                                    {batch.sampleLeads.map((lead: any) => (
-                                      <div key={lead.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                                        <div className="flex-1">
-                                          <h5 className="font-medium text-gray-900">{lead.companyName}</h5>
-                                          <p className="text-sm text-gray-600">{lead.contactName || 'No contact'} • {lead.email || 'No email'}</p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                            lead.tier === 'A' ? 'bg-green-100 text-green-800' :
-                                            lead.tier === 'B' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
-                                          }`}>
-                                            Tier {lead.tier}
-                                          </span>
-                                          <span className="text-sm font-medium text-gray-700">Score: {lead.score}</span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    {batch.leadCount > 5 && (
-                                      <p className="text-sm text-gray-500 text-center pt-2">
-                                        Showing 5 of {batch.leadCount} leads. Switch to table view to see all.
-                                      </p>
-                                    )}
-                                  </div>
-                                </>
-                              ) : (
-                                <p className="text-sm text-gray-500 text-center py-4">No leads found in this batch</p>
-                              )}
-                            </div>
-                          )}
                         </div>
                       )
                     })
@@ -2327,6 +2339,159 @@ export default function Leads() {
           />
         )}
 
+        {/* Import CSV Dialog */}
+        {showImportDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Import Leads from CSV</h2>
+                  <p className="text-sm text-gray-600 mt-1">Configure your import settings</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowImportDialog(false);
+                    setImportFile(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-6">
+                {/* File Info */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start space-x-3">
+                  <Upload className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900">Selected File</p>
+                    <p className="text-sm text-blue-700 truncate">{importFile?.name}</p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      {importFile ? `${(importFile.size / 1024).toFixed(2)} KB` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Batch Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Batch Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={importForm.batchName}
+                    onChange={(e) => setImportForm({ ...importForm, batchName: e.target.value })}
+                    placeholder="e.g., Q4 Lead Import"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Give this import batch a descriptive name for easy identification</p>
+                </div>
+
+                {/* Industry */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Industry
+                  </label>
+                  <select
+                    value={importForm.industry}
+                    onChange={(e) => setImportForm({ ...importForm, industry: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  >
+                    <option value="Other">Other</option>
+                    {INDUSTRIES.map((industry) => (
+                      <option key={industry} value={industry}>
+                        {industry}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Select the primary industry for these leads</p>
+                </div>
+
+                {/* Email Enrichment */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      id="enrichEmail"
+                      checked={importForm.enrichEmail}
+                      onChange={(e) => setImportForm({ ...importForm, enrichEmail: e.target.checked })}
+                      className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                    <div className="flex-1">
+                      <label htmlFor="enrichEmail" className="text-sm font-medium text-gray-900 cursor-pointer flex items-center">
+                        <Sparkles className="w-4 h-4 text-green-600 mr-2" />
+                        Enable Email Enrichment
+                      </label>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Automatically find and add missing email addresses using Hunter.io. This may take a few extra seconds.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Import Info */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                    <Target className="w-4 h-4 mr-2 text-gray-600" />
+                    What happens during import?
+                  </h3>
+                  <ul className="space-y-2 text-xs text-gray-600">
+                    <li className="flex items-start">
+                      <span className="text-primary-600 mr-2">•</span>
+                      <span>Duplicate leads (by email or company name) will be automatically skipped</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-primary-600 mr-2">•</span>
+                      <span>Quality scores will be calculated based on data completeness</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-primary-600 mr-2">•</span>
+                      <span>All leads will be grouped in a single batch for easy management</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-primary-600 mr-2">•</span>
+                      <span>You can view the batch details in the "Batch View" tab after import</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+                <button
+                  onClick={() => {
+                    setShowImportDialog(false);
+                    setImportFile(null);
+                  }}
+                  disabled={isImporting}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleImportSubmit}
+                  disabled={isImporting || !importForm.batchName.trim()}
+                  className="px-6 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader className="w-4 h-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Import Leads
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </Layout>
   )
@@ -2336,7 +2501,10 @@ export default function Leads() {
 function BatchAnalyticsModal({ batch, onClose }: { batch: any; onClose: () => void }) {
   const { data: analyticsData, isLoading } = useQuery({
     queryKey: ['batchAnalytics', batch.id],
-    queryFn: async () => await leadsAPI.getBatchAnalytics(batch.id),
+    queryFn: async () => {
+      const result = await leadsAPI.getBatchAnalytics(batch.id)
+      return result.data // Unwrap Axios response
+    },
   })
 
   const analytics = analyticsData?.data
