@@ -34,12 +34,12 @@
 - Create lead modal (new lead form)
 - ~600 lines ✅
 
-## Components To Create
+### 6. **BatchModals Component** (`/components/leads/BatchModals.tsx`)
+- Batch analytics modal (metrics, quality, campaigns)
+- Batch campaign creation modal
+- ~390 lines ✅
 
-### 6. **BatchModals** (`/components/leads/BatchModals.tsx`)
-- Batch analytics modal
-- Batch campaign modal
-- ~200 lines
+## Components To Create
 
 ### 7. **LeadsTableView** (`/components/leads/LeadsTableView.tsx`)
 - Complete table view for leads
@@ -78,7 +78,7 @@ After refactoring, the main file should be ~300-400 lines:
 3. ✅ Extract Generate Leads Modal
 4. ✅ Extract Create Campaign Modal
 5. ✅ Extract Lead Modals (View, Edit, Create)
-6. ⏳ Extract Batch Modals (Analytics, Campaign)
+6. ✅ Extract Batch Modals (Analytics, Campaign)
 7. ⏳ Extract Table View
 8. ⏳ Extract Batches View
 9. ⏳ Refactor main leads.tsx to use all components
@@ -87,9 +87,9 @@ After refactoring, the main file should be ~300-400 lines:
 
 ## Progress Summary
 
-**Completed**: 5 of 8 components (~1,325 lines extracted)
-**Remaining**: 3 components + main file integration (~1,100 lines + refactoring)
-**Status**: ~49% complete
+**Completed**: 6 of 8 components (~1,715 lines extracted)
+**Remaining**: 2 components + main file integration (~900 lines + refactoring)
+**Status**: ~64% complete
 
 ## File Size Reduction
 
