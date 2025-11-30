@@ -394,13 +394,28 @@ export class EmailSenderService {
         provider: this.currentConfig.provider,
       });
 
-      // Add tracking pixel for open tracking
-      const trackingPixel = `<img src="${process.env.API_BASE_URL}/api/emails/track/open/${params.leadId}" width="1" height="1" alt="" />`;
+      // Create email record first to get the ID for tracking
+      const emailRecord = await db.insert(emails).values({
+        leadId: params.leadId,
+        campaignId: params.campaignId,
+        subject: params.subject,
+        bodyText: params.bodyText,
+        bodyHtml: params.bodyHtml,
+        followUpStage: params.followUpStage,
+        status: 'queued',
+        sentAt: null,
+        externalId: null,
+      }).returning();
+
+      const emailId = emailRecord[0].id;
+
+      // Add tracking pixel for open tracking using the email ID
+      const trackingPixel = `<img src="${process.env.API_BASE_URL}/api/emails/track/open/${emailId}" width="1" height="1" alt="" />`;
       const bodyHtmlWithTracking = params.bodyHtml 
         ? `${params.bodyHtml}${trackingPixel}`
         : this.wrapInEmailTemplate(this.convertTextToHtml(params.bodyText)) + trackingPixel;
 
-      // Send email
+      // Send email with tracking pixel
       const info = await this.transporter.sendMail({
         from: `"${this.currentConfig.fromName}" <${this.currentConfig.fromEmail}>`,
         to: lead[0].email,
@@ -410,21 +425,19 @@ export class EmailSenderService {
         headers: {
           'X-Campaign-ID': params.campaignId || '',
           'X-Lead-ID': params.leadId,
+          'X-Email-ID': emailId,
         },
       });
 
-      // Record email in database
-      await db.insert(emails).values({
-        leadId: params.leadId,
-        campaignId: params.campaignId,
-        subject: params.subject,
-        bodyText: params.bodyText,
-        bodyHtml: params.bodyHtml,
-        followUpStage: params.followUpStage,
-        status: 'sent',
-        sentAt: new Date(),
-        externalId: info.messageId,
-      });
+      // Update email record with sent status
+      await db
+        .update(emails)
+        .set({
+          status: 'sent',
+          sentAt: new Date(),
+          externalId: info.messageId,
+        })
+        .where(eq(emails.id, emailId));
 
       // Update campaign emailsSent counter
       if (params.campaignId) {
