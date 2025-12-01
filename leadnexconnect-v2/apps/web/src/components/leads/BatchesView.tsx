@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Loader, Zap, TrendingUp } from 'lucide-react';
+import { Package, Loader, Zap, TrendingUp, Trash2 } from 'lucide-react';
 
 interface Batch {
   id: number;
@@ -19,9 +19,13 @@ interface BatchesViewProps {
     batchName: string;
   };
   generationProgress: string;
+  selectedBatches: Set<string | number>;
   onBatchClick: (batchId: number) => void;
   onStartCampaign: (batch: Batch) => void;
   onViewAnalytics: (batch: Batch) => void;
+  onSelectBatch: (batchId: string | number) => void;
+  onSelectAllBatches: () => void;
+  onDeleteSelected: () => void;
 }
 
 export const BatchesView: React.FC<BatchesViewProps> = ({
@@ -30,12 +34,40 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
   generating,
   generateForm,
   generationProgress,
+  selectedBatches,
   onBatchClick,
   onStartCampaign,
   onViewAnalytics,
+  onSelectBatch,
+  onSelectAllBatches,
+  onDeleteSelected,
 }) => {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Bulk Actions Bar */}
+      {selectedBatches.size > 0 && (
+        <div className="bg-primary-50 border-b border-primary-200 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-medium text-primary-900">
+              {selectedBatches.size} batch{selectedBatches.size !== 1 ? 'es' : ''} selected
+            </span>
+            <button
+              onClick={() => onSelectAllBatches()}
+              className="text-sm text-primary-600 hover:text-primary-800"
+            >
+              Clear selection
+            </button>
+          </div>
+          <button
+            onClick={onDeleteSelected}
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Selected
+          </button>
+        </div>
+      )}
+      
       <div className="p-6 space-y-4">
         {/* Loading Card - Show when generating */}
         {generating && (
@@ -78,23 +110,51 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
             <p className="text-gray-600">Generate leads with batch names to see them organized here</p>
           </div>
         ) : (
-          batches.map((batch: Batch) => {
+          <>
+            {/* Select All Checkbox */}
+            {batches.length > 0 && (
+              <div className="flex items-center px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={selectedBatches.size === batches.length && batches.length > 0}
+                  onChange={onSelectAllBatches}
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <span className="ml-3 text-sm text-gray-700">Select All Batches</span>
+              </div>
+            )}
+            
+            {batches.map((batch: Batch) => {
             return (
               <div key={batch.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
                 {/* Batch Header */}
                 <div 
-                  className="flex items-center justify-between p-4 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => onBatchClick(batch.id)}
+                  className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center gap-4 flex-1">
-                    <Package className="w-5 h-5 text-primary-600" />
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {batch.name}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Generated on {new Date(batch.createdAt).toLocaleDateString()} at {new Date(batch.createdAt).toLocaleTimeString()}
-                      </p>
+                    <input
+                      type="checkbox"
+                      checked={selectedBatches.has(batch.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        onSelectBatch(batch.id);
+                      }}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div 
+                      className="flex items-center gap-4 flex-1 cursor-pointer"
+                      onClick={() => onBatchClick(batch.id)}
+                    >
+                      <Package className="w-5 h-5 text-primary-600" />
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {batch.name}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          Generated on {new Date(batch.createdAt).toLocaleDateString()} at {new Date(batch.createdAt).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-6">
@@ -222,7 +282,8 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
                 )}
               </div>
             );
-          })
+          })}
+          </>
         )}
       </div>
     </div>

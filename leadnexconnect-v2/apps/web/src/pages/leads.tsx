@@ -41,6 +41,7 @@ export default function Leads() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+  const [selectedBatches, setSelectedBatches] = useState<Set<string | number>>(new Set())
   const [showCreateCampaignModal, setShowCreateCampaignModal] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
@@ -48,6 +49,8 @@ export default function Leads() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [editForm, setEditForm] = useState<Partial<Lead>>({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDeleteBatchesConfirm, setShowDeleteBatchesConfirm] = useState(false)
+  const [showDeleteLeadsConfirm, setShowDeleteLeadsConfirm] = useState(false)
   const [leadToDelete, setLeadToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showCreateLeadModal, setShowCreateLeadModal] = useState(false)
@@ -630,6 +633,84 @@ export default function Leads() {
     }
   }
 
+  const handleSelectBatch = (batchId: string | number) => {
+    const newSelected = new Set(selectedBatches)
+    if (newSelected.has(batchId)) {
+      newSelected.delete(batchId)
+    } else {
+      newSelected.add(batchId)
+    }
+    setSelectedBatches(newSelected)
+  }
+
+  const handleSelectAllBatches = () => {
+    if (selectedBatches.size === batches.length) {
+      setSelectedBatches(new Set())
+    } else {
+      setSelectedBatches(new Set(batches.map((batch: any) => batch.id)))
+    }
+  }
+
+  const handleDeleteSelectedBatches = () => {
+    if (selectedBatches.size === 0) return
+    setShowDeleteBatchesConfirm(true)
+  }
+
+  const confirmDeleteBatches = async () => {
+    try {
+      setIsDeleting(true)
+      toast.loading(`Deleting ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''}...`)
+      
+      // Delete each batch
+      await Promise.all(
+        Array.from(selectedBatches).map(batchId => 
+          api.delete(`/leads/batches/${batchId}`)
+        )
+      )
+      
+      toast.dismiss()
+      toast.success(`Successfully deleted ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''}`)
+      setShowDeleteBatchesConfirm(false)
+      setSelectedBatches(new Set())
+      refetchBatches()
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.response?.data?.error?.message || 'Failed to delete batches')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteSelectedLeads = () => {
+    if (selectedLeads.size === 0) return
+    setShowDeleteLeadsConfirm(true)
+  }
+
+  const confirmDeleteLeads = async () => {
+    try {
+      setIsDeleting(true)
+      toast.loading(`Deleting ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}...`)
+      
+      // Delete each lead
+      await Promise.all(
+        Array.from(selectedLeads).map(leadId => 
+          api.delete(`/leads/${leadId}`)
+        )
+      )
+      
+      toast.dismiss()
+      toast.success(`Successfully deleted ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}`)
+      setShowDeleteLeadsConfirm(false)
+      setSelectedLeads(new Set())
+      refetch()
+    } catch (error: any) {
+      toast.dismiss()
+      toast.error(error.response?.data?.error?.message || 'Failed to delete leads')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       new: 'bg-blue-100 text-blue-800',
@@ -1111,6 +1192,7 @@ export default function Leads() {
             onGenerateClick={() => setShowGenerateModal(true)}
             getStatusColor={getStatusColor}
             getTierBadge={getTierBadge}
+            onDeleteSelected={handleDeleteSelectedLeads}
           />
         ) : (
           <BatchesView
@@ -1119,6 +1201,10 @@ export default function Leads() {
             generating={generating}
             generateForm={generateForm}
             generationProgress={generationProgress}
+            selectedBatches={selectedBatches}
+            onSelectBatch={handleSelectBatch}
+            onSelectAllBatches={handleSelectAllBatches}
+            onDeleteSelected={handleDeleteSelectedBatches}
             onBatchClick={(batchId) => router.push(`/batches/${batchId}`)}
             onStartCampaign={(batch) => {
               setSelectedBatchForCampaign(batch)
@@ -1244,6 +1330,26 @@ export default function Leads() {
           onConfirm={confirmDelete}
           title="Delete Lead"
           message="Are you sure you want to delete this lead? This action cannot be undone."
+          confirmText="Delete"
+          isLoading={isDeleting}
+        />
+
+        <ConfirmDialog
+          isOpen={showDeleteBatchesConfirm}
+          onClose={() => setShowDeleteBatchesConfirm(false)}
+          onConfirm={confirmDeleteBatches}
+          title="Delete Batches"
+          message={`Are you sure you want to delete ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''}? This will also delete all leads within ${selectedBatches.size > 1 ? 'these batches' : 'this batch'}. This action cannot be undone.`}
+          confirmText="Delete"
+          isLoading={isDeleting}
+        />
+
+        <ConfirmDialog
+          isOpen={showDeleteLeadsConfirm}
+          onClose={() => setShowDeleteLeadsConfirm(false)}
+          onConfirm={confirmDeleteLeads}
+          title="Delete Leads"
+          message={`Are you sure you want to delete ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}? This action cannot be undone.`}
           confirmText="Delete"
           isLoading={isDeleting}
         />
