@@ -17,6 +17,13 @@ export default function Settings() {
     googleCustomSearchApiKey: false,
     smtpPass: false,
   })
+  
+  // Track which fields have been modified
+  const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set())
+  
+  // Store original masked values from server
+  const [originalMaskedValues, setOriginalMaskedValues] = useState<Record<string, string>>({})
+  
   const [settings, setSettings] = useState({
     // AI Keys
     anthropicApiKey: '',
@@ -52,13 +59,31 @@ export default function Settings() {
     setShowKeys(prev => ({ ...prev, [field]: !prev[field] }))
   }
 
+  const handleFieldChange = (fieldName: string, value: any) => {
+    setSettings(prev => ({ ...prev, [fieldName]: value }))
+    setModifiedFields(prev => new Set(prev).add(fieldName))
+  }
+
   const loadSettings = async () => {
     try {
       setLoading(true)
       const response = await api.get('/settings')
       if (response.data.success) {
         const loadedSettings = response.data.data
-        // Ensure all values are strings (not undefined/null) to avoid uncontrolled input warnings
+        
+        // Store the masked values separately
+        const maskedValues: Record<string, string> = {
+          anthropicApiKey: loadedSettings.anthropicApiKey || '',
+          apolloApiKey: loadedSettings.apolloApiKey || '',
+          hunterApiKey: loadedSettings.hunterApiKey || '',
+          peopleDataLabsApiKey: loadedSettings.peopleDataLabsApiKey || '',
+          googlePlacesApiKey: loadedSettings.googlePlacesApiKey || '',
+          googleCustomSearchApiKey: loadedSettings.googleCustomSearchApiKey || '',
+          smtpPass: loadedSettings.smtpPass || '',
+        }
+        setOriginalMaskedValues(maskedValues)
+        
+        // Set the settings with masked values
         setSettings({
           anthropicApiKey: loadedSettings.anthropicApiKey || '',
           apolloApiKey: loadedSettings.apolloApiKey || '',
@@ -78,6 +103,9 @@ export default function Settings() {
           emailsPerHour: loadedSettings.emailsPerHour || 50,
           dailyEmailLimit: loadedSettings.dailyEmailLimit || 500,
         })
+        
+        // Reset modified fields
+        setModifiedFields(new Set())
       }
     } catch (error: any) {
       toast.error('Failed to load settings')
@@ -90,10 +118,37 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const response = await api.put('/settings', settings)
+      // Only send fields that have been modified
+      const dataToSend: Record<string, any> = {}
+      
+      modifiedFields.forEach(fieldName => {
+        const value = (settings as any)[fieldName]
+        // Only include if the value is not empty and not a masked value
+        if (value && !value.includes('••••••••')) {
+          dataToSend[fieldName] = value
+        }
+      })
+      
+      // Always include non-sensitive fields
+      const alwaysIncludeFields = ['googleCustomSearchEngineId', 'smtpProvider', 'smtpHost', 'smtpPort', 
+                                    'smtpUser', 'smtpSecure', 'fromName', 'fromEmail', 
+                                    'emailsPerHour', 'dailyEmailLimit']
+      alwaysIncludeFields.forEach(field => {
+        if (modifiedFields.has(field)) {
+          dataToSend[field] = (settings as any)[field]
+        }
+      })
+      
+      if (Object.keys(dataToSend).length === 0) {
+        toast.error('No changes to save')
+        setSaving(false)
+        return
+      }
+      
+      const response = await api.put('/settings', dataToSend)
       if (response.data.success) {
         toast.success('Settings saved successfully!')
-        loadSettings() // Reload to get masked values
+        loadSettings() // Reload to get fresh masked values
       }
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || 'Failed to save settings')
@@ -152,7 +207,7 @@ export default function Settings() {
                 <input
                   type={showKeys.anthropicApiKey ? "text" : "password"}
                   value={settings.anthropicApiKey}
-                  onChange={(e) => setSettings({...settings, anthropicApiKey: e.target.value})}
+                  onChange={(e) => handleFieldChange('anthropicApiKey', e.target.value)}
                   placeholder="sk-ant-..."
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -182,7 +237,7 @@ export default function Settings() {
                 <input
                   type={showKeys.apolloApiKey ? "text" : "password"}
                   value={settings.apolloApiKey}
-                  onChange={(e) => setSettings({...settings, apolloApiKey: e.target.value})}
+                  onChange={(e) => handleFieldChange('apolloApiKey', e.target.value)}
                   placeholder="Enter your Apollo.io API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -204,7 +259,7 @@ export default function Settings() {
                 <input
                   type={showKeys.hunterApiKey ? "text" : "password"}
                   value={settings.hunterApiKey}
-                  onChange={(e) => setSettings({...settings, hunterApiKey: e.target.value})}
+                  onChange={(e) => handleFieldChange('hunterApiKey', e.target.value)}
                   placeholder="Enter your Hunter.io API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -226,7 +281,7 @@ export default function Settings() {
                 <input
                   type={showKeys.peopleDataLabsApiKey ? "text" : "password"}
                   value={settings.peopleDataLabsApiKey}
-                  onChange={(e) => setSettings({...settings, peopleDataLabsApiKey: e.target.value})}
+                  onChange={(e) => handleFieldChange('peopleDataLabsApiKey', e.target.value)}
                   placeholder="Enter your PDL API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -248,7 +303,7 @@ export default function Settings() {
                 <input
                   type={showKeys.googlePlacesApiKey ? "text" : "password"}
                   value={settings.googlePlacesApiKey}
-                  onChange={(e) => setSettings({...settings, googlePlacesApiKey: e.target.value})}
+                  onChange={(e) => handleFieldChange('googlePlacesApiKey', e.target.value)}
                   placeholder="Enter your Google Places API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -270,7 +325,7 @@ export default function Settings() {
                 <input
                   type={showKeys.googleCustomSearchApiKey ? "text" : "password"}
                   value={settings.googleCustomSearchApiKey}
-                  onChange={(e) => setSettings({...settings, googleCustomSearchApiKey: e.target.value})}
+                  onChange={(e) => handleFieldChange('googleCustomSearchApiKey', e.target.value)}
                   placeholder="Enter your Google Custom Search API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -291,7 +346,7 @@ export default function Settings() {
               <input
                 type="text"
                 value={settings.googleCustomSearchEngineId}
-                onChange={(e) => setSettings({...settings, googleCustomSearchEngineId: e.target.value})}
+                onChange={(e) => handleFieldChange('googleCustomSearchEngineId', e.target.value)}
                 placeholder="Enter your Custom Search Engine ID"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
@@ -311,7 +366,7 @@ export default function Settings() {
               </label>
               <select
                 value={settings.smtpProvider}
-                onChange={(e) => setSettings({...settings, smtpProvider: e.target.value})}
+                onChange={(e) => handleFieldChange('smtpProvider', e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="smtp2go">SMTP2GO</option>
@@ -328,7 +383,7 @@ export default function Settings() {
                 <input
                   type="text"
                   value={settings.smtpHost}
-                  onChange={(e) => setSettings({...settings, smtpHost: e.target.value})}
+                  onChange={(e) => handleFieldChange('smtpHost', e.target.value)}
                   placeholder="mail-eu.smtp2go.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -340,7 +395,7 @@ export default function Settings() {
                 <input
                   type="number"
                   value={settings.smtpPort}
-                  onChange={(e) => setSettings({...settings, smtpPort: e.target.value})}
+                  onChange={(e) => handleFieldChange('smtpPort', e.target.value)}
                   placeholder="2525"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -353,7 +408,7 @@ export default function Settings() {
               <input
                 type="text"
                 value={settings.smtpUser}
-                onChange={(e) => setSettings({...settings, smtpUser: e.target.value})}
+                onChange={(e) => handleFieldChange('smtpUser', e.target.value)}
                 placeholder="your-smtp-username"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
@@ -366,7 +421,7 @@ export default function Settings() {
                 <input
                   type={showKeys.smtpPass ? "text" : "password"}
                   value={settings.smtpPass}
-                  onChange={(e) => setSettings({...settings, smtpPass: e.target.value})}
+                  onChange={(e) => handleFieldChange('smtpPass', e.target.value)}
                   placeholder="Enter your SMTP password"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -387,7 +442,7 @@ export default function Settings() {
                 <input
                   type="text"
                   value={settings.fromName}
-                  onChange={(e) => setSettings({...settings, fromName: e.target.value})}
+                  onChange={(e) => handleFieldChange('fromName', e.target.value)}
                   placeholder="Your Company Name"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -399,7 +454,7 @@ export default function Settings() {
                 <input
                   type="email"
                   value={settings.fromEmail}
-                  onChange={(e) => setSettings({...settings, fromEmail: e.target.value})}
+                  onChange={(e) => handleFieldChange('fromEmail', e.target.value)}
                   placeholder="noreply@yourcompany.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -430,7 +485,7 @@ export default function Settings() {
               <input
                 type="number"
                 value={settings.emailsPerHour}
-                onChange={(e) => setSettings({...settings, emailsPerHour: parseInt(e.target.value)})}
+                onChange={(e) => handleFieldChange('emailsPerHour', parseInt(e.target.value))}
                 min="1"
                 max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -444,7 +499,7 @@ export default function Settings() {
               <input
                 type="number"
                 value={settings.dailyEmailLimit}
-                onChange={(e) => setSettings({...settings, dailyEmailLimit: parseInt(e.target.value)})}
+                onChange={(e) => handleFieldChange('dailyEmailLimit', parseInt(e.target.value))}
                 min="1"
                 max="5000"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
