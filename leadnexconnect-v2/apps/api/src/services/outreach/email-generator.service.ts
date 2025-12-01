@@ -22,6 +22,7 @@ export class EmailGeneratorService {
     jobTitle?: string;
     website?: string;
     useTemplate?: boolean;
+    skipTemplateFallback?: boolean;
   }): Promise<{
     subject: string;
     bodyText: string;
@@ -32,8 +33,22 @@ export class EmailGeneratorService {
 
       const apiKey = await settingsService.get('anthropicApiKey', process.env.ANTHROPIC_API_KEY || '');
       if (!apiKey) {
-        logger.warn('[EmailGenerator] Anthropic API key not configured, falling back to template');
-        return this.generateEmail(params);
+        logger.warn('[EmailGenerator] Anthropic API key not configured');
+        if (!params.skipTemplateFallback) {
+          logger.info('[EmailGenerator] Falling back to template generation');
+          return this.generateEmail({ 
+            companyName: params.companyName,
+            contactName: params.contactName,
+            industry: params.industry,
+            city: params.city,
+            country: params.country,
+            followUpStage: params.followUpStage,
+            skipAIFallback: true 
+          });
+        } else {
+          // Both AI and template failed, use default
+          return this.generateDefaultEmail(params);
+        }
       }
 
       // Initialize Anthropic client with API key
@@ -77,16 +92,30 @@ export class EmailGeneratorService {
         error: error.message,
       });
 
-      // Fallback to template-based generation
-      logger.info('[EmailGenerator] Falling back to template generation');
-      return this.generateEmail(params);
+      // Fallback to template-based generation (but only if not already in fallback mode)
+      if (!params.skipTemplateFallback) {
+        logger.info('[EmailGenerator] Falling back to template generation');
+        return this.generateEmail({ 
+          companyName: params.companyName,
+          contactName: params.contactName,
+          industry: params.industry,
+          city: params.city,
+          country: params.country,
+          followUpStage: params.followUpStage,
+          skipAIFallback: true 
+        });
+      } else {
+        // Both AI and template failed, use default
+        logger.info('[EmailGenerator] Using default email template');
+        return this.generateDefaultEmail(params);
+      }
     }
   }
 
   /**
    * Generate personalized email content using templates
    */
-  async generateEmail(params: GenerateEmailParams): Promise<{
+  async generateEmail(params: GenerateEmailParams & { skipAIFallback?: boolean }): Promise<{
     subject: string;
     bodyText: string;
     bodyHtml: string;
@@ -101,9 +130,30 @@ export class EmailGeneratorService {
       );
 
       if (!template) {
-        logger.warn('[EmailGenerator] No template found, using AI generation');
-        // Try AI generation as fallback
-        return this.generateWithAI(params);
+        logger.warn('[EmailGenerator] No template found');
+        
+        // Try AI generation as fallback (but only if not already in fallback mode)
+        if (!params.skipAIFallback) {
+          logger.info('[EmailGenerator] Attempting AI generation as fallback');
+          try {
+            return await this.generateWithAI({ 
+              companyName: params.companyName,
+              contactName: params.contactName,
+              industry: params.industry,
+              city: params.city,
+              country: params.country,
+              followUpStage: params.followUpStage,
+              skipTemplateFallback: true 
+            });
+          } catch (aiError: any) {
+            logger.error('[EmailGenerator] AI fallback failed', { error: aiError.message });
+            // Continue to default email generation
+          }
+        }
+        
+        // Use default email template as last resort
+        logger.info('[EmailGenerator] Using default email template');
+        return this.generateDefaultEmail(params);
       }
 
       // Replace variables
@@ -244,6 +294,66 @@ Do not include any other text, greetings, or signatures.`;
       .replace(/\{\{industry\}\}/g, params.industry)
       .replace(/\{\{city\}\}/g, params.city || 'your area')
       .replace(/\{\{country\}\}/g, params.country || 'your region');
+  }
+
+  /**
+   * Generate a default email when both AI and templates fail
+   */
+  private generateDefaultEmail(params: GenerateEmailParams): {
+    subject: string;
+    bodyText: string;
+    bodyHtml: string;
+  } {
+    const contactName = params.contactName || 'there';
+    const companyName = params.companyName;
+    const followUpStage = params.followUpStage || '1';
+    
+    let subject: string;
+    let bodyText: string;
+
+    // Different content based on follow-up stage
+    if (followUpStage === '1' || followUpStage === 'initial') {
+      subject = `Quick question about ${companyName}`;
+      bodyText = `Hi ${contactName},
+
+I came across ${companyName} and was impressed by your work in the ${params.industry} industry.
+
+I wanted to reach out because I believe we might be able to help streamline your operations and boost your growth.
+
+Would you be open to a brief conversation to explore how we can support ${companyName}?
+
+Looking forward to hearing from you.
+
+Best regards`;
+    } else if (followUpStage === '2' || followUpStage === 'follow_up_1') {
+      subject = `Following up: ${companyName}`;
+      bodyText = `Hi ${contactName},
+
+I wanted to follow up on my previous email regarding ${companyName}.
+
+I understand you're busy, but I genuinely believe we can provide value to your ${params.industry} business.
+
+Do you have 10 minutes this week for a quick call?
+
+Best regards`;
+    } else {
+      subject = `Last follow-up: ${companyName}`;
+      bodyText = `Hi ${contactName},
+
+I'll keep this brief - I've reached out a couple of times about how we can help ${companyName}.
+
+If this isn't a priority right now, no problem at all. But if you'd like to explore the possibilities, I'm here to help.
+
+Just let me know!
+
+Best regards`;
+    }
+
+    return {
+      subject,
+      bodyText,
+      bodyHtml: this.convertToHtml(bodyText),
+    };
   }
 }
 
