@@ -47,6 +47,8 @@ export class ScheduledCampaignsJob {
       const now = new Date();
 
       // Get all active campaigns with a startDate in the past or now
+      // Only get campaigns where startDate exists and lastRunAt is null or before startDate
+      // This ensures we only execute each campaign once at its scheduled time
       const scheduledCampaigns = await db
         .select()
         .from(campaigns)
@@ -61,17 +63,30 @@ export class ScheduledCampaignsJob {
         return;
       }
 
-      logger.info(`[ScheduledCampaigns] Found ${scheduledCampaigns.length} campaigns ready to execute`);
+      logger.info(`[ScheduledCampaigns] Found ${scheduledCampaigns.length} active campaigns, checking which need execution`);
 
       // Process each campaign
       for (const campaign of scheduledCampaigns) {
         try {
+          // Skip if no startDate (shouldn't happen due to query, but safety check)
+          if (!campaign.startDate) {
+            continue;
+          }
+
+          const startDate = new Date(campaign.startDate);
+          
           // Check if campaign has been executed already
-          // We'll use lastRunAt to track if execution has started
+          // A campaign should only be executed once at its scheduled time
           if (campaign.lastRunAt) {
-            const timeSinceLastRun = now.getTime() - new Date(campaign.lastRunAt).getTime();
-            // If last run was less than 2 minutes ago, skip (already executing or recently executed)
-            if (timeSinceLastRun < 2 * 60 * 1000) {
+            const lastRunAt = new Date(campaign.lastRunAt);
+            
+            // If lastRunAt is after or equal to startDate, campaign was already executed
+            if (lastRunAt >= startDate) {
+              logger.debug('[ScheduledCampaigns] Campaign already executed, skipping', {
+                campaignId: campaign.id,
+                startDate: startDate.toISOString(),
+                lastRunAt: lastRunAt.toISOString(),
+              });
               continue;
             }
           }
@@ -79,10 +94,11 @@ export class ScheduledCampaignsJob {
           logger.info('[ScheduledCampaigns] Executing scheduled campaign', {
             campaignId: campaign.id,
             campaignName: campaign.name,
-            scheduledFor: campaign.startDate,
+            scheduledFor: startDate.toISOString(),
           });
 
-          // Mark as running by updating lastRunAt
+          // Mark as running by updating lastRunAt to NOW (not startDate)
+          // This prevents duplicate execution
           await db
             .update(campaigns)
             .set({ lastRunAt: now })

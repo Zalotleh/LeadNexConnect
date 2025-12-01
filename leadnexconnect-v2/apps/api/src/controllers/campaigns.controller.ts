@@ -606,14 +606,23 @@ export class CampaignsController {
 
       const campaign = campaignResult[0];
 
+      // Determine if campaign is scheduled for future
+      const scheduledStartDate = campaign.startDate ? new Date(campaign.startDate) : new Date();
+      const now = new Date();
+      const isFutureScheduled = scheduledStartDate > now;
+
       // Only set startDate if not already scheduled
       const updateData: any = { 
-        status: 'active', 
-        lastRunAt: new Date() 
+        status: 'active',
       };
       
       if (!campaign.startDate) {
         updateData.startDate = new Date();
+      }
+      
+      // Only set lastRunAt if executing immediately (not scheduled for future)
+      if (!isFutureScheduled) {
+        updateData.lastRunAt = new Date();
       }
 
       // Update campaign status to active
@@ -626,14 +635,12 @@ export class CampaignsController {
         id, 
         name: campaign.name,
         startDate: campaign.startDate || updateData.startDate,
-        scheduledStart: campaign.startDate ? new Date(campaign.startDate) : null
+        scheduledStart: campaign.startDate ? new Date(campaign.startDate) : null,
+        isFutureScheduled,
       });
 
       // Check if campaign is scheduled for future execution
-      const scheduledStartDate = campaign.startDate ? new Date(campaign.startDate) : new Date();
-      const now = new Date();
-      
-      if (scheduledStartDate > now) {
+      if (isFutureScheduled) {
         logger.info('[CampaignsController] Campaign scheduled for future execution', {
           campaignId: id,
           scheduledFor: scheduledStartDate,
@@ -694,6 +701,21 @@ export class CampaignsController {
         targetCountries: campaign.targetCountries,
         targetCities: campaign.targetCities,
       });
+
+      // Safety check: If campaign has startDate and lastRunAt >= startDate, it's already been executed
+      if (campaign.startDate && campaign.lastRunAt) {
+        const startDate = new Date(campaign.startDate);
+        const lastRunAt = new Date(campaign.lastRunAt);
+        
+        if (lastRunAt >= startDate) {
+          logger.warn('[CampaignsController] Campaign already executed, skipping duplicate execution', {
+            campaignId,
+            startDate: startDate.toISOString(),
+            lastRunAt: lastRunAt.toISOString(),
+          });
+          return;
+        }
+      }
 
       // Check if this is a manual campaign with pre-selected leads
       if (campaign.campaignType === 'manual') {
