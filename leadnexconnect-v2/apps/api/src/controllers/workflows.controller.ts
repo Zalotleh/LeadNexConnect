@@ -29,6 +29,7 @@ export class WorkflowsController {
           return {
             ...workflow,
             steps,
+            stepsCount: steps.length, // Add stepsCount field
           };
         })
       );
@@ -82,6 +83,7 @@ export class WorkflowsController {
         data: {
           ...workflow,
           steps,
+          stepsCount: steps.length, // Add stepsCount field
         },
       });
     } catch (error: any) {
