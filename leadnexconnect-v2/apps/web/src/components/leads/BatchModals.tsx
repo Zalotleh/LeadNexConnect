@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Users, Target, Package, Loader, Zap } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { leadsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
+import WorkflowSelector from '../WorkflowSelector';
 
 interface Batch {
   id: number;
@@ -231,12 +232,13 @@ const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({ show, batch, 
 };
 
 const BatchCampaignModal: React.FC<BatchCampaignModalProps> = ({ show, batch, onClose, onCreateCampaign }) => {
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  
   if (!show || !batch) return null;
 
   const handleSubmit = async (startImmediately: boolean) => {
     const name = (document.getElementById('batchCampaignName') as HTMLInputElement).value;
     const description = (document.getElementById('batchCampaignDescription') as HTMLTextAreaElement).value;
-    const workflowId = (document.getElementById('batchCampaignWorkflow') as HTMLSelectElement).value;
 
     if (!name.trim()) {
       toast.error('Please enter a campaign name');
@@ -249,7 +251,7 @@ const BatchCampaignModal: React.FC<BatchCampaignModalProps> = ({ show, batch, on
         name,
         description: description || undefined,
         batchId: batch.id,
-        workflowId: workflowId || undefined,
+        workflowId: selectedWorkflowId || undefined,
         startImmediately,
       });
       toast.dismiss();
@@ -322,17 +324,13 @@ const BatchCampaignModal: React.FC<BatchCampaignModalProps> = ({ show, batch, on
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Workflow (Optional)
-            </label>
-            <select
-              id="batchCampaignWorkflow"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="">No workflow (single email)</option>
-              <option value="workflow-1">Follow-up Sequence (3 emails)</option>
-              <option value="workflow-2">Nurture Campaign (5 emails)</option>
-            </select>
+            <WorkflowSelector
+              selectedWorkflowId={selectedWorkflowId}
+              onSelect={setSelectedWorkflowId}
+              label="Email Workflow (Optional)"
+              placeholder="Select a workflow or send a single email"
+              required={false}
+            />
             <p className="text-xs text-gray-500 mt-1">
               Select a workflow to send multiple emails over time
             </p>
