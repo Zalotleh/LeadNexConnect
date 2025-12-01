@@ -21,6 +21,7 @@ import settingsRoutes from './routes/settings.routes';
 import apiPerformanceRoutes from './routes/api-performance.routes';
 import aiRoutes from './routes/ai.routes';
 import workflowsRoutes from './routes/workflows.routes';
+import testingRoutes from './routes/testing.routes';
 
 // Load environment variables
 dotenv.config();
@@ -81,6 +82,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/performance', apiPerformanceRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/workflows', workflowsRoutes);
+app.use('/api/testing', testingRoutes);
 
 // 404 handler
 app.use((req, res) => {
