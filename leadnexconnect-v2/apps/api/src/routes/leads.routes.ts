@@ -12,6 +12,7 @@ router.post('/', (req, res) => leadsController.createLead(req, res));
 router.post('/generate', (req, res) => leadsController.generateLeads(req, res));
 router.post('/import', (req, res) => leadsController.importLinkedIn(req, res));
 router.put('/:id', (req, res) => leadsController.updateLead(req, res));
+router.delete('/batches/:id', (req, res) => leadsController.deleteBatch(req, res));
 router.delete('/:id', (req, res) => leadsController.deleteLead(req, res));
 
 export default router;

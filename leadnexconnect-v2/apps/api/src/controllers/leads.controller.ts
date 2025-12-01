@@ -918,6 +918,36 @@ export class LeadsController {
       });
     }
   }
+
+  async deleteBatch(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      logger.info('[LeadsController] Deleting batch', { batchId: id });
+
+      // First delete all leads associated with this batch
+      await db.delete(leads).where(eq(leads.batchId, id));
+
+      // Then delete the batch
+      await db.delete(leadBatches).where(eq(leadBatches.id, id));
+
+      logger.info('[LeadsController] Batch deleted successfully', { batchId: id });
+
+      res.json({
+        success: true,
+        message: 'Batch deleted successfully',
+      });
+    } catch (error: any) {
+      logger.error('[LeadsController] Error deleting batch', {
+        error: error.message,
+        batchId: req.params.id,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
 }
 
 export const leadsController = new LeadsController();
