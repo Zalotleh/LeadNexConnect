@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Zap } from 'lucide-react';
+import { Users, Zap, Trash2 } from 'lucide-react';
 
 interface Lead {
   id: string;
@@ -28,6 +28,7 @@ interface LeadsTableViewProps {
   onSelectLead: (id: string) => void;
   onViewLead: (lead: Lead) => void;
   onEditLead: (lead: Lead) => void;
+  onDeleteSelected?: () => void;
   onGenerateClick: () => void;
   getStatusColor: (status: string) => string;
   getTierBadge: (score: number) => { label: string; className: string };
@@ -47,6 +48,7 @@ export const LeadsTableView: React.FC<LeadsTableViewProps> = ({
   onGenerateClick,
   getStatusColor,
   getTierBadge,
+  onDeleteSelected,
 }) => {
   if (isLoading) {
     return (
@@ -83,6 +85,22 @@ export const LeadsTableView: React.FC<LeadsTableViewProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
+      {selectedLeads.size > 0 && onDeleteSelected && (
+        <div className="bg-primary-50 border-b border-primary-200 px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-primary-900">
+              {selectedLeads.size} lead{selectedLeads.size > 1 ? 's' : ''} selected
+            </span>
+          </div>
+          <button
+            onClick={onDeleteSelected}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Selected
+          </button>
+        </div>
+      )}
       <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
         <p className="text-sm text-gray-700">
           Showing <span className="font-medium">{filteredLeads.length}</span> of <span className="font-medium">{leads.length}</span> leads
@@ -136,13 +154,22 @@ export const LeadsTableView: React.FC<LeadsTableViewProps> = ({
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                   />
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4">
                   <div className="text-sm font-medium text-gray-900">{lead.companyName}</div>
-                  <div className="text-sm text-gray-500">{lead.website || '-'}</div>
+                  {lead.website && (
+                    <a 
+                      href={lead.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline break-all"
+                    >
+                      {lead.website}
+                    </a>
+                  )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">{lead.contactName}</div>
-                  <div className="text-sm text-gray-500">{lead.email}</div>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-900">{lead.contactName || '-'}</div>
+                  <div className="text-sm text-gray-500 break-all">{lead.email}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {lead.industry || '-'}
