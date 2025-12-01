@@ -423,13 +423,19 @@ export default function BatchDetailPage() {
                       Company
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
+                      Contact/Email
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Score
+                      Industry
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tier
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Score
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Location
@@ -441,7 +447,8 @@ export default function BatchDetailPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {filteredLeads.map((lead: any) => {
-                    const tier = getTierBadge(lead.qualityScore || 0)
+                    const score = lead.qualityScore || 0
+                    const tier = getTierBadge(score)
                     const status = getStatusBadge(lead.status)
                     const TierIcon = tier.icon
                     const StatusIcon = status.icon
@@ -449,8 +456,7 @@ export default function BatchDetailPage() {
                     return (
                       <tr
                         key={lead.id}
-                        className="hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/leads/${lead.id}`)}
+                        className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -479,16 +485,12 @@ export default function BatchDetailPage() {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-sm text-gray-900">{lead.email || 'N/A'}</p>
-                          {lead.phone && <p className="text-xs text-gray-500">{lead.phone}</p>}
+                          <div className="text-sm text-gray-900">{lead.contactName || '-'}</div>
+                          <div className="text-xs text-gray-500">{lead.email || 'N/A'}</div>
+                          {lead.phone && <div className="text-xs text-gray-500">{lead.phone}</div>}
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex items-center gap-2">
-                            <TierIcon className="w-4 h-4" />
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${tier.className}`}>
-                              {lead.qualityScore || 0}
-                            </span>
-                          </div>
+                          <span className="text-sm text-gray-900">{lead.industry || '-'}</span>
                         </td>
                         <td className="px-4 py-4">
                           <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${status.className}`}>
@@ -497,27 +499,46 @@ export default function BatchDetailPage() {
                           </span>
                         </td>
                         <td className="px-4 py-4">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-full ${tier.className}`}>
+                            <TierIcon className="w-3.5 h-3.5" />
+                            {tier.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{score}/100</span>
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  score >= 80 ? 'bg-red-500' : score >= 60 ? 'bg-yellow-500' : 'bg-blue-500'
+                                }`}
+                                style={{ width: `${score}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
                           <p className="text-sm text-gray-900">{lead.city || 'N/A'}</p>
-                          <p className="text-xs text-gray-500">{lead.country}</p>
+                          <p className="text-xs text-gray-500">{lead.country || '-'}</p>
                         </td>
                         <td className="px-4 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => router.push(`/leads/${lead.id}`)}
+                              className="text-primary-600 hover:text-primary-900 text-sm font-medium"
+                              title="View lead"
+                            >
+                              View
+                            </button>
                             <button 
                               onClick={() => {
                                 setSelectedLead(lead)
                                 setShowEditLeadModal(true)
                               }}
-                              className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                              className="text-gray-600 hover:text-gray-900 text-sm font-medium"
                               title="Edit lead"
                             >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteLead(lead.id)}
-                              className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                              title="Delete lead"
-                            >
-                              <Trash2 className="w-4 h-4" />
+                              Edit
                             </button>
                           </div>
                         </td>
