@@ -10,6 +10,7 @@ import { emailQueueService } from './services/outreach/email-queue.service';
 import { dailyLeadGenerationJob } from './jobs/daily-lead-generation.job';
 import { dailyOutreachJob } from './jobs/daily-outreach.job';
 import { followUpCheckerJob } from './jobs/follow-up-checker.job';
+import { scheduledCampaignsJob } from './jobs/scheduled-campaigns.job';
 
 // Import routes
 import leadsRoutes from './routes/leads.routes';
@@ -144,6 +145,7 @@ app.listen(PORT, async () => {
     dailyLeadGenerationJob.start();
     dailyOutreachJob.start();
     followUpCheckerJob.start();
+    scheduledCampaignsJob.start();
     logger.info('✅ All cron jobs started successfully');
   } catch (error: any) {
     logger.error('❌ Failed to start cron jobs', {
@@ -165,6 +167,7 @@ const gracefulShutdown = async () => {
     dailyLeadGenerationJob.stop();
     dailyOutreachJob.stop();
     followUpCheckerJob.stop();
+    scheduledCampaignsJob.stop();
     logger.info('Cron jobs stopped');
   } catch (error: any) {
     logger.error('Error stopping cron jobs', { error: error.message });

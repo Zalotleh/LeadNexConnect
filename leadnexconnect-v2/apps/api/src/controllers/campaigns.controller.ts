@@ -606,15 +606,52 @@ export class CampaignsController {
 
       const campaign = campaignResult[0];
 
+      // Only set startDate if not already scheduled
+      const updateData: any = { 
+        status: 'active', 
+        lastRunAt: new Date() 
+      };
+      
+      if (!campaign.startDate) {
+        updateData.startDate = new Date();
+      }
+
       // Update campaign status to active
       await db
         .update(campaigns)
-        .set({ status: 'active', startDate: new Date(), lastRunAt: new Date() })
+        .set(updateData)
         .where(eq(campaigns.id, id));
 
-      logger.info('[CampaignsController] Campaign started', { id, name: campaign.name });
+      logger.info('[CampaignsController] Campaign started', { 
+        id, 
+        name: campaign.name,
+        startDate: campaign.startDate || updateData.startDate,
+        scheduledStart: campaign.startDate ? new Date(campaign.startDate) : null
+      });
 
-      // Start lead generation and outreach in background
+      // Check if campaign is scheduled for future execution
+      const scheduledStartDate = campaign.startDate ? new Date(campaign.startDate) : new Date();
+      const now = new Date();
+      
+      if (scheduledStartDate > now) {
+        logger.info('[CampaignsController] Campaign scheduled for future execution', {
+          campaignId: id,
+          scheduledFor: scheduledStartDate,
+          delayMinutes: Math.round((scheduledStartDate.getTime() - now.getTime()) / 60000)
+        });
+        
+        return res.json({
+          success: true,
+          data: {
+            ...campaign,
+            status: 'active',
+            startDate: scheduledStartDate,
+          },
+          message: `Campaign scheduled to start at ${scheduledStartDate.toLocaleString()}`,
+        });
+      }
+
+      // Start lead generation and outreach immediately
       this.executeCampaign(id, campaign).catch(error => {
         logger.error('[CampaignsController] Error executing campaign', {
           campaignId: id,
@@ -767,6 +804,14 @@ export class CampaignsController {
 
     logger.info(`[CampaignsController] Found ${steps.length} workflow steps`);
 
+    // Determine the base time for scheduling
+    // If campaign has a startDate, use it; otherwise use current time
+    const baseTime = campaign.startDate ? new Date(campaign.startDate).getTime() : Date.now();
+    logger.info('[CampaignsController] Using base time for scheduling', {
+      baseTime: new Date(baseTime).toISOString(),
+      campaignStartDate: campaign.startDate,
+    });
+
     let totalEmailsQueued = 0;
 
     // Process each lead
@@ -795,8 +840,8 @@ export class CampaignsController {
 
           // Queue email - let email sender service handle HTML conversion
           if (cumulativeDelayMinutes > 0) {
-            // Schedule for later based on cumulative delay
-            const sendAt = new Date(Date.now() + cumulativeDelayMinutes * 60 * 1000);
+            // Schedule for later based on cumulative delay from base time
+            const sendAt = new Date(baseTime + cumulativeDelayMinutes * 60 * 1000);
             await emailQueueService.scheduleEmail({
               leadId: lead.id,
               campaignId: campaignId,
@@ -821,27 +866,56 @@ export class CampaignsController {
               sendAt: sendAt.toISOString(),
             });
           } else {
-            // Send immediately (first step)
-            await emailQueueService.addEmail({
-              leadId: lead.id,
-              campaignId: campaignId,
-              to: lead.email,
-              subject,
-              bodyText,
-              bodyHtml: undefined, // Let email sender convert to HTML
-              followUpStage: step.stepNumber === 1 ? 'initial' : `follow_up_${step.stepNumber - 1}`,
-              metadata: {
-                companyName: lead.companyName,
-                industry: lead.industry,
-                workflowStepNumber: step.stepNumber,
-                workflowStepId: step.id,
-              },
-            });
+            // First step - check if it should be scheduled or sent immediately
+            const now = Date.now();
             
-            logger.info('[CampaignsController] Workflow step queued immediately', { 
-              leadId: lead.id,
-              stepNumber: step.stepNumber,
-            });
+            if (baseTime > now) {
+              // Campaign is scheduled for future, schedule the first email
+              const sendAt = new Date(baseTime);
+              await emailQueueService.scheduleEmail({
+                leadId: lead.id,
+                campaignId: campaignId,
+                to: lead.email,
+                subject,
+                bodyText,
+                bodyHtml: undefined,
+                followUpStage: 'initial',
+                metadata: {
+                  companyName: lead.companyName,
+                  industry: lead.industry,
+                  workflowStepNumber: step.stepNumber,
+                  workflowStepId: step.id,
+                },
+              }, sendAt);
+              
+              logger.info('[CampaignsController] Workflow first step scheduled for campaign start time', { 
+                leadId: lead.id,
+                stepNumber: step.stepNumber,
+                sendAt: sendAt.toISOString(),
+              });
+            } else {
+              // Send immediately (campaign already started or starting now)
+              await emailQueueService.addEmail({
+                leadId: lead.id,
+                campaignId: campaignId,
+                to: lead.email,
+                subject,
+                bodyText,
+                bodyHtml: undefined,
+                followUpStage: 'initial',
+                metadata: {
+                  companyName: lead.companyName,
+                  industry: lead.industry,
+                  workflowStepNumber: step.stepNumber,
+                  workflowStepId: step.id,
+                },
+              });
+              
+              logger.info('[CampaignsController] Workflow step queued immediately', { 
+                leadId: lead.id,
+                stepNumber: step.stepNumber,
+              });
+            }
           }
 
           totalEmailsQueued++;
@@ -897,6 +971,17 @@ export class CampaignsController {
     const template = templateResults[0];
     let emailsQueued = 0;
 
+    // Determine the base time for scheduling
+    const baseTime = campaign.startDate ? new Date(campaign.startDate).getTime() : Date.now();
+    const now = Date.now();
+    const shouldSchedule = baseTime > now;
+
+    logger.info('[CampaignsController] Using base time for single template', {
+      baseTime: new Date(baseTime).toISOString(),
+      shouldSchedule,
+      campaignStartDate: campaign.startDate,
+    });
+
     // Send emails to each lead
     for (const lead of campaignLeadsList) {
       try {
@@ -913,26 +998,49 @@ export class CampaignsController {
           ? this.replaceTemplateVariables(template.bodyHtml, lead)
           : undefined;
 
-        // Queue email for sending
-        await emailQueueService.addEmail({
-          leadId: lead.id,
-          campaignId: campaignId,
-          to: lead.email,
-          subject,
-          bodyText,
-          bodyHtml,
-          followUpStage: 'initial',
-          metadata: {
-            companyName: lead.companyName,
-            industry: lead.industry,
-          },
-        });
+        // Queue email for sending - schedule if campaign has future start date
+        if (shouldSchedule) {
+          await emailQueueService.scheduleEmail({
+            leadId: lead.id,
+            campaignId: campaignId,
+            to: lead.email,
+            subject,
+            bodyText,
+            bodyHtml,
+            followUpStage: 'initial',
+            metadata: {
+              companyName: lead.companyName,
+              industry: lead.industry,
+            },
+          }, new Date(baseTime));
+          
+          logger.info('[CampaignsController] Email scheduled for lead', { 
+            leadId: lead.id, 
+            email: lead.email,
+            sendAt: new Date(baseTime).toISOString(),
+          });
+        } else {
+          await emailQueueService.addEmail({
+            leadId: lead.id,
+            campaignId: campaignId,
+            to: lead.email,
+            subject,
+            bodyText,
+            bodyHtml,
+            followUpStage: 'initial',
+            metadata: {
+              companyName: lead.companyName,
+              industry: lead.industry,
+            },
+          });
+          
+          logger.info('[CampaignsController] Email queued immediately for lead', { 
+            leadId: lead.id, 
+            email: lead.email 
+          });
+        }
 
         emailsQueued++;
-        logger.info('[CampaignsController] Email queued for lead', { 
-          leadId: lead.id, 
-          email: lead.email 
-        });
 
         // Small delay to avoid overwhelming the queue
         await new Promise(resolve => setTimeout(resolve, 100));

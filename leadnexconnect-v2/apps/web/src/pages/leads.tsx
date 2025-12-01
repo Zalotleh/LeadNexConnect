@@ -475,7 +475,8 @@ export default function Leads() {
 
       // Add schedule if provided
       if (createCampaignForm.startTime) {
-        campaignData.startTime = createCampaignForm.startTime
+        campaignData.scheduledAt = createCampaignForm.startTime
+        campaignData.scheduleType = 'scheduled'
       }
 
       const campaignResponse = await api.post('/campaigns', campaignData)
