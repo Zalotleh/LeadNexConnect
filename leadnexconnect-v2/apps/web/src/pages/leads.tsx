@@ -243,6 +243,8 @@ export default function Leads() {
         toast.success('Batches exported successfully!');
       } else {
         // Export leads from table view
+        toast.loading('Exporting leads...');
+        
         const params = new URLSearchParams();
         if (statusFilter !== 'all') params.append('status', statusFilter);
         if (filters.industry !== 'all') params.append('industry', filters.industry);
@@ -251,14 +253,28 @@ export default function Leads() {
         if (filters.maxScore < 100) params.append('maxScore', filters.maxScore.toString());
 
         const queryString = params.toString();
-        const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/leads/export${queryString ? '?' + queryString : ''}`;
+        const url = `/leads/export${queryString ? '?' + queryString : ''}`;
         
-        // Download file
-        window.location.href = url;
-        toast.success('Exporting leads...');
+        // Fetch the CSV data
+        const response = await api.get(url);
+        
+        // Create blob and download
+        const blob = new Blob([response.data], { type: 'text/csv' });
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(downloadUrl);
+        
+        toast.dismiss();
+        toast.success('Leads exported successfully!');
       }
-    } catch (error) {
-      toast.error('Failed to export');
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error?.message || 'Failed to export');
     }
   }
 
