@@ -79,16 +79,21 @@ export function useLeadsData({
   const allBatches = Array.isArray(batchesData?.data) ? batchesData.data : []
   
   // Filter batches based on activeTab
+  // Note: Batches don't have a 'source' field. Instead:
+  // - Imported batches: importSettings has only {industry, enrichEmail}
+  // - Generated batches: importSettings has {sources: [...], industry, country, city, maxResults}
   const batches = allBatches.filter((batch: any) => {
     if (activeTab === 'all') return true
+    
+    const hasSourcesArray = batch.importSettings?.sources && Array.isArray(batch.importSettings.sources)
+    
     if (activeTab === 'imported') {
-      return batch.source === 'csv_import' || batch.source === 'manual_import'
+      // CSV imports don't have a sources array in importSettings
+      return !hasSourcesArray
     }
     if (activeTab === 'generated') {
-      return batch.source === 'apollo' || 
-             batch.source === 'google_places' || 
-             batch.source === 'peopledatalabs' ||
-             batch.source === 'automated'
+      // Generated batches have a sources array (apollo, google_places, etc.)
+      return hasSourcesArray
     }
     return true
   })

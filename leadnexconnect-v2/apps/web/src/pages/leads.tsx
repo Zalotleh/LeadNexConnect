@@ -879,7 +879,7 @@ export default function Leads() {
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">
                   {viewMode === 'table' 
                     ? allLeads.filter((l: any) => l.sourceType === 'manual_import').length
-                    : allBatches.filter((b: any) => b.source === 'csv_import' || b.source === 'manual_import').length
+                    : allBatches.filter((b: any) => !b.importSettings?.sources).length
                   }
                 </span>
               </button>
@@ -896,12 +896,7 @@ export default function Leads() {
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">
                   {viewMode === 'table'
                     ? allLeads.filter((l: any) => l.sourceType === 'automated' || (!l.sourceType && l.source !== 'manual')).length
-                    : allBatches.filter((b: any) => 
-                        b.source === 'apollo' || 
-                        b.source === 'google_places' || 
-                        b.source === 'peopledatalabs' ||
-                        b.source === 'automated'
-                      ).length
+                    : allBatches.filter((b: any) => b.importSettings?.sources && Array.isArray(b.importSettings.sources)).length
                   }
                 </span>
               </button>
