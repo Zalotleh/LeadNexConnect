@@ -15,7 +15,10 @@ export default function Settings() {
     peopleDataLabsApiKey: false,
     googlePlacesApiKey: false,
     googleCustomSearchApiKey: false,
+    googleCustomSearchEngineId: false,
     smtpPass: false,
+    awsAccessKeyId: false,
+    awsSecretAccessKey: false,
   })
   
   // Track which fields have been modified
@@ -23,6 +26,9 @@ export default function Settings() {
   
   // Store original masked values from server
   const [originalMaskedValues, setOriginalMaskedValues] = useState<Record<string, string>>({})
+  
+  // Store unmasked values when revealed
+  const [unmaskedValues, setUnmaskedValues] = useState<Record<string, string>>({})
   
   const [settings, setSettings] = useState({
     // AI Keys
@@ -46,6 +52,11 @@ export default function Settings() {
     fromName: '',
     fromEmail: '',
     
+    // AWS SES Config
+    awsAccessKeyId: '',
+    awsSecretAccessKey: '',
+    awsRegion: 'us-east-1',
+    
     // Email Settings
     emailsPerHour: 50,
     dailyEmailLimit: 500,
@@ -55,7 +66,31 @@ export default function Settings() {
     loadSettings()
   }, [])
 
-  const toggleKeyVisibility = (field: keyof typeof showKeys) => {
+  const toggleKeyVisibility = async (field: keyof typeof showKeys) => {
+    const isCurrentlyShown = showKeys[field]
+    
+    // If we're about to show the field and haven't fetched the unmasked value yet
+    if (!isCurrentlyShown && !unmaskedValues[field]) {
+      try {
+        const response = await api.get(`/settings/unmasked/${field}`)
+        if (response.data.success) {
+          const unmaskedValue = response.data.data.value || ''
+          setUnmaskedValues(prev => ({ ...prev, [field]: unmaskedValue }))
+          setSettings(prev => ({ ...prev, [field]: unmaskedValue }))
+        }
+      } catch (error) {
+        console.error('Failed to fetch unmasked value', error)
+        toast.error('Failed to reveal value')
+        return
+      }
+    } else if (!isCurrentlyShown && unmaskedValues[field]) {
+      // If we already have the unmasked value, just use it
+      setSettings(prev => ({ ...prev, [field]: unmaskedValues[field] }))
+    } else {
+      // If we're hiding the field, restore the masked value
+      setSettings(prev => ({ ...prev, [field]: originalMaskedValues[field] || '' }))
+    }
+    
     setShowKeys(prev => ({ ...prev, [field]: !prev[field] }))
   }
 
@@ -79,7 +114,10 @@ export default function Settings() {
           peopleDataLabsApiKey: loadedSettings.peopleDataLabsApiKey || '',
           googlePlacesApiKey: loadedSettings.googlePlacesApiKey || '',
           googleCustomSearchApiKey: loadedSettings.googleCustomSearchApiKey || '',
+          googleCustomSearchEngineId: loadedSettings.googleCustomSearchEngineId || '',
           smtpPass: loadedSettings.smtpPass || '',
+          awsAccessKeyId: loadedSettings.awsAccessKeyId || '',
+          awsSecretAccessKey: loadedSettings.awsSecretAccessKey || '',
         }
         setOriginalMaskedValues(maskedValues)
         
@@ -100,12 +138,16 @@ export default function Settings() {
           smtpSecure: loadedSettings.smtpSecure || 'false',
           fromName: loadedSettings.fromName || '',
           fromEmail: loadedSettings.fromEmail || '',
+          awsAccessKeyId: loadedSettings.awsAccessKeyId || '',
+          awsSecretAccessKey: loadedSettings.awsSecretAccessKey || '',
+          awsRegion: loadedSettings.awsRegion || 'us-east-1',
           emailsPerHour: loadedSettings.emailsPerHour || 50,
           dailyEmailLimit: loadedSettings.dailyEmailLimit || 500,
         })
         
-        // Reset modified fields
+        // Reset modified fields and unmasked values
         setModifiedFields(new Set())
+        setUnmaskedValues({})
       }
     } catch (error: any) {
       toast.error('Failed to load settings')
@@ -132,7 +174,7 @@ export default function Settings() {
       // Always include non-sensitive fields
       const alwaysIncludeFields = ['googleCustomSearchEngineId', 'smtpProvider', 'smtpHost', 'smtpPort', 
                                     'smtpUser', 'smtpSecure', 'fromName', 'fromEmail', 
-                                    'emailsPerHour', 'dailyEmailLimit']
+                                    'awsRegion', 'emailsPerHour', 'dailyEmailLimit']
       alwaysIncludeFields.forEach(field => {
         if (modifiedFields.has(field)) {
           dataToSend[field] = (settings as any)[field]
@@ -343,13 +385,22 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Google Custom Search Engine ID
               </label>
-              <input
-                type="text"
-                value={settings.googleCustomSearchEngineId}
-                onChange={(e) => handleFieldChange('googleCustomSearchEngineId', e.target.value)}
-                placeholder="Enter your Custom Search Engine ID"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+              <div className="relative">
+                <input
+                  type={showKeys.googleCustomSearchEngineId ? "text" : "password"}
+                  value={settings.googleCustomSearchEngineId}
+                  onChange={(e) => handleFieldChange('googleCustomSearchEngineId', e.target.value)}
+                  placeholder="Enter your Custom Search Engine ID"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('googleCustomSearchEngineId')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.googleCustomSearchEngineId ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">Get from <a href="https://programmablesearchengine.google.com" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">programmablesearchengine.google.com</a></p>
             </div>
           </div>
@@ -372,6 +423,7 @@ export default function Settings() {
                 <option value="smtp2go">SMTP2GO</option>
                 <option value="sendgrid">SendGrid</option>
                 <option value="gmail">Gmail</option>
+                <option value="aws-ses">AWS SES</option>
                 <option value="generic">Generic SMTP</option>
               </select>
             </div>
@@ -469,6 +521,95 @@ export default function Settings() {
                 <TestTube className="w-4 h-4 inline mr-2" />
                 {testing ? 'Testing...' : 'Test SMTP Connection'}
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* AWS SES Configuration */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">AWS SES Configuration</h2>
+            <p className="text-sm text-gray-500 mt-1">Alternative to SMTP - Use Amazon Simple Email Service</p>
+          </div>
+          <div className="p-6 space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                AWS Access Key ID
+              </label>
+              <div className="relative">
+                <input
+                  type={showKeys.awsAccessKeyId ? "text" : "password"}
+                  value={settings.awsAccessKeyId}
+                  onChange={(e) => handleFieldChange('awsAccessKeyId', e.target.value)}
+                  placeholder="AKIA..."
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('awsAccessKeyId')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.awsAccessKeyId ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Your AWS IAM access key with SES permissions</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                AWS Secret Access Key
+              </label>
+              <div className="relative">
+                <input
+                  type={showKeys.awsSecretAccessKey ? "text" : "password"}
+                  value={settings.awsSecretAccessKey}
+                  onChange={(e) => handleFieldChange('awsSecretAccessKey', e.target.value)}
+                  placeholder="Enter your AWS secret access key"
+                  className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => toggleKeyVisibility('awsSecretAccessKey')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showKeys.awsSecretAccessKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Your AWS secret key (kept secure)</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                AWS Region
+              </label>
+              <select
+                value={settings.awsRegion}
+                onChange={(e) => handleFieldChange('awsRegion', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="us-east-1">US East (N. Virginia) - us-east-1</option>
+                <option value="us-east-2">US East (Ohio) - us-east-2</option>
+                <option value="us-west-1">US West (N. California) - us-west-1</option>
+                <option value="us-west-2">US West (Oregon) - us-west-2</option>
+                <option value="eu-west-1">EU (Ireland) - eu-west-1</option>
+                <option value="eu-west-2">EU (London) - eu-west-2</option>
+                <option value="eu-central-1">EU (Frankfurt) - eu-central-1</option>
+                <option value="ap-south-1">Asia Pacific (Mumbai) - ap-south-1</option>
+                <option value="ap-northeast-1">Asia Pacific (Tokyo) - ap-northeast-1</option>
+                <option value="ap-northeast-2">Asia Pacific (Seoul) - ap-northeast-2</option>
+                <option value="ap-southeast-1">Asia Pacific (Singapore) - ap-southeast-1</option>
+                <option value="ap-southeast-2">Asia Pacific (Sydney) - ap-southeast-2</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">The AWS region where your SES is configured</p>
+            </div>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> To use AWS SES, you need to:
+              </p>
+              <ul className="text-xs text-blue-700 mt-2 space-y-1 list-disc list-inside">
+                <li>Verify your sender email address or domain in AWS SES</li>
+                <li>Request production access (by default SES is in sandbox mode)</li>
+                <li>Create IAM credentials with SES send permissions</li>
+                <li>Set SMTP Provider to "AWS SES" above</li>
+              </ul>
             </div>
           </div>
         </div>

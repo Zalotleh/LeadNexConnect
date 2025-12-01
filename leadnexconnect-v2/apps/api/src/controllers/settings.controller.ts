@@ -15,6 +15,19 @@ export class SettingsController {
     }
   }
 
+  async getUnmaskedSetting(req: Request, res: Response) {
+    try {
+      const { key } = req.params;
+      logger.info('[SettingsController] Getting unmasked setting', { key });
+      
+      const value = await settingsService.get(key);
+      res.json({ success: true, data: { key, value } });
+    } catch (error: any) {
+      logger.error('[SettingsController] Error getting unmasked setting', { error: error.message });
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
+
   async updateSettings(req: Request, res: Response) {
     try {
       const settingsData = req.body;

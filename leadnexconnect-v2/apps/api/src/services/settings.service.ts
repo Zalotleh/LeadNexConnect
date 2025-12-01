@@ -24,6 +24,11 @@ interface SettingsData {
   fromName?: string;
   fromEmail?: string;
   
+  // AWS SES Configuration
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsRegion?: string;
+  
   // Email Settings
   emailsPerHour?: number;
   dailyEmailLimit?: number;
@@ -112,6 +117,11 @@ export class SettingsService {
         smtpSecure: await this.get('smtpSecure', process.env.SMTP_SECURE),
         fromName: await this.get('fromName', process.env.FROM_NAME),
         fromEmail: await this.get('fromEmail', process.env.FROM_EMAIL),
+        
+        // AWS SES Config
+        awsAccessKeyId: await this.get('awsAccessKeyId', process.env.AWS_ACCESS_KEY_ID),
+        awsSecretAccessKey: await this.get('awsSecretAccessKey', process.env.AWS_SECRET_ACCESS_KEY),
+        awsRegion: await this.get('awsRegion', process.env.AWS_REGION || 'us-east-1'),
         
         // Email Settings
         emailsPerHour: await this.get('emailsPerHour', 50),
@@ -208,9 +218,18 @@ export class SettingsService {
       peopleDataLabsApiKey: this.maskApiKey(allSettings.peopleDataLabsApiKey),
       googlePlacesApiKey: this.maskApiKey(allSettings.googlePlacesApiKey),
       googleCustomSearchApiKey: this.maskApiKey(allSettings.googleCustomSearchApiKey),
-      googleCustomSearchEngineId: this.maskApiKey(allSettings.googleCustomSearchEngineId),
+      // Don't mask googleCustomSearchEngineId - it's not sensitive
       smtpPass: this.maskApiKey(allSettings.smtpPass),
+      awsAccessKeyId: this.maskApiKey(allSettings.awsAccessKeyId),
+      awsSecretAccessKey: this.maskApiKey(allSettings.awsSecretAccessKey),
     };
+  }
+
+  /**
+   * Check if a value has been set (not empty or masked)
+   */
+  isSet(value?: string): boolean {
+    return !!value && value !== '' && !value.includes('••••••••');
   }
 
   /**
@@ -241,6 +260,9 @@ export class SettingsService {
       smtpSecure: process.env.SMTP_SECURE,
       fromName: process.env.FROM_NAME,
       fromEmail: process.env.FROM_EMAIL,
+      awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      awsRegion: process.env.AWS_REGION,
     };
 
     return envMap[key];
