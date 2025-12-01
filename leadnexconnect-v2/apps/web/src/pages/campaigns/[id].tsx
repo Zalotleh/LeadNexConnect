@@ -22,6 +22,10 @@ import {
   Workflow,
   Loader,
   Sparkles,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react'
 
 interface Lead {
@@ -115,6 +119,16 @@ export default function CampaignDetail() {
     queryKey: ['campaign', id],
     queryFn: async () => {
       const response = await api.get(`/campaigns/${id}`)
+      return response.data.data
+    },
+    enabled: !!id,
+  })
+
+  // Fetch email schedule and history
+  const { data: emailScheduleData, isLoading: isLoadingSchedule } = useQuery({
+    queryKey: ['campaign-email-schedule', id],
+    queryFn: async () => {
+      const response = await api.get(`/campaigns/${id}/email-schedule`)
       return response.data.data
     },
     enabled: !!id,
@@ -716,6 +730,302 @@ export default function CampaignDetail() {
             </div>
           )}
         </div>
+
+        {/* Email Schedule & Timeline */}
+        {emailScheduleData && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Calendar className="w-6 h-6 text-primary-600" />
+              Email Schedule & Timeline
+            </h2>
+
+            {/* Campaign Timeline Info */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Campaign Created</p>
+                  <p className="text-gray-900 font-semibold">
+                    {new Date(emailScheduleData.campaign.createdAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+                {emailScheduleData.campaign.startDate && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 mb-1">Campaign Started</p>
+                    <p className="text-gray-900 font-semibold">
+                      {new Date(emailScheduleData.campaign.startDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Last Updated</p>
+                  <p className="text-gray-900 font-semibold">
+                    {new Date(emailScheduleData.campaign.updatedAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Email Statistics */}
+            {emailScheduleData.statistics && emailScheduleData.statistics.total > 0 && (
+              <div className="mb-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                <div className="bg-blue-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Total</p>
+                  <p className="text-2xl font-bold text-blue-600">{emailScheduleData.statistics.total}</p>
+                </div>
+                <div className="bg-yellow-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Queued</p>
+                  <p className="text-2xl font-bold text-yellow-600">{emailScheduleData.statistics.queued}</p>
+                </div>
+                <div className="bg-purple-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Sent</p>
+                  <p className="text-2xl font-bold text-purple-600">{emailScheduleData.statistics.sent}</p>
+                </div>
+                <div className="bg-green-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Delivered</p>
+                  <p className="text-2xl font-bold text-green-600">{emailScheduleData.statistics.delivered}</p>
+                </div>
+                <div className="bg-indigo-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Opened</p>
+                  <p className="text-2xl font-bold text-indigo-600">{emailScheduleData.statistics.opened}</p>
+                  <p className="text-xs text-indigo-600 mt-1">{emailScheduleData.statistics.openRate}%</p>
+                </div>
+                <div className="bg-orange-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Clicked</p>
+                  <p className="text-2xl font-bold text-orange-600">{emailScheduleData.statistics.clicked}</p>
+                  <p className="text-xs text-orange-600 mt-1">{emailScheduleData.statistics.clickRate}%</p>
+                </div>
+                <div className="bg-red-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-600 mb-1">Failed</p>
+                  <p className="text-2xl font-bold text-red-600">{emailScheduleData.statistics.failed}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Planned Schedule */}
+            {emailScheduleData.schedule && emailScheduleData.schedule.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-primary-600" />
+                  Planned Email Sequence
+                </h3>
+                <div className="space-y-2">
+                  {emailScheduleData.schedule.map((step: any, index: number) => (
+                    <div key={index} className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                        {step.stepNumber}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{step.subject}</p>
+                        <p className="text-xs text-gray-600">
+                          {step.delayDays === 0 ? 'Immediate' : `+${step.delayDays} days`}
+                          {' • '}
+                          Day {step.cumulativeDelayDays}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900">
+                          {new Date(step.plannedDateTime).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {new Date(step.plannedDateTime).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actual Emails Sent */}
+            {emailScheduleData.emails && emailScheduleData.emails.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-primary-600" />
+                  Email History ({emailScheduleData.emails.length} emails)
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lead</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sent</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Delivered</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Opened</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clicked</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {emailScheduleData.emails.slice(0, 50).map((email: any) => (
+                        <tr key={email.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {email.status === 'delivered' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                <CheckCircle className="w-3 h-3" />
+                                Delivered
+                              </span>
+                            )}
+                            {email.status === 'sent' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                <Send className="w-3 h-3" />
+                                Sent
+                              </span>
+                            )}
+                            {email.status === 'queued' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                <Clock className="w-3 h-3" />
+                                Queued
+                              </span>
+                            )}
+                            {(email.status === 'failed' || email.status === 'bounced') && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                                <XCircle className="w-3 h-3" />
+                                {email.status === 'bounced' ? 'Bounced' : 'Failed'}
+                              </span>
+                            )}
+                            {email.status === 'opened' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-indigo-100 text-indigo-800 rounded-full">
+                                <Eye className="w-3 h-3" />
+                                Opened
+                              </span>
+                            )}
+                            {email.status === 'clicked' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                                <MousePointer className="w-3 h-3" />
+                                Clicked
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{email.leadCompanyName || 'Unknown'}</p>
+                              <p className="text-xs text-gray-500">{email.leadEmail}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm text-gray-900 max-w-xs truncate">{email.subject}</p>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <p className="text-sm text-gray-900">
+                              {new Date(email.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(email.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {email.sentAt ? (
+                              <>
+                                <p className="text-sm text-gray-900">
+                                  {new Date(email.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(email.sentAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {email.deliveredAt ? (
+                              <>
+                                <p className="text-sm text-gray-900">
+                                  {new Date(email.deliveredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(email.deliveredAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {email.openedAt ? (
+                              <>
+                                <p className="text-sm text-gray-900">
+                                  {new Date(email.openedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(email.openedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                {email.openCount > 1 && (
+                                  <p className="text-xs text-indigo-600 font-medium">{email.openCount}x</p>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {email.clickedAt ? (
+                              <>
+                                <p className="text-sm text-gray-900">
+                                  {new Date(email.clickedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(email.clickedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                {email.clickCount > 1 && (
+                                  <p className="text-xs text-orange-600 font-medium">{email.clickCount}x</p>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {emailScheduleData.emails.length > 50 && (
+                    <div className="p-4 text-center text-sm text-gray-500 bg-gray-50 border-t">
+                      Showing 50 of {emailScheduleData.emails.length} emails
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* No emails sent yet */}
+            {(!emailScheduleData.emails || emailScheduleData.emails.length === 0) && (
+              <div className="text-center py-8 text-gray-500">
+                <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                <p>No emails have been sent yet</p>
+                {campaign?.status === 'draft' && (
+                  <p className="text-sm mt-2">Start the campaign to begin sending emails</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Enrolled Leads */}
         <div className="bg-white rounded-lg shadow">

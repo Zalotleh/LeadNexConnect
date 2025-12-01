@@ -1303,6 +1303,175 @@ export class CampaignsController {
   }
 
   /**
+   * GET /api/campaigns/:id/email-schedule - Get detailed email schedule with actual send times
+   */
+  async getEmailSchedule(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      logger.info('[CampaignsController] Getting email schedule', { campaignId: id });
+
+      // Get campaign
+      const campaignResult = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .limit(1);
+
+      if (!campaignResult[0]) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Campaign not found' },
+        });
+      }
+
+      const campaign = campaignResult[0];
+
+      // Get workflow if exists
+      let workflow = null;
+      let steps: any[] = [];
+      let schedule: any[] = [];
+
+      if (campaign.workflowId) {
+        const { workflows, workflowSteps } = await import('@leadnex/database');
+        
+        const workflowResult = await db
+          .select()
+          .from(workflows)
+          .where(eq(workflows.id, campaign.workflowId))
+          .limit(1);
+
+        if (workflowResult[0]) {
+          workflow = workflowResult[0];
+          
+          steps = await db
+            .select()
+            .from(workflowSteps)
+            .where(eq(workflowSteps.workflowId, campaign.workflowId))
+            .orderBy(workflowSteps.stepNumber);
+
+          // Calculate planned schedule
+          let baseDate = campaign.startDate ? new Date(campaign.startDate) : new Date();
+          let cumulativeDelayDays = 0;
+
+          for (const step of steps) {
+            cumulativeDelayDays += step.daysAfterPrevious || 0;
+
+            const sendDate = new Date(baseDate);
+            sendDate.setDate(sendDate.getDate() + cumulativeDelayDays);
+
+            schedule.push({
+              stepNumber: step.stepNumber,
+              subject: step.subject,
+              delayDays: step.daysAfterPrevious,
+              cumulativeDelayDays,
+              plannedDateTime: sendDate.toISOString(),
+            });
+          }
+        }
+      }
+
+      // Get actual emails sent for this campaign
+      const sentEmails = await db
+        .select({
+          id: emails.id,
+          leadId: emails.leadId,
+          subject: emails.subject,
+          status: emails.status,
+          followUpStage: emails.followUpStage,
+          sentAt: emails.sentAt,
+          deliveredAt: emails.deliveredAt,
+          openedAt: emails.openedAt,
+          clickedAt: emails.clickedAt,
+          openCount: emails.openCount,
+          clickCount: emails.clickCount,
+          createdAt: emails.createdAt,
+          leadCompanyName: leads.companyName,
+          leadEmail: leads.email,
+          leadContactName: leads.contactName,
+        })
+        .from(emails)
+        .leftJoin(leads, eq(emails.leadId, leads.id))
+        .where(eq(emails.campaignId, id))
+        .orderBy(desc(emails.createdAt));
+
+      // Group emails by step/stage
+      const emailsByStep: { [key: string]: any[] } = {};
+      sentEmails.forEach((email) => {
+        const stage = email.followUpStage || 'initial';
+        if (!emailsByStep[stage]) {
+          emailsByStep[stage] = [];
+        }
+        emailsByStep[stage].push({
+          id: email.id,
+          leadId: email.leadId,
+          leadCompanyName: email.leadCompanyName,
+          leadEmail: email.leadEmail,
+          leadContactName: email.leadContactName,
+          subject: email.subject,
+          status: email.status,
+          sentAt: email.sentAt,
+          deliveredAt: email.deliveredAt,
+          openedAt: email.openedAt,
+          clickedAt: email.clickedAt,
+          openCount: email.openCount,
+          clickCount: email.clickCount,
+          createdAt: email.createdAt,
+        });
+      });
+
+      // Calculate statistics
+      const totalQueued = sentEmails.filter(e => e.status === 'queued').length;
+      const totalSent = sentEmails.filter(e => e.status === 'sent' || e.status === 'delivered').length;
+      const totalDelivered = sentEmails.filter(e => e.status === 'delivered').length;
+      const totalOpened = sentEmails.filter(e => e.openedAt !== null).length;
+      const totalClicked = sentEmails.filter(e => e.clickedAt !== null).length;
+      const totalFailed = sentEmails.filter(e => e.status === 'failed' || e.status === 'bounced').length;
+
+      res.json({
+        success: true,
+        data: {
+          campaign: {
+            id: campaign.id,
+            name: campaign.name,
+            status: campaign.status,
+            createdAt: campaign.createdAt,
+            startDate: campaign.startDate,
+            updatedAt: campaign.updatedAt,
+          },
+          workflow: workflow ? {
+            id: workflow.id,
+            name: workflow.name,
+            totalSteps: steps.length,
+          } : null,
+          schedule,
+          emails: sentEmails,
+          emailsByStep,
+          statistics: {
+            total: sentEmails.length,
+            queued: totalQueued,
+            sent: totalSent,
+            delivered: totalDelivered,
+            opened: totalOpened,
+            clicked: totalClicked,
+            failed: totalFailed,
+            openRate: totalSent > 0 ? ((totalOpened / totalSent) * 100).toFixed(2) : '0',
+            clickRate: totalSent > 0 ? ((totalClicked / totalSent) * 100).toFixed(2) : '0',
+          },
+        },
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error getting email schedule', {
+        error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
    * DELETE /api/campaigns/:id - Delete campaign
    */
   async deleteCampaign(req: Request, res: Response) {
