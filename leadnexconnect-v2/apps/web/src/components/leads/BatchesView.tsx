@@ -105,11 +105,11 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
                     {batch.totalLeads && (
                       <>
                         <div className="text-center">
-                          <p className="text-2xl font-bold text-green-600">{batch.successfulImports}</p>
-                          <p className="text-xs text-gray-600">Successful</p>
+                          <p className="text-2xl font-bold text-green-600">{batch.successfulImports || 0}</p>
+                          <p className="text-xs text-gray-600">Imported</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-2xl font-bold text-yellow-600">{batch.duplicatesSkipped}</p>
+                          <p className="text-2xl font-bold text-yellow-600">{batch.duplicatesSkipped || 0}</p>
                           <p className="text-xs text-gray-600">Duplicates</p>
                         </div>
                       </>
@@ -141,6 +141,85 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
                     </div>
                   </div>
                 </div>
+                
+                {/* Import Status Bar - Only show for imported batches with statistics */}
+                {batch.totalLeads && batch.totalLeads > 0 && (
+                  <div className="px-4 py-3 bg-white border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-700">Import Status</span>
+                      <span className="text-xs text-gray-500">
+                        {batch.totalLeads} total processed
+                      </span>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <div className="h-full flex">
+                        {/* Successful portion */}
+                        {(batch.successfulImports || 0) > 0 && (
+                          <div 
+                            className="bg-green-500 flex items-center justify-center"
+                            style={{ width: `${((batch.successfulImports || 0) / batch.totalLeads) * 100}%` }}
+                            title={`${batch.successfulImports || 0} successfully imported`}
+                          />
+                        )}
+                        {/* Duplicates portion */}
+                        {(batch.duplicatesSkipped || 0) > 0 && (
+                          <div 
+                            className="bg-yellow-500 flex items-center justify-center"
+                            style={{ width: `${((batch.duplicatesSkipped || 0) / batch.totalLeads) * 100}%` }}
+                            title={`${batch.duplicatesSkipped || 0} duplicates skipped`}
+                          />
+                        )}
+                        {/* Failed portion */}
+                        {(() => {
+                          const failed = batch.totalLeads - (batch.successfulImports || 0) - (batch.duplicatesSkipped || 0);
+                          return failed > 0 ? (
+                            <div 
+                              className="bg-red-500 flex items-center justify-center"
+                              style={{ width: `${(failed / batch.totalLeads) * 100}%` }}
+                              title={`${failed} failed to import`}
+                            />
+                          ) : null;
+                        })()}
+                      </div>
+                    </div>
+                    
+                    {/* Legend */}
+                    <div className="flex items-center gap-4 mt-2 text-xs">
+                      {(batch.successfulImports || 0) > 0 && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          <span className="text-gray-700">{batch.successfulImports} Added</span>
+                        </div>
+                      )}
+                      {(batch.duplicatesSkipped || 0) > 0 && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                          <span className="text-gray-700">{batch.duplicatesSkipped} Duplicates</span>
+                        </div>
+                      )}
+                      {(() => {
+                        const failed = batch.totalLeads - (batch.successfulImports || 0) - (batch.duplicatesSkipped || 0);
+                        return failed > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <span className="text-gray-700">{failed} Failed</span>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                    
+                    {/* Warning message if all duplicates */}
+                    {(batch.successfulImports || 0) === 0 && (batch.duplicatesSkipped || 0) > 0 && (
+                      <div className="mt-3 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p className="text-xs text-yellow-800">
+                          ⚠️ All leads in this batch were duplicates. No new leads were added to the system.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })

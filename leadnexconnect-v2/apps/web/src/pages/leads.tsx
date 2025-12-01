@@ -317,7 +317,38 @@ export default function Leads() {
           });
 
           if (response.data.success) {
-            toast.success(`Imported ${response.data.data.imported} leads successfully! ${response.data.data.duplicates > 0 ? `(${response.data.data.duplicates} duplicates skipped)` : ''}`);
+            const { imported, duplicates, totalLeads } = response.data.data;
+            const failed = totalLeads - imported - duplicates;
+            
+            // Build detailed success message
+            let message = `📊 Import Complete!\n\n`;
+            message += `✅ Successfully added: ${imported} leads\n`;
+            if (duplicates > 0) {
+              message += `⚠️ Duplicates skipped: ${duplicates} leads\n`;
+            }
+            if (failed > 0) {
+              message += `❌ Failed to import: ${failed} leads\n`;
+            }
+            message += `📦 Total processed: ${totalLeads} leads`;
+            
+            // Show appropriate toast based on results
+            if (imported === 0 && duplicates > 0) {
+              toast.error(`All ${duplicates} leads were duplicates. No new leads added.`, {
+                duration: 6000,
+                style: { maxWidth: '500px' }
+              });
+            } else if (imported > 0 && duplicates === 0) {
+              toast.success(message, { 
+                duration: 5000,
+                style: { maxWidth: '500px', whiteSpace: 'pre-line' }
+              });
+            } else {
+              toast.success(message, { 
+                duration: 6000,
+                style: { maxWidth: '500px', whiteSpace: 'pre-line' }
+              });
+            }
+            
             refetch();
             refetchBatches();
             
