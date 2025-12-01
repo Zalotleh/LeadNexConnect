@@ -849,6 +849,33 @@ export class CampaignsController {
       // Queue all steps for this lead with appropriate delays
       for (const step of steps) {
         try {
+          // Determine the follow-up stage for this step
+          const followUpStage = step.stepNumber === 1 ? 'initial' : `follow_up_${step.stepNumber - 1}`;
+          
+          // Check if email already exists for this combination (prevent duplicates)
+          const existingEmails = await db
+            .select()
+            .from(emails)
+            .where(
+              and(
+                eq(emails.campaignId, campaignId),
+                eq(emails.leadId, lead.id),
+                eq(emails.followUpStage, followUpStage)
+              )
+            )
+            .limit(1);
+
+          if (existingEmails.length > 0) {
+            logger.info('[CampaignsController] Email already queued for this lead+step, skipping duplicate', {
+              leadId: lead.id,
+              stepNumber: step.stepNumber,
+              followUpStage,
+              existingEmailId: existingEmails[0].id,
+              existingEmailStatus: existingEmails[0].status,
+            });
+            continue;
+          }
+
           // Replace template variables
           const subject = this.replaceTemplateVariables(step.subject, lead);
           const bodyText = this.replaceTemplateVariables(step.body, lead);
@@ -1009,6 +1036,28 @@ export class CampaignsController {
       try {
         if (!lead.email) {
           logger.warn('[CampaignsController] Lead has no email', { leadId: lead.id });
+          continue;
+        }
+
+        // Check if email already exists for this lead (prevent duplicates)
+        const existingEmails = await db
+          .select()
+          .from(emails)
+          .where(
+            and(
+              eq(emails.campaignId, campaignId),
+              eq(emails.leadId, lead.id),
+              eq(emails.followUpStage, 'initial')
+            )
+          )
+          .limit(1);
+
+        if (existingEmails.length > 0) {
+          logger.info('[CampaignsController] Email already queued for this lead, skipping duplicate', {
+            leadId: lead.id,
+            existingEmailId: existingEmails[0].id,
+            existingEmailStatus: existingEmails[0].status,
+          });
           continue;
         }
 
