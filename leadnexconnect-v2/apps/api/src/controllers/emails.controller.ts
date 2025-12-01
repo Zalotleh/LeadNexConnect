@@ -157,14 +157,21 @@ export class EmailsController {
         return res.end(pixel);
       }
 
-      // Only track if not already opened (first open only)
-      if (!email[0].openedAt) {
-        // Update email
-        await db
-          .update(emails)
-          .set({ openedAt: new Date() })
-          .where(eq(emails.id, id));
+      // Track every open (increment openCount)
+      const currentOpenCount = email[0].openCount || 0;
+      const isFirstOpen = !email[0].openedAt;
+      
+      await db
+        .update(emails)
+        .set({ 
+          openedAt: email[0].openedAt || new Date(),
+          openCount: currentOpenCount + 1,
+          status: 'opened' // Update status to 'opened'
+        })
+        .where(eq(emails.id, id));
 
+      // Only update lead and campaign stats on first open
+      if (isFirstOpen) {
         // Update lead
         const lead = await db.select().from(leads).where(eq(leads.id, email[0].leadId)).limit(1);
         if (lead[0]) {
@@ -190,10 +197,15 @@ export class EmailsController {
           }
         }
 
-        logger.info('[EmailsController] Email open tracked', {
+        logger.info('[EmailsController] Email opened (first time)', {
           emailId: id,
           leadId: email[0].leadId,
           campaignId: email[0].campaignId,
+        });
+      } else {
+        logger.info('[EmailsController] Email opened again', {
+          emailId: id,
+          openCount: currentOpenCount + 1,
         });
       }
 
@@ -240,14 +252,21 @@ export class EmailsController {
         return res.redirect(url as string || 'https://www.booknexsolutions.com');
       }
 
-      // Only track first click
-      if (!email[0].clickedAt) {
-        // Update email
-        await db
-          .update(emails)
-          .set({ clickedAt: new Date() })
-          .where(eq(emails.id, id));
+      // Track every click (increment clickCount)
+      const currentClickCount = email[0].clickCount || 0;
+      const isFirstClick = !email[0].clickedAt;
+      
+      await db
+        .update(emails)
+        .set({ 
+          clickedAt: email[0].clickedAt || new Date(),
+          clickCount: currentClickCount + 1,
+          status: 'clicked' // Update status to 'clicked'
+        })
+        .where(eq(emails.id, id));
 
+      // Only update lead and campaign stats on first click
+      if (isFirstClick) {
         // Update lead
         const lead = await db.select().from(leads).where(eq(leads.id, email[0].leadId)).limit(1);
         if (lead[0]) {
@@ -273,10 +292,16 @@ export class EmailsController {
           }
         }
 
-        logger.info('[EmailsController] Email click tracked', {
+        logger.info('[EmailsController] Email clicked (first time)', {
           emailId: id,
           leadId: email[0].leadId,
           campaignId: email[0].campaignId,
+          redirectUrl: url,
+        });
+      } else {
+        logger.info('[EmailsController] Email clicked again', {
+          emailId: id,
+          clickCount: currentClickCount + 1,
           redirectUrl: url,
         });
       }

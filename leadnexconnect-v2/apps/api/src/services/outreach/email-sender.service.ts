@@ -140,6 +140,25 @@ export class EmailSenderService {
   }
 
   /**
+   * Wrap links in HTML with tracking
+   */
+  private wrapLinksWithTracking(html: string, emailId: string): string {
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+    
+    // Replace all href attributes with tracking links
+    return html.replace(/href="([^"]+)"/g, (match, url) => {
+      // Skip if it's already a tracking link or an email link
+      if (url.includes('/track/click/') || url.startsWith('mailto:') || url.startsWith('#')) {
+        return match;
+      }
+      
+      // Create tracking URL
+      const trackingUrl = `${apiBaseUrl}/api/emails/track/click/${emailId}?url=${encodeURIComponent(url)}`;
+      return `href="${trackingUrl}"`;
+    });
+  }
+
+  /**
    * Wrap HTML content in a professional email template
    */
   private wrapInEmailTemplate(content: string): string {
@@ -410,10 +429,19 @@ export class EmailSenderService {
       const emailId = emailRecord[0].id;
 
       // Add tracking pixel for open tracking using the email ID
-      const trackingPixel = `<img src="${process.env.API_BASE_URL}/api/emails/track/open/${emailId}" width="1" height="1" alt="" />`;
-      const bodyHtmlWithTracking = params.bodyHtml 
-        ? `${params.bodyHtml}${trackingPixel}`
-        : this.wrapInEmailTemplate(this.convertTextToHtml(params.bodyText)) + trackingPixel;
+      const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3001';
+      const trackingPixel = `<img src="${apiBaseUrl}/api/emails/track/open/${emailId}" width="1" height="1" alt="" style="display:block;" />`;
+      
+      // Generate HTML with tracking
+      let bodyHtmlWithTracking = params.bodyHtml 
+        ? params.bodyHtml
+        : this.wrapInEmailTemplate(this.convertTextToHtml(params.bodyText));
+      
+      // Wrap all links with click tracking
+      bodyHtmlWithTracking = this.wrapLinksWithTracking(bodyHtmlWithTracking, emailId);
+      
+      // Add tracking pixel at the end
+      bodyHtmlWithTracking = bodyHtmlWithTracking + trackingPixel;
 
       // Send email with tracking pixel
       const info = await this.transporter.sendMail({
