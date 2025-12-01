@@ -527,8 +527,6 @@ export class LeadsController {
       
       const [batch] = await db.insert(leadBatches).values({
         name: finalBatchName,
-        description: `Imported ${leadsData.length} leads from CSV`,
-        source: 'csv_import',
         totalLeads: leadsData.length,
         successfulImports: 0,
         failedImports: 0,
@@ -584,7 +582,6 @@ export class LeadsController {
             sourceType: 'manual_import',
             status: 'new',
             qualityScore,
-            tier: qualityScore >= 80 ? 'hot' : qualityScore >= 60 ? 'warm' : 'cold',
             batchId: batch.id,
           }).returning();
 
