@@ -25,7 +25,15 @@ export function useLeadsData({
   searchQuery,
   generating
 }: UseLeadsDataParams) {
-  // Fetch leads
+  // Fetch ALL leads without sourceType filter for accurate counts
+  const { data: allLeadsData, isLoading: allLeadsLoading, refetch: refetchAllLeads } = useQuery({
+    queryKey: ['all-leads'],
+    queryFn: async () => {
+      return await leadsService.getAll({})
+    },
+  })
+
+  // Fetch filtered leads based on current filters
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['leads', statusFilter, filters, searchQuery, activeTab],
     queryFn: async () => {
@@ -43,6 +51,17 @@ export function useLeadsData({
     },
   })
 
+  // Fetch ALL batches for accurate counts
+  const { data: allBatchesData, isLoading: allBatchesLoading, refetch: refetchAllBatches } = useQuery({
+    queryKey: ['all-batches'],
+    queryFn: async () => {
+      const result = await leadsAPI.getBatches()
+      return result.data
+    },
+    enabled: viewMode === 'batches' || generating,
+    staleTime: 0,
+  })
+
   // Fetch batches for batch view
   const { data: batchesData, isLoading: batchesLoading, refetch: refetchBatches } = useQuery({
     queryKey: ['batches', activeTab],
@@ -55,6 +74,8 @@ export function useLeadsData({
   })
 
   const leads = data?.data || []
+  const allLeads = allLeadsData?.data || []
+  const allBatchesArray = Array.isArray(allBatchesData?.data) ? allBatchesData.data : []
   const allBatches = Array.isArray(batchesData?.data) ? batchesData.data : []
   
   // Filter batches based on activeTab
@@ -75,9 +96,17 @@ export function useLeadsData({
   return {
     leads,
     batches,
+    allLeads,  // All unfiltered leads for counting
+    allBatches: allBatchesArray,  // All unfiltered batches for counting
     isLoading,
     batchesLoading,
-    refetch,
-    refetchBatches
+    refetch: () => {
+      refetch()
+      refetchAllLeads()
+    },
+    refetchBatches: () => {
+      refetchBatches()
+      refetchAllBatches()
+    }
   }
 }

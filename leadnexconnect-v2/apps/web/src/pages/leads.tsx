@@ -94,7 +94,7 @@ export default function Leads() {
   })
 
   // Use custom hook for data fetching
-  const { leads, batches, isLoading, batchesLoading, refetch, refetchBatches } = useLeadsData({
+  const { leads, batches, allLeads, allBatches, isLoading, batchesLoading, refetch, refetchBatches } = useLeadsData({
     statusFilter,
     filters,
     searchQuery,
@@ -863,7 +863,7 @@ export default function Leads() {
               >
                 {viewMode === 'table' ? 'All Leads' : 'All Batches'}
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
-                  {viewMode === 'table' ? leads.length : batches.length}
+                  {viewMode === 'table' ? allLeads.length : allBatches.length}
                 </span>
               </button>
               <button
@@ -878,8 +878,8 @@ export default function Leads() {
                 Imported
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">
                   {viewMode === 'table' 
-                    ? leads.filter((l: any) => l.sourceType === 'manual_import').length
-                    : batches.filter((b: any) => b.sourceType === 'manual_import').length
+                    ? allLeads.filter((l: any) => l.sourceType === 'manual_import').length
+                    : allBatches.filter((b: any) => b.source === 'csv_import' || b.source === 'manual_import').length
                   }
                 </span>
               </button>
@@ -895,8 +895,13 @@ export default function Leads() {
                 Generated
                 <span className="ml-2 px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">
                   {viewMode === 'table'
-                    ? leads.filter((l: any) => l.sourceType === 'automated' || !l.sourceType).length
-                    : batches.filter((b: any) => b.sourceType === 'automated' || !b.sourceType).length
+                    ? allLeads.filter((l: any) => l.sourceType === 'automated' || (!l.sourceType && l.source !== 'manual')).length
+                    : allBatches.filter((b: any) => 
+                        b.source === 'apollo' || 
+                        b.source === 'google_places' || 
+                        b.source === 'peopledatalabs' ||
+                        b.source === 'automated'
+                      ).length
                   }
                 </span>
               </button>
