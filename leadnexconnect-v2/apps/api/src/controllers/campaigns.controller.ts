@@ -518,14 +518,19 @@ export class CampaignsController {
 
       const campaign = campaignResults[0];
 
-      // Execute campaign
-      await this.executeCampaign(id, campaign);
-
-      // Update campaign status to active
+      // Update campaign status to active BEFORE executing
+      // (so email queue can process jobs immediately)
       await db
         .update(campaigns)
         .set({ status: 'active', updatedAt: new Date() })
         .where(eq(campaigns.id, id));
+
+      // Small delay to ensure database transaction commits
+      // before email queue starts processing jobs
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Execute campaign
+      await this.executeCampaign(id, campaign);
 
       res.json({
         success: true,
