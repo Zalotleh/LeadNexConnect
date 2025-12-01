@@ -339,10 +339,18 @@ export class LeadsController {
             .from(leads)
             .where(eq(leads.batchId, batch.id));
 
+          // Get campaigns for this batch
+          const batchCampaigns = await db
+            .select()
+            .from(campaigns)
+            .where(eq(campaigns.batchId, batch.id));
+
           return {
             ...batch,
             leadCount: totalLeads.length,
             sampleLeads: batchLeads,
+            campaignCount: batchCampaigns.length,
+            activeCampaignCount: batchCampaigns.filter(c => c.status === 'active').length,
           };
         })
       );

@@ -930,7 +930,7 @@ export default function Leads() {
                 <div>
                   <p className="text-sm text-gray-600">Total Leads in Batches</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {batches.reduce((sum: number, batch: any) => sum + (batch.leadsCount || 0), 0)}
+                    {batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0)}
                   </p>
                 </div>
                 <Users className="w-8 h-8 text-green-500" />
@@ -941,7 +941,7 @@ export default function Leads() {
                 <div>
                   <p className="text-sm text-gray-600">Avg Leads per Batch</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {batches.length > 0 ? Math.round(batches.reduce((sum: number, batch: any) => sum + (batch.leadsCount || 0), 0) / batches.length) : 0}
+                    {batches.length > 0 ? Math.round(batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0) / batches.length) : 0}
                   </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-purple-500" />
@@ -952,7 +952,7 @@ export default function Leads() {
                 <div>
                   <p className="text-sm text-gray-600">Active Campaigns</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {batches.filter((b: any) => b.campaignStatus === 'active').length}
+                    {batches.reduce((sum: number, batch: any) => sum + (batch.activeCampaignCount || 0), 0)}
                   </p>
                 </div>
                 <Zap className="w-8 h-8 text-orange-500" />
