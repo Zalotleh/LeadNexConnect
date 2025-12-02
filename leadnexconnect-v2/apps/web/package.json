@@ -6,7 +6,8 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "mkdir -p public/tinymce && cp -r ../../node_modules/tinymce/* public/tinymce/"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.17.9",

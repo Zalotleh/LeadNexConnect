@@ -1,6 +1,36 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Editor } from '@tinymce/tinymce-react';
 import { getAllEmailVariables, EmailVariable } from '@/lib/emailVariables';
+
+// Import TinyMCE
+import 'tinymce/tinymce';
+// Import theme
+import 'tinymce/themes/silver';
+// Import models
+import 'tinymce/models/dom';
+// Import icons
+import 'tinymce/icons/default';
+// Import plugins
+import 'tinymce/plugins/advlist';
+import 'tinymce/plugins/autolink';
+import 'tinymce/plugins/lists';
+import 'tinymce/plugins/link';
+import 'tinymce/plugins/image';
+import 'tinymce/plugins/charmap';
+import 'tinymce/plugins/preview';
+import 'tinymce/plugins/anchor';
+import 'tinymce/plugins/searchreplace';
+import 'tinymce/plugins/visualblocks';
+import 'tinymce/plugins/code';
+import 'tinymce/plugins/fullscreen';
+import 'tinymce/plugins/insertdatetime';
+import 'tinymce/plugins/media';
+import 'tinymce/plugins/table';
+import 'tinymce/plugins/help';
+import 'tinymce/plugins/wordcount';
+import 'tinymce/plugins/emoticons';
+// Import emoticons database
+import 'tinymce/plugins/emoticons/js/emojis';
 
 interface TinyMCEEmailEditorProps {
   value: string;
@@ -38,7 +68,8 @@ export default function TinyMCEEmailEditor({
   return (
     <div className="tinymce-email-editor">
       <Editor
-        apiKey="no-api-key-required"
+        tinymceScriptSrc="/tinymce/tinymce.min.js"
+        licenseKey="gpl"
         onInit={(evt, editor) => (editorRef.current = editor)}
         value={value}
         onEditorChange={(content) => onChange(content)}
