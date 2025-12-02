@@ -446,6 +446,8 @@ export default function WorkflowDetail() {
                           rows={8}
                           enableVisualEditor={true}
                           enableAI={true}
+                          enableTemplates={true}
+                          defaultSubject={editForm.steps[index].subject}
                           aiContext={{
                             companyName: 'Example Company',
                             contactName: 'John',

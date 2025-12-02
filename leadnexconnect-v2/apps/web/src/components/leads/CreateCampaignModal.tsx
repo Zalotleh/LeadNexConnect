@@ -148,6 +148,8 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                 required
                 enableVisualEditor={true}
                 enableAI={!!selectedLead}
+                enableTemplates={true}
+                defaultSubject={createCampaignForm.emailSubject}
                 aiContext={selectedLead ? {
                   companyName: selectedLead.companyName || 'Example Company',
                   contactName: selectedLead.contactName || 'John',
