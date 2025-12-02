@@ -54,6 +54,8 @@ export const campaignStatusEnum = pgEnum('campaign_status', [
 
 export const scheduleTypeEnum = pgEnum('schedule_type', [
   'manual',
+  'immediate',
+  'scheduled',
   'daily',
   'weekly',
   'custom',
