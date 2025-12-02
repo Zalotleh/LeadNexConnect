@@ -179,15 +179,28 @@ export class EmailGeneratorService {
     jobTitle?: string;
     website?: string;
   }): string {
-    const followUpContext = params.followUpStage === 'follow_up_1'
-      ? 'This is a follow-up email (first reminder). Keep it brief and reference the previous email.'
-      : params.followUpStage === 'follow_up_2'
-      ? 'This is a second follow-up email. Be more direct and create urgency.'
-      : 'This is an initial cold outreach email.';
+    const isFollowUp = params.followUpStage === 'follow_up_1' || params.followUpStage === 'follow_up_2';
+    const isSecondFollowUp = params.followUpStage === 'follow_up_2';
+    
+    // Industry-specific pain points
+    const industryPainPoints: Record<string, string> = {
+      'Technology': 'managing scattered customer data across multiple tools, inefficient booking processes, and missed revenue opportunities',
+      'Healthcare': 'complex appointment scheduling, patient communication challenges, and administrative overhead',
+      'Real Estate': 'managing multiple property viewings, client follow-ups, and booking coordination',
+      'Consulting': 'calendar chaos, client onboarding delays, and manual scheduling back-and-forth',
+      'Education': 'student/parent meeting coordination, resource booking, and communication gaps',
+      'Financial Services': 'client meeting scheduling, compliance tracking, and relationship management',
+      'Legal': 'client consultation scheduling, case management, and communication workflows',
+      'Marketing': 'client demos, campaign coordination, and team collaboration challenges',
+      'Sales': 'prospect meeting booking, follow-up management, and pipeline visibility',
+      'default': 'scattered scheduling tools, missed opportunities, and inefficient workflows'
+    };
 
-    return `You are a professional B2B sales email writer for BookNex, a comprehensive booking and management platform.
+    const painPoint = industryPainPoints[params.industry || ''] || industryPainPoints['default'];
 
-Task: Write a personalized ${followUpContext.toLowerCase()} email to a ${params.industry} business.
+    return `You are a professional B2B sales email writer for BookNex, a comprehensive booking and CRM platform.
+
+Task: Write a ${isFollowUp ? (isSecondFollowUp ? 'second follow-up' : 'first follow-up') : 'initial cold outreach'} email to a ${params.industry} business.
 
 Target Business Details:
 - Company Name: ${params.companyName}
@@ -197,31 +210,84 @@ ${params.jobTitle ? `- Job Title: ${params.jobTitle}` : ''}
 - Location: ${params.city ? `${params.city}, ` : ''}${params.country || ''}
 ${params.website ? `- Website: ${params.website}` : ''}
 
-Context: ${followUpContext}
+Email Context: ${isFollowUp ? (isSecondFollowUp ? 'This is a SECOND follow-up email. Be more direct and create urgency.' : 'This is a FOLLOW-UP email (first reminder). Reference the previous email briefly.') : 'This is an INITIAL outreach email.'}
 
-Product (BookNex):
-- All-in-one booking and management platform
-- Perfect for ${params.industry} businesses
-- Features: Online booking, payment processing, customer management, automated reminders, analytics
-- Helps businesses save time and increase revenue
+Product: BookNex - All-in-one booking and CRM platform
+Industry Pain Point: ${painPoint}
+
+BLACK FRIDAY SPECIAL OFFER (Active Now - Ends December 7, 2024):
+- Offer Code: BOOKNEX100
+- Discount: 50% off first year
+- Deadline: December 7, 2024
+- This is a time-sensitive opportunity
 
 Requirements:
-1. Subject line: Catchy, personalized, 50 characters max
-2. Email body: Professional, conversational tone
-3. Highlight 2-3 specific pain points for ${params.industry} businesses
-4. Mention how BookNex solves these problems
-5. Include a clear call-to-action (book a demo)
-6. Keep it under 150 words
-7. Don't be salesy - be helpful and consultative
-8. Personalize based on their business name and location
+1. Subject line: Catchy, personalized, 40-50 characters max
+2. Email body: Professional but conversational tone - write like a helpful peer, not a salesperson
+3. Keep it concise and scannable (150-200 words maximum)
+4. Mention the industry-specific pain point naturally
+5. Highlight the BLACK FRIDAY offer prominently with urgency (ends December 7)
+6. Include the offer code BOOKNEX100 clearly
+7. ${isFollowUp ? 'Reference the previous email briefly, add new value or perspective' : 'Start with a relevant hook related to their role/industry'}
+8. DO NOT use placeholder text or brackets - use actual information provided
+9. DO NOT mention statistics or success metrics unless you have verified data
+10. DO NOT use generic phrases like "I hope this email finds you well"
+11. Use short, punchy sentences - avoid long paragraphs
+
+CRITICAL - Call-to-Action Links (use these exact variables):
+- {{signUpLink}} - For signing up to BookNex (PRIMARY CTA)
+- {{featuresLink}} - To explore specific features
+- {{pricingLink}} - To see pricing and plans
+- {{integrationsLink}} - To view integrations
+- {{demoLink}} - To book a demo
+- {{websiteLink}} - General website link
+
+CRITICAL - Signature Variable:
+- End with {{signature}} - this will be replaced with the sender's signature
+
+${isFollowUp ? `
+FOLLOW-UP SPECIFIC:
+- Acknowledge previous message briefly ("Following up on my last email...")
+- Provide a NEW angle or additional value (e.g., mention a specific feature, share a quick win, reference the Black Friday deadline)
+- Use a softer CTA like "Would you like to see a quick demo?" or "Want to grab this offer before December 7?"
+- Reinforce urgency with the Black Friday deadline
+- Keep it shorter and more casual than initial email
+${isSecondFollowUp ? '- Be more direct - this is the final follow-up' : ''}
+` : `
+INITIAL EMAIL SPECIFIC:
+- Hook: Start with their role or industry challenge
+- Pain Point: Reference the specific pain point for their industry
+- Solution: Briefly introduce BookNex as the solution (all-in-one booking & CRM)
+- Black Friday Offer: Highlight 50% off + BOOKNEX100 code + December 7 deadline
+- CTAs: Include 2-3 actionable CTAs:
+  * Primary: "Sign up now with {{signUpLink}} using code BOOKNEX100"
+  * Secondary: "Explore features at {{featuresLink}}" or "See pricing at {{pricingLink}}"
+  * Tertiary: "Book a quick demo at {{demoLink}}"
+- Make the Black Friday offer feel urgent and valuable
+`}
+
+Example Structure for Initial Email:
+Hi [Name],
+
+[Role/industry-specific hook mentioning pain point]
+
+[One sentence about BookNex solution]
+
+🎉 Black Friday Special - 50% off your first year with code BOOKNEX100 (ends December 7)
+
+[Brief value proposition with specific benefit]
+
+[2-3 CTAs using link variables]
+
+{{signature}}
 
 Format your response EXACTLY as:
 SUBJECT: [your subject line]
 
 BODY:
-[your email body]
+[your email body - must end with {{signature}}]
 
-Do not include any other text, greetings, or signatures.`;
+Do not include any other text or additional formatting.`;
   }
 
   /**
