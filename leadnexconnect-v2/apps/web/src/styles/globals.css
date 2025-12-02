@@ -47,9 +47,6 @@ body {
 /* Import GrapeJS core CSS */
 @import 'grapesjs/dist/css/grapes.min.css';
 
-/* Import GrapeJS newsletter preset CSS */
-@import 'grapesjs-preset-newsletter/dist/grapesjs-preset-newsletter.css';
-
 /* Custom GrapeJS Overrides */
 .gjs-cv-canvas {
   background-color: #f3f4f6 !important;
@@ -181,8 +178,7 @@ body {
 .gjs-field textarea:focus {
   border-color: #6366f1;
   outline: none;
-  ring: 2px;
-  ring-color: rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
 /* Color picker */
