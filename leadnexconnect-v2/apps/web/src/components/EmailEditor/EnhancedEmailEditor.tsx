@@ -424,7 +424,7 @@ export default function EnhancedEmailEditor({
       {/* Load Template Modal */}
       {showLoadTemplateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">Load Template</h3>
               <button
@@ -435,9 +435,8 @@ export default function EnhancedEmailEditor({
               </button>
             </div>
 
-            {/* Search and Filter */}
-            <div className="p-4 border-b space-y-3">
-              <div className="flex gap-3">
+            <div className="p-4">
+              <div className="flex gap-3 mb-4">
                 <input
                   type="text"
                   value={templateSearch}
@@ -450,7 +449,7 @@ export default function EnhancedEmailEditor({
                   onChange={(e) => setTemplateCategory(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
-                  <option value="">All Categories</option>
+                  <option value="">All categories</option>
                   <option value="initial_outreach">Initial Outreach</option>
                   <option value="follow_up">Follow Up</option>
                   <option value="meeting_request">Meeting Request</option>
@@ -460,55 +459,55 @@ export default function EnhancedEmailEditor({
                   <option value="general">General</option>
                   <option value="other">Other</option>
                 </select>
+                <button
+                  type="button"
+                  onClick={loadTemplates}
+                  className="px-3 py-2 bg-primary-600 text-white rounded-lg"
+                >
+                  {isLoadingTemplates ? 'Loading...' : 'Refresh'}
+                </button>
               </div>
-            </div>
 
-            {/* Templates List */}
-            <div className="flex-1 overflow-y-auto p-4">
-              {isLoadingTemplates ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-                  <p className="text-gray-500 mt-2">Loading templates...</p>
-                </div>
-              ) : templates.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">No templates found</p>
-                  <p className="text-sm text-gray-400 mt-1">Try adjusting your search or create a new template</p>
-                </div>
-              ) : (
-                <div className="grid gap-3">
-                  {templates.map((template) => (
-                    <div
-                      key={template.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-primary-500 hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => handleLoadTemplate(template)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">{template.name}</h4>
-                          {template.description && (
-                            <p className="text-sm text-gray-600 mt-1">{template.description}</p>
-                          )}
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-primary-100 text-primary-700">
-                              {template.category?.replace('_', ' ')}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              Used {template.usageCount || 0} times
-                            </span>
+              <div className="grid gap-3 max-h-[50vh] overflow-y-auto">
+                {isLoadingTemplates ? (
+                  <div className="text-sm text-gray-600">Loading templates...</div>
+                ) : templates.length === 0 ? (
+                  <div className="text-sm text-gray-600">No templates found.</div>
+                ) : (
+                  templates.map((t) => (
+                    <div key={t.id} className="p-3 border rounded-lg flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-gray-900">{t.name}</div>
+                            <div className="text-xs text-gray-500">{t.subject}</div>
                           </div>
+                          <div className="text-xs text-gray-400">{t.category || 'general'}</div>
                         </div>
-                        <ChevronDown className="w-5 h-5 text-gray-400 transform -rotate-90" />
+                        {t.description && <div className="mt-2 text-sm text-gray-700">{t.description}</div>}
                       </div>
-                      <div className="mt-3 pt-3 border-t border-gray-100">
-                        <p className="text-sm font-medium text-gray-700">Subject:</p>
-                        <p className="text-sm text-gray-600 mt-1">{template.subject}</p>
+                      <div className="ml-4 flex-shrink-0 flex flex-col gap-2">
+                        <button
+                          onClick={() => handleLoadTemplate(t)}
+                          className="px-3 py-1 text-sm bg-primary-600 text-white rounded-lg"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Quick preview: open a small window with HTML content
+                            const preview = window.open('', '_blank');
+                            if (preview) preview.document.body.innerHTML = t.bodyHtml || t.bodyText || '';
+                          }}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-lg"
+                        >
+                          Preview
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50">
@@ -516,7 +515,7 @@ export default function EnhancedEmailEditor({
                 onClick={() => setShowLoadTemplateModal(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
               >
-                Cancel
+                Close
               </button>
             </div>
           </div>

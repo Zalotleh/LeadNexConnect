@@ -12,9 +12,16 @@ export default async function handler(
     : `${backendUrl}/api/templates`;
 
   try {
-    const { params } = req.query;
-    const pathParts = Array.isArray(params) ? params : [params];
-    const url = `${apiUrl}/${pathParts.join('/')}`;
+    // req.query.params can be a string or array for catch-all routes
+    const params = req.query.params;
+    let path = '';
+    if (Array.isArray(params)) {
+      path = params.map(encodeURIComponent).join('/');
+    } else if (typeof params === 'string') {
+      path = encodeURIComponent(params);
+    }
+
+    const url = path ? `${apiUrl}/${path}` : apiUrl;
 
     // Forward the request to the backend API
     const response = await fetch(url, {
@@ -22,7 +29,7 @@ export default async function handler(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: req.method !== 'GET' && req.method !== 'DELETE' ? JSON.stringify(req.body) : undefined,
+      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
     });
 
     const data = await response.json();
