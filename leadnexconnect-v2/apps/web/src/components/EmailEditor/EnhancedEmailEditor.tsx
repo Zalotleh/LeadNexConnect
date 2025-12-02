@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, Code, Sparkles, Save, X, FileText, ChevronDown } from 'lucide-react';
+import { Palette, Code, Sparkles, Save, X, FileText, ChevronDown, Eye, Monitor, Smartphone } from 'lucide-react';
 import { getAllEmailVariables } from '@/lib/emailVariables';
 import EmailEditor from '../EmailEditor';
 import TinyMCEEmailEditor from './TinyMCEEmailEditor';
 import toast from 'react-hot-toast';
+import api from '@/services/api';
 
 interface EnhancedEmailEditorProps {
   label: string;
@@ -109,6 +110,79 @@ export default function EnhancedEmailEditor({
     subject: defaultSubject,
     category: 'general' as 'initial_outreach' | 'follow_up' | 'meeting_request' | 'introduction' | 'product_demo' | 'partnership' | 'general' | 'other'
   });
+
+  // Preview states
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [leads, setLeads] = useState<any[]>([]);
+  const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [isLoadingLeads, setIsLoadingLeads] = useState(false);
+  const [previewSubject, setPreviewSubject] = useState(defaultSubject);
+
+  // Load leads when preview modal opens
+  useEffect(() => {
+    if (showPreviewModal && leads.length === 0) {
+      loadLeads();
+    }
+  }, [showPreviewModal]);
+
+  const loadLeads = async () => {
+    setIsLoadingLeads(true);
+    try {
+      const response = await api.get('/leads?limit=50');
+      if (response.data.success) {
+        setLeads(response.data.data);
+        if (response.data.data.length > 0) {
+          setSelectedLead(response.data.data[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load leads:', error);
+      toast.error('Failed to load leads');
+    } finally {
+      setIsLoadingLeads(false);
+    }
+  };
+
+  // Variable substitution function
+  const substituteVariables = (text: string, data: any = {}): string => {
+    if (!text) return '';
+    
+    // Default sample data if no lead selected
+    const defaultData: Record<string, string> = {
+      contactName: 'John',
+      firstName: 'John',
+      lastName: 'Doe',
+      companyName: 'Acme Corp',
+      industry: 'Technology',
+      city: 'San Francisco',
+      country: 'USA',
+      title: 'CEO',
+      email: 'john.doe@acme.com',
+      phone: '+1 (555) 123-4567',
+    };
+    
+    const substitutionData: Record<string, string> = selectedLead ? {
+      contactName: selectedLead.contactName || selectedLead.name || 'there',
+      firstName: selectedLead.firstName || selectedLead.contactName?.split(' ')[0] || 'John',
+      lastName: selectedLead.lastName || selectedLead.contactName?.split(' ')[1] || 'Doe',
+      companyName: selectedLead.companyName || 'the company',
+      industry: selectedLead.industry || 'your industry',
+      city: selectedLead.city || 'your city',
+      country: selectedLead.country || 'your country',
+      title: selectedLead.title || 'your role',
+      email: selectedLead.email || 'email@example.com',
+      phone: selectedLead.phone || '+1 (555) 000-0000',
+    } : defaultData;
+    
+    let result = text;
+    Object.keys(substitutionData).forEach(key => {
+      const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'gi');
+      result = result.replace(regex, substitutionData[key] || '');
+    });
+    
+    return result;
+  };
 
   // Load templates when modal opens
   useEffect(() => {
@@ -286,6 +360,19 @@ export default function EnhancedEmailEditor({
         </label>
 
         <div className="flex items-center gap-2">
+          {/* Preview Button */}
+          {value && value.trim() !== '' && (
+            <button
+              type="button"
+              onClick={() => setShowPreviewModal(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+              title="Preview email"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              Preview
+            </button>
+          )}
+
           {/* Load Template Button */}
           {enableTemplates && (
             <button
@@ -592,6 +679,147 @@ export default function EnhancedEmailEditor({
             <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50">
               <button
                 onClick={() => setShowLoadTemplateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Email Preview</h3>
+              <div className="flex items-center gap-3">
+                {/* Desktop/Mobile Toggle */}
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('desktop')}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      previewMode === 'desktop'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                    Desktop
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('mobile')}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      previewMode === 'mobile'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    Mobile
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Lead Selector */}
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700">Preview with lead data:</label>
+                {isLoadingLeads ? (
+                  <div className="text-sm text-gray-500">Loading leads...</div>
+                ) : leads.length > 0 ? (
+                  <select
+                    value={selectedLead?.id || ''}
+                    onChange={(e) => {
+                      const lead = leads.find(l => l.id === parseInt(e.target.value));
+                      setSelectedLead(lead || null);
+                    }}
+                    className="flex-1 max-w-md px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sample Data</option>
+                    {leads.map(lead => (
+                      <option key={lead.id} value={lead.id}>
+                        {lead.contactName || lead.name} - {lead.companyName || 'No company'}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-sm text-gray-500">No leads available (using sample data)</div>
+                )}
+              </div>
+
+              {/* Show variables being used */}
+              {selectedLead && (
+                <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg">
+                  <div className="text-xs font-medium text-gray-700 mb-2">Variables:</div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{selectedLead.contactName || 'N/A'}</span></div>
+                    <div><span className="text-gray-500">Company:</span> <span className="font-medium">{selectedLead.companyName || 'N/A'}</span></div>
+                    <div><span className="text-gray-500">Industry:</span> <span className="font-medium">{selectedLead.industry || 'N/A'}</span></div>
+                    <div><span className="text-gray-500">Location:</span> <span className="font-medium">{selectedLead.city || 'N/A'}, {selectedLead.country || 'N/A'}</span></div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Preview Content */}
+            <div className="flex-1 overflow-auto p-6 bg-gray-100">
+              <div 
+                className={`mx-auto bg-white shadow-lg rounded-lg overflow-hidden transition-all duration-300 ${
+                  previewMode === 'mobile' ? 'max-w-sm' : 'max-w-3xl'
+                }`}
+              >
+                {/* Email Header (Gmail-like) */}
+                <div className="bg-white border-b border-gray-200 p-4">
+                  <div className="text-xs text-gray-500 mb-1">Subject</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {substituteVariables(previewSubject || defaultSubject || 'No Subject')}
+                  </div>
+                  <div className="mt-3 flex items-center gap-3 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
+                        {(selectedLead?.contactName || 'You')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">You</div>
+                        <div className="text-xs text-gray-500">to {selectedLead?.email || 'recipient@example.com'}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Email Body */}
+                <div 
+                  className="p-6 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ 
+                    __html: substituteVariables(editorMode === 'visual' ? visualContent : textToHtml(simpleContent))
+                  }}
+                />
+
+                {/* Email Footer */}
+                <div className="border-t border-gray-200 p-4 bg-gray-50">
+                  <div className="text-xs text-gray-500 text-center">
+                    This is a preview. Actual email may appear slightly different in different email clients.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50">
+              <button
+                onClick={() => setShowPreviewModal(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
               >
                 Close
