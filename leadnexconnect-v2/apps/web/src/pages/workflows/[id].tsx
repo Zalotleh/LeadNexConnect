@@ -445,6 +445,15 @@ export default function WorkflowDetail() {
                           placeholder="Email body..."
                           rows={8}
                           enableVisualEditor={true}
+                          enableAI={true}
+                          aiContext={{
+                            companyName: 'Example Company',
+                            contactName: 'John',
+                            industry: 'technology',
+                            city: 'San Francisco',
+                            country: 'USA',
+                            followUpStage: index === 0 ? 'initial' : `follow_up_${index}`
+                          }}
                         />
                       ) : (
                         <>

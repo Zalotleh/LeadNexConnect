@@ -1248,6 +1248,7 @@ export default function Leads() {
         <CreateCampaignModal
           show={showCreateCampaignModal}
           selectedLeadsCount={selectedLeads.size}
+          selectedLead={selectedLeads.size > 0 ? allLeads.find((lead: Lead) => selectedLeads.has(lead.id)) : null}
           createCampaignForm={createCampaignForm}
           aiGenerating={aiGenerating}
           onClose={() => setShowCreateCampaignModal(false)}

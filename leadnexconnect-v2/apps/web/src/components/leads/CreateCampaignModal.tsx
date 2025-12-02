@@ -15,6 +15,13 @@ interface CreateCampaignForm {
 interface CreateCampaignModalProps {
   show: boolean;
   selectedLeadsCount: number;
+  selectedLead?: {
+    companyName?: string;
+    contactName?: string;
+    industry?: string;
+    city?: string;
+    country?: string;
+  } | null;
   createCampaignForm: CreateCampaignForm;
   aiGenerating: boolean;
   onClose: () => void;
@@ -26,6 +33,7 @@ interface CreateCampaignModalProps {
 export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
   show,
   selectedLeadsCount,
+  selectedLead,
   createCampaignForm,
   aiGenerating,
   onClose,
@@ -139,6 +147,15 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                 rows={8}
                 required
                 enableVisualEditor={true}
+                enableAI={!!selectedLead}
+                aiContext={selectedLead ? {
+                  companyName: selectedLead.companyName || 'Example Company',
+                  contactName: selectedLead.contactName || 'John',
+                  industry: selectedLead.industry || 'technology',
+                  city: selectedLead.city || 'San Francisco',
+                  country: selectedLead.country || 'USA',
+                  followUpStage: 'initial'
+                } : undefined}
               />
             </>
           )}
