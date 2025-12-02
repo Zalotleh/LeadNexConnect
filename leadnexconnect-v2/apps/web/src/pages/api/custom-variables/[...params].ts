@@ -4,13 +4,17 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
   const { params } = req.query;
 
   try {
     // Construct path from params array
     const path = Array.isArray(params) ? params.join('/') : params;
-    const url = `${API_URL}/api/custom-variables/${path}`;
+    
+    // Construct the API URL - handle both http://localhost:4000 and http://localhost:4000/api formats
+    const url = backendUrl.endsWith('/api')
+      ? `${backendUrl}/custom-variables/${path}`
+      : `${backendUrl}/api/custom-variables/${path}`;
 
     // Prepare request options
     const options: RequestInit = {

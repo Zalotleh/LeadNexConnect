@@ -4,7 +4,12 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  
+  // Construct the API URL - handle both http://localhost:4000 and http://localhost:4000/api formats
+  const apiUrl = backendUrl.endsWith('/api') 
+    ? `${backendUrl}/custom-variables`
+    : `${backendUrl}/api/custom-variables`;
 
   try {
     const { method, query } = req;
@@ -16,7 +21,7 @@ export default async function handler(
     if (query.isActive) queryParams.append('isActive', query.isActive as string);
 
     const queryString = queryParams.toString();
-    const url = `${API_URL}/api/custom-variables${queryString ? `?${queryString}` : ''}`;
+    const url = queryString ? `${apiUrl}?${queryString}` : apiUrl;
 
     // Prepare request options
     const options: RequestInit = {
