@@ -182,21 +182,118 @@ export class EmailGeneratorService {
     const isFollowUp = params.followUpStage === 'follow_up_1' || params.followUpStage === 'follow_up_2';
     const isSecondFollowUp = params.followUpStage === 'follow_up_2';
     
-    // Industry-specific pain points
-    const industryPainPoints: Record<string, string> = {
-      'Technology': 'managing scattered customer data across multiple tools, inefficient booking processes, and missed revenue opportunities',
-      'Healthcare': 'complex appointment scheduling, patient communication challenges, and administrative overhead',
-      'Real Estate': 'managing multiple property viewings, client follow-ups, and booking coordination',
-      'Consulting': 'calendar chaos, client onboarding delays, and manual scheduling back-and-forth',
-      'Education': 'student/parent meeting coordination, resource booking, and communication gaps',
-      'Financial Services': 'client meeting scheduling, compliance tracking, and relationship management',
-      'Legal': 'client consultation scheduling, case management, and communication workflows',
-      'Marketing': 'client demos, campaign coordination, and team collaboration challenges',
-      'Sales': 'prospect meeting booking, follow-up management, and pipeline visibility',
-      'default': 'scattered scheduling tools, missed opportunities, and inefficient workflows'
+    // Industry-specific pain points (arrays for variety and specificity)
+    const industryPainPoints: Record<string, string[]> = {
+      'wellness': [
+        'missed appointments',
+        'double bookings',
+        'time spent on admin instead of focusing on clients',
+        'manual appointment reminders',
+        'client communication gaps'
+      ],
+      'healthcare': [
+        'appointment scheduling chaos',
+        'patient no-shows',
+        'manual booking processes',
+        'coordination between providers',
+        'patient communication challenges'
+      ],
+      'consulting': [
+        'calendar management overhead',
+        'client scheduling conflicts',
+        'inefficient booking workflows',
+        'manual follow-up processes',
+        'project coordination issues'
+      ],
+      'education': [
+        'appointment coordination challenges',
+        'student scheduling issues',
+        'administrative bottlenecks',
+        'parent-teacher meeting coordination',
+        'resource booking conflicts'
+      ],
+      'financial services': [
+        'client meeting scheduling complexity',
+        'missed appointment opportunities',
+        'administrative inefficiency',
+        'compliance tracking overhead',
+        'client relationship management gaps'
+      ],
+      'real estate': [
+        'property showing coordination',
+        'client scheduling conflicts',
+        'administrative overhead',
+        'follow-up management',
+        'appointment booking chaos'
+      ],
+      'legal': [
+        'client appointment management',
+        'calendar coordination challenges',
+        'administrative time drain',
+        'case management overhead',
+        'client communication workflows'
+      ],
+      'marketing': [
+        'client meeting scheduling',
+        'team coordination issues',
+        'workflow inefficiencies',
+        'campaign management complexity',
+        'demo scheduling challenges'
+      ],
+      'e-commerce': [
+        'customer support scheduling',
+        'team coordination challenges',
+        'operational inefficiencies',
+        'order management overhead',
+        'customer communication gaps'
+      ],
+      'saas': [
+        'demo scheduling complexity',
+        'sales meeting coordination',
+        'customer onboarding challenges',
+        'trial follow-up management',
+        'support ticket coordination'
+      ],
+      'technology': [
+        'managing scattered customer data',
+        'inefficient booking processes',
+        'missed revenue opportunities',
+        'tool fragmentation',
+        'workflow inefficiencies'
+      ],
+      'sales': [
+        'prospect meeting booking',
+        'follow-up management',
+        'pipeline visibility',
+        'lead coordination',
+        'manual scheduling overhead'
+      ],
+      'manufacturing': [
+        'production scheduling challenges',
+        'supply chain coordination',
+        'resource management issues',
+        'order coordination',
+        'operational bottlenecks'
+      ],
+      'retail': [
+        'staff scheduling complexity',
+        'customer appointment management',
+        'operational coordination',
+        'inventory management overhead',
+        'customer service challenges'
+      ]
     };
 
-    const painPoint = industryPainPoints[params.industry || ''] || industryPainPoints['default'];
+    // Get pain points for the industry (normalize to lowercase for matching)
+    const industryKey = (params.industry || '').toLowerCase().replace(/\s+/g, '-');
+    const painPointsArray = industryPainPoints[industryKey] || industryPainPoints['technology'] || [
+      'appointment scheduling challenges',
+      'operational inefficiencies',
+      'administrative overhead'
+    ];
+    
+    // Join pain points as a comma-separated string for the prompt
+    const painPoint = painPointsArray.join(', ');
 
     return `You are a professional B2B sales email writer for BookNex, a comprehensive booking and CRM platform.
 
