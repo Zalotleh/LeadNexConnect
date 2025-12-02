@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { getAllEmailVariables, EmailVariable } from '@/lib/emailVariables';
+import { getAllEmailVariables, EmailVariable, emailVariableManager } from '@/lib/emailVariables';
 
 interface TinyMCEEmailEditorProps {
   value: string;
@@ -13,9 +13,37 @@ export default function TinyMCEEmailEditor({
   variables,
 }: TinyMCEEmailEditorProps) {
   const editorRef = useRef<any>(null);
-  const emailVariables = variables || getAllEmailVariables();
+  const [emailVariables, setEmailVariables] = useState<EmailVariable[]>(
+    variables || getAllEmailVariables()
+  );
   const [isClient, setIsClient] = useState(false);
   const [Editor, setEditor] = useState<any>(null);
+  const [isLoadingVariables, setIsLoadingVariables] = useState(false);
+
+  // Load custom variables on mount
+  useEffect(() => {
+    const loadVariables = async () => {
+      if (!emailVariableManager.areCustomVariablesLoaded()) {
+        setIsLoadingVariables(true);
+        await emailVariableManager.loadCustomVariables();
+        setIsLoadingVariables(false);
+        
+        // Update local state with all variables
+        setEmailVariables(getAllEmailVariables());
+      }
+    };
+    
+    loadVariables();
+  }, []);
+
+  // Update variables when they change
+  useEffect(() => {
+    if (variables) {
+      setEmailVariables(variables);
+    } else {
+      setEmailVariables(getAllEmailVariables());
+    }
+  }, [variables]);
 
   useEffect(() => {
     setIsClient(true);
@@ -27,7 +55,12 @@ export default function TinyMCEEmailEditor({
   if (!isClient || !Editor) {
     return (
       <div className="h-[500px] bg-gray-50 rounded-lg flex items-center justify-center border border-gray-300">
-        <div className="text-gray-600">Loading editor...</div>
+        <div className="text-center">
+          <div className="text-gray-600 mb-2">
+            {isLoadingVariables ? 'Loading variables...' : 'Loading editor...'}
+          </div>
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto"></div>
+        </div>
       </div>
     );
   }

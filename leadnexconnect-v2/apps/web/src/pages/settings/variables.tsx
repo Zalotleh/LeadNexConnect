@@ -17,6 +17,7 @@ import {
   XCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { emailVariableManager } from '@/lib/emailVariables';
 
 interface CustomVariable {
   id: string;
@@ -124,6 +125,9 @@ export default function VariablesPage() {
       setShowAddModal(false);
       resetForm();
       loadVariables();
+      
+      // Reload email variable manager for TinyMCE
+      emailVariableManager.reloadCustomVariables();
     } catch (error: any) {
       console.error('Create variable error:', error);
       toast.error(error.message || 'Failed to create variable');
@@ -162,6 +166,9 @@ export default function VariablesPage() {
       setSelectedVariable(null);
       resetForm();
       loadVariables();
+      
+      // Reload email variable manager for TinyMCE
+      emailVariableManager.reloadCustomVariables();
     } catch (error: any) {
       console.error('Update variable error:', error);
       toast.error(error.message || 'Failed to update variable');
@@ -188,6 +195,9 @@ export default function VariablesPage() {
       setShowDeleteModal(false);
       setSelectedVariable(null);
       loadVariables();
+      
+      // Reload email variable manager for TinyMCE
+      emailVariableManager.reloadCustomVariables();
     } catch (error: any) {
       console.error('Delete variable error:', error);
       toast.error(error.message || 'Failed to delete variable');

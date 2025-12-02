@@ -21,6 +21,8 @@ export class EmailVariableManager {
   private static instance: EmailVariableManager;
   private variables: Map<string, EmailVariable> = new Map();
   private customVariables: Map<string, EmailVariable> = new Map();
+  private isLoadingCustom: boolean = false;
+  private customVariablesLoaded: boolean = false;
 
   private constructor() {
     this.initializeDefaultVariables();
@@ -235,6 +237,62 @@ export class EmailVariableManager {
       ...Array.from(this.variables.values()),
       ...Array.from(this.customVariables.values()),
     ];
+  }
+
+  /**
+   * Load custom variables from API
+   */
+  async loadCustomVariables(): Promise<void> {
+    if (this.isLoadingCustom) return;
+    
+    this.isLoadingCustom = true;
+    try {
+      const response = await fetch('/api/custom-variables?isActive=true');
+      if (!response.ok) {
+        throw new Error('Failed to load custom variables');
+      }
+      
+      const customVars = await response.json();
+      
+      // Clear existing custom variables
+      this.customVariables.clear();
+      
+      // Add loaded custom variables
+      customVars.forEach((cv: any) => {
+        const variable: EmailVariable = {
+          key: cv.key,
+          label: cv.label,
+          value: cv.value,
+          category: cv.category || 'custom',
+          description: cv.description || undefined,
+          defaultValue: cv.defaultValue || undefined,
+          isEditable: true,
+        };
+        this.customVariables.set(cv.key, variable);
+      });
+      
+      this.customVariablesLoaded = true;
+      console.log(`[EmailVariableManager] Loaded ${customVars.length} custom variables`);
+    } catch (error) {
+      console.error('[EmailVariableManager] Failed to load custom variables:', error);
+    } finally {
+      this.isLoadingCustom = false;
+    }
+  }
+
+  /**
+   * Check if custom variables are loaded
+   */
+  areCustomVariablesLoaded(): boolean {
+    return this.customVariablesLoaded;
+  }
+
+  /**
+   * Reload custom variables (call after creating/updating/deleting)
+   */
+  async reloadCustomVariables(): Promise<void> {
+    this.customVariablesLoaded = false;
+    await this.loadCustomVariables();
   }
 
   /**
