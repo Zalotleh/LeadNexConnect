@@ -11,6 +11,9 @@
   "dependencies": {
     "@tanstack/react-query": "^5.17.9",
     "axios": "^1.6.5",
+    "grapesjs": "^0.22.14",
+    "grapesjs-blocks-basic": "^1.0.2",
+    "grapesjs-preset-newsletter": "^1.0.2",
     "lucide-react": "^0.303.0",
     "next": "^14.0.4",
     "react": "^18.2.0",
