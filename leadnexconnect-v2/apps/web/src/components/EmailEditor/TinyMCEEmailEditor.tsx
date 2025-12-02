@@ -89,6 +89,27 @@ export default function TinyMCEEmailEditor({
             }
           `,
           setup: (editor: any) => {
+            // Add custom handling to preserve variables structure
+            editor.on('BeforeSetContent', (e: any) => {
+              // Wrap standalone variables in spans to prevent TinyMCE from breaking them
+              if (e.content) {
+                e.content = e.content.replace(
+                  /{{([^}]+)}}/g,
+                  '<span class="email-variable" contenteditable="false">{{$1}}</span>'
+                );
+              }
+            });
+
+            editor.on('GetContent', (e: any) => {
+              // Remove the span wrappers when getting content
+              if (e.content) {
+                e.content = e.content.replace(
+                  /<span class="email-variable"[^>]*>{{([^}]+)}}<\/span>/g,
+                  '{{$1}}'
+                );
+              }
+            });
+
             editor.ui.registry.addMenuButton('variables', {
               text: 'Variables',
               icon: 'code-sample',

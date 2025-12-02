@@ -43,6 +43,58 @@ export default function EnhancedEmailEditor({
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   
+  // Store separate content for each mode to preserve formatting
+  const [simpleContent, setSimpleContent] = useState(value);
+  const [visualContent, setVisualContent] = useState('');
+  
+  // Initialize visual content from value if it contains HTML
+  useEffect(() => {
+    if (value && value.includes('<')) {
+      setVisualContent(value);
+      // Convert HTML to plain text for simple mode
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = value;
+      setSimpleContent(tempDiv.textContent || tempDiv.innerText || value);
+    } else {
+      setSimpleContent(value);
+    }
+  }, []); // Only run on mount
+  
+  // Helper to convert plain text to HTML (for visual editor)
+  const textToHtml = (text: string): string => {
+    if (!text) return '';
+    // Preserve line breaks and convert to paragraphs
+    return text
+      .split('\n\n')
+      .filter(para => para.trim())
+      .map(para => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+      .join('');
+  };
+  
+  // Helper to convert HTML to plain text (for simple editor)
+  const htmlToText = (html: string): string => {
+    if (!html) return '';
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    return tempDiv.textContent || tempDiv.innerText || '';
+  };
+  
+  // Handle mode switching
+  const handleModeSwitch = (newMode: 'simple' | 'visual') => {
+    if (newMode === 'visual' && editorMode === 'simple') {
+      // Switching to visual: convert plain text to HTML
+      const html = textToHtml(simpleContent);
+      setVisualContent(html);
+      onChange(html);
+    } else if (newMode === 'simple' && editorMode === 'visual') {
+      // Switching to simple: convert HTML to plain text
+      const text = htmlToText(visualContent);
+      setSimpleContent(text);
+      onChange(text);
+    }
+    setEditorMode(newMode);
+  };
+  
   // Template states
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showLoadTemplateModal, setShowLoadTemplateModal] = useState(false);
@@ -91,8 +143,20 @@ export default function EnhancedEmailEditor({
 
   const handleLoadTemplate = async (template: any) => {
     try {
-      // Load the template content into the editor
-      onChange(template.bodyHtml || template.bodyText);
+      const content = template.bodyHtml || template.bodyText;
+      
+      // Determine if content is HTML
+      if (content.includes('<')) {
+        setVisualContent(content);
+        setSimpleContent(htmlToText(content));
+        setEditorMode('visual');
+      } else {
+        setSimpleContent(content);
+        setVisualContent(textToHtml(content));
+        setEditorMode('simple');
+      }
+      
+      onChange(content);
       
       // Increment usage count
       await fetch(`/api/templates/${template.id}/use`, {
@@ -136,9 +200,18 @@ export default function EnhancedEmailEditor({
 
       const result = await response.json();
       
-      // Load the AI-generated HTML into the editor
-      // Backend returns { success, data: { subject, bodyText, bodyHtml } }
-      onChange(result.data?.bodyHtml || result.data?.bodyText || '');
+      // Load the AI-generated HTML into both states
+      const content = result.data?.bodyHtml || result.data?.bodyText || '';
+      
+      if (content.includes('<')) {
+        setVisualContent(content);
+        setSimpleContent(htmlToText(content));
+      } else {
+        setSimpleContent(content);
+        setVisualContent(textToHtml(content));
+      }
+      
+      onChange(content);
       
       // Switch to visual mode to show the generated content
       setEditorMode('visual');
@@ -258,7 +331,7 @@ export default function EnhancedEmailEditor({
             <div className="flex bg-gray-100 rounded-lg p-1">
               <button
                 type="button"
-                onClick={() => setEditorMode('simple')}
+                onClick={() => handleModeSwitch('simple')}
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   editorMode === 'simple'
                     ? 'bg-white text-primary-700 shadow-sm'
@@ -270,7 +343,7 @@ export default function EnhancedEmailEditor({
               </button>
               <button
                 type="button"
-                onClick={() => setEditorMode('visual')}
+                onClick={() => handleModeSwitch('visual')}
                 className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   editorMode === 'visual'
                     ? 'bg-white text-primary-700 shadow-sm'
@@ -296,8 +369,11 @@ export default function EnhancedEmailEditor({
       {editorMode === 'simple' && (
         <EmailEditor
           label=""
-          value={value}
-          onChange={onChange}
+          value={simpleContent}
+          onChange={(newValue: string) => {
+            setSimpleContent(newValue);
+            onChange(newValue);
+          }}
           placeholder={placeholder}
           rows={rows}
           required={required}
@@ -308,8 +384,11 @@ export default function EnhancedEmailEditor({
       {editorMode === 'visual' && (
         <div className="border border-gray-300 rounded-lg overflow-hidden">
           <TinyMCEEmailEditor
-            value={value}
-            onChange={onChange}
+            value={visualContent}
+            onChange={(newValue: string) => {
+              setVisualContent(newValue);
+              onChange(newValue);
+            }}
             variables={getAllEmailVariables()}
           />
         </div>
