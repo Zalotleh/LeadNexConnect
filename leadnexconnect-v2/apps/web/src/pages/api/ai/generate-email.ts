@@ -12,7 +12,12 @@ export default async function handler(
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
     
     // Forward the request to the backend API
-    const response = await fetch(`${backendUrl}/api/ai/generate-email`, {
+    // If NEXT_PUBLIC_API_URL already includes /api, just append the endpoint path
+    const apiUrl = backendUrl.endsWith('/api') 
+      ? `${backendUrl}/ai/generate-email`
+      : `${backendUrl}/api/ai/generate-email`;
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

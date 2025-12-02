@@ -60,10 +60,11 @@ export default function EnhancedEmailEditor({
         throw new Error('Failed to generate email');
       }
 
-      const data = await response.json();
+      const result = await response.json();
       
       // Load the AI-generated HTML into the editor
-      onChange(data.bodyHtml || data.bodyText);
+      // Backend returns { success, data: { subject, bodyText, bodyHtml } }
+      onChange(result.data?.bodyHtml || result.data?.bodyText || '');
       
       // Switch to visual mode to show the generated content
       setEditorMode('visual');
