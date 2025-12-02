@@ -514,6 +514,31 @@ export const workflowSteps = pgTable('workflow_steps', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Custom Variables - User-defined email variables
+export const customVariables = pgTable('custom_variables', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  // Variable Identification
+  key: varchar('key', { length: 100 }).notNull().unique(), // e.g., 'companyRevenue'
+  label: varchar('label', { length: 255 }).notNull(), // e.g., 'Company Revenue'
+  value: varchar('value', { length: 255 }).notNull(), // e.g., '{{companyRevenue}}'
+  
+  // Classification
+  category: varchar('category', { length: 50 }).notNull().default('custom'), // 'lead', 'company', 'link', 'custom'
+  description: text('description'), // Help text explaining what this variable does
+  
+  // Usage
+  usageCount: integer('usage_count').default(0), // How many templates/workflows use this
+  isActive: boolean('is_active').default(true), // Can be deactivated without deleting
+  
+  // Default Value
+  defaultValue: varchar('default_value', { length: 500 }), // Fallback if variable not populated
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Relations
 export const leadsRelations = relations(leads, ({ many, one }) => ({
   emails: many(emails),
