@@ -195,14 +195,88 @@ Backend should replace `{{variableName}}` with actual values before sending emai
 3. **Template Library**: No saved templates yet
 
 ### Roadmap
+
+#### **Phase 1: Core Implementation** ✅ **COMPLETED**
+- [x] Replace GrapeJS with TinyMCE
+- [x] Self-hosted setup with GPL license
+- [x] Variable management system
+- [x] Rich text formatting toolbar
+- [x] Variable dropdown and autocomplete
+- [x] Image upload support
+- [x] SSR-safe implementation
+- [x] Integration with workflows and campaigns
+
+#### **Phase 2: AI Integration** 🔄 **NEXT**
+**Estimated Time:** 1-2 days
+
+**Goals:**
+- [x] AI generates email content in HTML format
+- [ ] Load AI-generated content into TinyMCE editor
+- [ ] Parse AI response into editor-compatible structure
+- [ ] Preserve variables in AI-generated emails
+- [ ] Allow users to customize AI content in visual editor
+- [ ] Test AI → Visual → Customize → Save workflow
+
+**Tasks:**
+1. Update `email-generator.service.ts` to output HTML format
+2. Modify AI prompt to generate email-friendly HTML
+3. Create function to parse AI HTML and load into TinyMCE
+4. Test variable preservation through AI generation
+5. Add "Generate with AI" button in visual editor mode
+6. Implement loading states and error handling
+
+#### **Phase 3: Enhanced Features** 📋 **PLANNED**
+**Estimated Time:** 3-4 days
+
+**Goals:**
+- [ ] Email preview with actual lead data substitution
+- [ ] Edit sent/queued emails before delivery
+- [ ] Template library (save/load functionality)
+- [ ] A/B testing for email variations
+- [ ] Advanced image editing tools
+- [ ] Responsive design preview (mobile/desktop)
+- [ ] Email client compatibility checker
+
+**Tasks:**
+1. Build preview modal with real lead data
+2. Implement template CRUD operations
+3. Add template browser with search/filter
+4. Create A/B test configuration UI
+5. Add sent email editing with re-queue functionality
+6. Implement responsive preview switcher
+7. Add email client preview (Gmail, Outlook, etc.)
+
+#### **Phase 4: Variable Management UI** ⚙️ **PLANNED**
+**Estimated Time:** 2-3 days
+
+**Goals:**
+- [ ] Settings page for custom variable management
+- [ ] Add/edit/delete custom variables
+- [ ] Sync variables with backend database
+- [ ] Variable usage analytics
+- [ ] Import/export variable sets
+- [ ] Variable validation and testing
+
+**Tasks:**
+1. Create `/settings/variables` page
+2. Build variable CRUD interface
+3. Design database schema for custom_variables table
+4. Create backend API endpoints (GET, POST, PUT, DELETE)
+5. Implement frontend/backend synchronization
+6. Add variable usage tracking
+7. Create variable testing interface with sample data
+8. Add variable import/export functionality
+
+#### **Future Enhancements** 💡
 - [ ] Fix variable visibility in editor viewport
-- [ ] Add email template library
-- [ ] Responsive editor height
-- [ ] A/B testing integration
-- [ ] Advanced image editing
-- [ ] Email preview with real data
-- [ ] Undo/redo enhancement
 - [ ] Keyboard shortcuts guide
+- [ ] Undo/redo history viewer
+- [ ] Email scheduling from editor
+- [ ] Collaborative editing (multiple users)
+- [ ] Version history for emails
+- [ ] Spell check and grammar suggestions
+- [ ] Email analytics integration
+- [ ] Dark mode for editor
 
 ## Troubleshooting
 
