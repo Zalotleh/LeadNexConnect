@@ -20,13 +20,23 @@ export default async function handler(
     const url = queryParams.toString() ? `${apiUrl}?${queryParams}` : apiUrl;
 
     // Forward the request to the backend API
-    const response = await fetch(url, {
-      method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
-    });
+    const fetchOptions: any = { method: req.method };
+
+    const hasBody =
+      req.method !== 'GET' &&
+      req.body !== undefined &&
+      req.body !== null &&
+      !(typeof req.body === 'string' && req.body.trim() === '') &&
+      !(typeof req.body === 'object' && Object.keys(req.body as any).length === 0);
+
+    if (hasBody) {
+      fetchOptions.body = JSON.stringify(req.body);
+      fetchOptions.headers = { 'Content-Type': 'application/json' };
+    } else {
+      fetchOptions.headers = {};
+    }
+
+    const response = await fetch(url, fetchOptions);
 
     const data = await response.json();
 
