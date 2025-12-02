@@ -15,7 +15,10 @@ Create fake leads with test email addresses for safe testing.
 
 **API Endpoint:**
 ```bash
-POST /api/testing/generate-test-leads
+POST /api/testing/generate-test-leads:4000/api/testing/dry-run-workflow \
+  -H "Content-Type: application/json" \
+  -d '{
+    "leadId": "your-test-lead
 Content-Type: application/json
 
 {

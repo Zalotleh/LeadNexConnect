@@ -138,7 +138,14 @@ cp -r node_modules/tinymce apps/web/public/tinymce
   plugins: ['advlist', 'autolink', 'lists', 'link', 'image', ...],
   toolbar: 'undo redo | blocks | bold italic | variables | ...',
   protect: [/{{[\s\S]*?}}/g],  // Protect variable syntax
-}
+}<EnhancedEmailEditor
+  enableAI={!!selectedLead}  // Only show if lead selected
+  aiContext={selectedLead ? {
+    companyName: selectedLead.companyName,
+    contactName: selectedLead.contactName,
+    industry: selectedLead.industry,
+    // ... real lead data
+  } : undefined}
 ```
 
 ## Usage Guide

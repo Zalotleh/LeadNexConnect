@@ -1,4 +1,4 @@
-import Layout from '@/components/Layout';
+import SettingsLayout from '@/components/SettingsLayout';
 import { useState, useEffect } from 'react';
 import { 
   Plus, 
@@ -79,7 +79,7 @@ export default function VariablesPage() {
       if (!response.ok) throw new Error('Failed to load variables');
       
       const data = await response.json();
-      setVariables(data);
+      setVariables(data.data || []);
     } catch (error: any) {
       console.error('Load variables error:', error);
       toast.error('Failed to load variables');
@@ -267,18 +267,8 @@ export default function VariablesPage() {
   const filteredVariables = variables;
 
   return (
-    <Layout>
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Custom Variables
-          </h1>
-          <p className="text-gray-600">
-            Manage custom email variables for personalized outreach
-          </p>
-        </div>
-
+    <SettingsLayout>
+      <div>{/* Removed duplicate header - handled by SettingsLayout */}
         {/* Search and Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -845,6 +835,6 @@ export default function VariablesPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </SettingsLayout>
   );
 }

@@ -665,7 +665,7 @@ export default function EnhancedEmailEditor({
                             const preview = window.open('', '_blank');
                             if (preview) preview.document.body.innerHTML = t.bodyHtml || t.bodyText || '';
                           }}
-                          className="px-3 py-1 text-sm border border-gray-300 rounded-lg"
+                          className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                         >
                           Preview
                         </button>
@@ -764,10 +764,10 @@ export default function EnhancedEmailEditor({
                 <div className="mt-3 p-3 bg-white border border-gray-200 rounded-lg">
                   <div className="text-xs font-medium text-gray-700 mb-2">Variables:</div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{selectedLead.contactName || 'N/A'}</span></div>
-                    <div><span className="text-gray-500">Company:</span> <span className="font-medium">{selectedLead.companyName || 'N/A'}</span></div>
-                    <div><span className="text-gray-500">Industry:</span> <span className="font-medium">{selectedLead.industry || 'N/A'}</span></div>
-                    <div><span className="text-gray-500">Location:</span> <span className="font-medium">{selectedLead.city || 'N/A'}, {selectedLead.country || 'N/A'}</span></div>
+                    <div><span className="text-gray-500">Contact:</span> <span className="font-medium text-gray-900">{selectedLead.contactName || 'N/A'}</span></div>
+                    <div><span className="text-gray-500">Company:</span> <span className="font-medium text-gray-900">{selectedLead.companyName || 'N/A'}</span></div>
+                    <div><span className="text-gray-500">Industry:</span> <span className="font-medium text-gray-900">{selectedLead.industry || 'N/A'}</span></div>
+                    <div><span className="text-gray-500">Location:</span> <span className="font-medium text-gray-900">{selectedLead.city || 'N/A'}, {selectedLead.country || 'N/A'}</span></div>
                   </div>
                 </div>
               )}
@@ -801,7 +801,8 @@ export default function EnhancedEmailEditor({
 
                 {/* Email Body */}
                 <div 
-                  className="p-6 prose prose-sm max-w-none"
+                  className="p-6 prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900 prose-ul:text-gray-700 prose-ol:text-gray-700 prose-li:text-gray-700"
+                  style={{ color: '#374151' }}
                   dangerouslySetInnerHTML={{ 
                     __html: substituteVariables(editorMode === 'visual' ? visualContent : textToHtml(simpleContent))
                   }}

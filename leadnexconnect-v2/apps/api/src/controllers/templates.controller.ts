@@ -41,10 +41,11 @@ class TemplatesController {
         search 
       });
 
-      res.json(templates);
+      res.json({ success: true, data: templates });
     } catch (error: any) {
       logger.error('[TemplatesController] Error getting templates:', error);
       res.status(500).json({ 
+        success: false,
         error: 'Failed to fetch templates',
         message: error.message 
       });
@@ -63,15 +64,16 @@ class TemplatesController {
         .limit(1);
 
       if (!template || template.length === 0) {
-        return res.status(404).json({ error: 'Template not found' });
+        return res.status(404).json({ success: false, error: 'Template not found' });
       }
 
       logger.info('[TemplatesController] Retrieved template', { id });
 
-      res.json(template[0]);
+      res.json({ success: true, data: template[0] });
     } catch (error: any) {
       logger.error('[TemplatesController] Error getting template:', error);
       res.status(500).json({ 
+        success: false,
         error: 'Failed to fetch template',
         message: error.message 
       });
@@ -97,6 +99,7 @@ class TemplatesController {
       // Validate required fields
       if (!name || !subject || !bodyHtml) {
         return res.status(400).json({ 
+          success: false,
           error: 'Name, subject, and bodyHtml are required' 
         });
       }
@@ -123,10 +126,11 @@ class TemplatesController {
         name 
       });
 
-      res.status(201).json(newTemplate[0]);
+      res.status(201).json({ success: true, data: newTemplate[0] });
     } catch (error: any) {
       logger.error('[TemplatesController] Error creating template:', error);
       res.status(500).json({ 
+        success: false,
         error: 'Failed to create template',
         message: error.message 
       });
@@ -169,15 +173,16 @@ class TemplatesController {
         .returning();
 
       if (!updatedTemplate || updatedTemplate.length === 0) {
-        return res.status(404).json({ error: 'Template not found' });
+        return res.status(404).json({ success: false, error: 'Template not found' });
       }
 
       logger.info('[TemplatesController] Updated template', { id, name });
 
-      res.json(updatedTemplate[0]);
+      res.json({ success: true, data: updatedTemplate[0] });
     } catch (error: any) {
       logger.error('[TemplatesController] Error updating template:', error);
       res.status(500).json({ 
+        success: false,
         error: 'Failed to update template',
         message: error.message 
       });
@@ -195,7 +200,7 @@ class TemplatesController {
         .returning();
 
       if (!deletedTemplate || deletedTemplate.length === 0) {
-        return res.status(404).json({ error: 'Template not found' });
+        return res.status(404).json({ success: false, error: 'Template not found' });
       }
 
       logger.info('[TemplatesController] Deleted template', { id });
@@ -203,11 +208,12 @@ class TemplatesController {
       res.json({ 
         success: true, 
         message: 'Template deleted successfully',
-        template: deletedTemplate[0]
+        data: deletedTemplate[0]
       });
     } catch (error: any) {
       logger.error('[TemplatesController] Error deleting template:', error);
       res.status(500).json({ 
+        success: false,
         error: 'Failed to delete template',
         message: error.message 
       });
@@ -226,7 +232,7 @@ class TemplatesController {
         .limit(1);
 
       if (!template || template.length === 0) {
-        return res.status(404).json({ error: 'Template not found' });
+        return res.status(404).json({ success: false, error: 'Template not found' });
       }
 
       const updatedTemplate = await db
@@ -243,10 +249,11 @@ class TemplatesController {
         newCount: updatedTemplate[0].usageCount 
       });
 
-      res.json(updatedTemplate[0]);
+      res.json({ success: true, data: updatedTemplate[0] });
     } catch (error: any) {
       logger.error('[TemplatesController] Error incrementing usage:', error);
       res.status(500).json({ 
+        success: false,
         error: 'Failed to increment usage count',
         message: error.message 
       });

@@ -1,5 +1,5 @@
 import { db } from './index';
-import { emailTemplates, settings } from './schema';
+import { emailTemplates, settings, customVariables } from './schema';
 
 async function seed() {
   console.log('🌱 Seeding database...');
@@ -275,40 +275,184 @@ BookNex Solutions</p>`,
     console.log('✅ Email templates created');
 
     // Seed Settings
-    console.log('Creating default settings...');
+    try {
+      console.log('Creating default settings...');
 
-    await db.insert(settings).values([
-      {
-        key: 'api_limits',
-        value: {
-          apollo: { limit: 100, period: 'monthly' },
-          peopledatalabs: { limit: 100, period: 'monthly' },
-          hunter: { limit: 50, period: 'monthly' },
-          googlePlaces: { limit: 40000, period: 'monthly' },
+      await db.insert(settings).values([
+        {
+          key: 'api_limits',
+          value: {
+            apollo: { limit: 100, period: 'monthly' },
+            peopledatalabs: { limit: 100, period: 'monthly' },
+            hunter: { limit: 50, period: 'monthly' },
+            googlePlaces: { limit: 40000, period: 'monthly' },
+          },
         },
+        {
+          key: 'email_config',
+          value: {
+            dailyLimit: 50,
+            hourlyLimit: 20,
+            followUp1DelayDays: 3,
+            followUp2DelayDays: 5,
+          },
+        },
+        {
+          key: 'lead_scoring',
+          value: {
+            emailVerified: 40,
+            websiteExists: 15,
+            phoneNumber: 10,
+            linkedinProfile: 15,
+            companySizeMatch: 20,
+          },
+        },
+      ]);
+
+      console.log('✅ Default settings created');
+    } catch (error: any) {
+      if (error.code === '23505') {
+        console.log('⚠️  Settings already exist, skipping...');
+      } else {
+        throw error;
+      }
+    }
+
+    // Seed Custom Variables
+    try {
+      console.log('Creating custom variables...');
+
+      await db.insert(customVariables).values([
+      {
+        key: 'company_name',
+        label: 'Company Name',
+        value: '{{company_name}}',
+        category: 'lead',
+        description: 'The name of the lead\'s company',
+        defaultValue: '[Company]',
+        isActive: true,
+        usageCount: 0,
       },
       {
-        key: 'email_config',
-        value: {
-          dailyLimit: 50,
-          hourlyLimit: 20,
-          followUp1DelayDays: 3,
-          followUp2DelayDays: 5,
-        },
+        key: 'contact_name',
+        label: 'Contact Name',
+        value: '{{contact_name}}',
+        category: 'lead',
+        description: 'The name of the lead contact person',
+        defaultValue: '[Contact]',
+        isActive: true,
+        usageCount: 0,
       },
       {
-        key: 'lead_scoring',
-        value: {
-          emailVerified: 40,
-          websiteExists: 15,
-          phoneNumber: 10,
-          linkedinProfile: 15,
-          companySizeMatch: 20,
-        },
+        key: 'contact_email',
+        label: 'Contact Email',
+        value: '{{contact_email}}',
+        category: 'lead',
+        description: 'The email address of the lead contact',
+        defaultValue: 'contact@example.com',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'city',
+        label: 'City',
+        value: '{{city}}',
+        category: 'lead',
+        description: 'The city where the lead\'s business is located',
+        defaultValue: '[City]',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'industry',
+        label: 'Industry',
+        value: '{{industry}}',
+        category: 'lead',
+        description: 'The industry category of the lead',
+        defaultValue: '[Industry]',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'sender_name',
+        label: 'Sender Name',
+        value: '{{sender_name}}',
+        category: 'sender',
+        description: 'Your name or your team member\'s name',
+        defaultValue: 'Zizo',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'sender_email',
+        label: 'Sender Email',
+        value: '{{sender_email}}',
+        category: 'sender',
+        description: 'Your email address',
+        defaultValue: 'hello@booknex.com',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'sender_company',
+        label: 'Sender Company',
+        value: '{{sender_company}}',
+        category: 'sender',
+        description: 'Your company name',
+        defaultValue: 'BookNex Solutions',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'product_name',
+        label: 'Product Name',
+        value: '{{product_name}}',
+        category: 'product',
+        description: 'The name of your product or service',
+        defaultValue: 'BookNex',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'product_url',
+        label: 'Product URL',
+        value: '{{product_url}}',
+        category: 'product',
+        description: 'Your product or company website URL',
+        defaultValue: 'https://booknex.com',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'unsubscribe_link',
+        label: 'Unsubscribe Link',
+        value: '{{unsubscribe_link}}',
+        category: 'system',
+        description: 'Link to unsubscribe from emails',
+        defaultValue: '[Unsubscribe URL]',
+        isActive: true,
+        usageCount: 0,
+      },
+      {
+        key: 'current_date',
+        label: 'Current Date',
+        value: '{{current_date}}',
+        category: 'system',
+        description: 'The current date when the email is sent',
+        defaultValue: new Date().toISOString().split('T')[0],
+        isActive: true,
+        usageCount: 0,
       },
     ]);
 
-    console.log('✅ Default settings created');
+    console.log('✅ Default custom variables created');
+    } catch (error: any) {
+      if (error.code === '23505') {
+        console.log('⚠️  Custom variables already exist, skipping...');
+      } else {
+        throw error;
+      }
+    }
 
     console.log('🎉 Database seeded successfully!');
   } catch (error) {

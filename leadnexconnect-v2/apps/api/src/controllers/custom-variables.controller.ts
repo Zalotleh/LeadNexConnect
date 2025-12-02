@@ -55,7 +55,7 @@ export const getCustomVariables = async (req: Request, res: Response) => {
       count: variables.length,
     });
 
-    res.json(variables);
+    res.json({ success: true, data: variables });
   } catch (error: any) {
     logger.error('[CustomVariablesController] Error fetching variables', {
       error: error.message,
@@ -63,6 +63,7 @@ export const getCustomVariables = async (req: Request, res: Response) => {
     });
 
     res.status(500).json({
+      success: false,
       error: 'Failed to fetch custom variables',
       message: error.message,
     });
@@ -96,7 +97,7 @@ export const getCustomVariable = async (req: Request, res: Response) => {
       key: variable.key,
     });
 
-    res.json(variable);
+    res.json({ success: true, data: variable });
   } catch (error: any) {
     logger.error('[CustomVariablesController] Error fetching variable', {
       error: error.message,
@@ -168,7 +169,7 @@ export const createCustomVariable = async (req: Request, res: Response) => {
       key: newVariable.key,
     });
 
-    res.status(201).json(newVariable);
+    res.status(201).json({ success: true, data: newVariable });
   } catch (error: any) {
     // Handle unique constraint violation
     if (error.code === '23505') {
@@ -240,7 +241,7 @@ export const updateCustomVariable = async (req: Request, res: Response) => {
       key: updatedVariable.key,
     });
 
-    res.json(updatedVariable);
+    res.json({ success: true, data: updatedVariable });
   } catch (error: any) {
     logger.error('[CustomVariablesController] Error updating variable', {
       error: error.message,
@@ -346,7 +347,7 @@ export const incrementUsageCount = async (req: Request, res: Response) => {
       newCount: updatedVariable.usageCount,
     });
 
-    res.json(updatedVariable);
+    res.json({ success: true, data: updatedVariable });
   } catch (error: any) {
     logger.error('[CustomVariablesController] Error incrementing usage count', {
       error: error.message,

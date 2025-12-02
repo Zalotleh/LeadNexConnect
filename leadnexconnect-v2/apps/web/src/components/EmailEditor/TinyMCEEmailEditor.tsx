@@ -102,6 +102,7 @@ export default function TinyMCEEmailEditor({
             'bullist numlist outdent indent | removeformat | ' +
             'variables | link image | code preview | help',
           toolbar_mode: 'sliding',
+          link_quicklink: false, // Disable auto-link popup on text selection
           content_style: `
             body {
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -122,27 +123,9 @@ export default function TinyMCEEmailEditor({
             }
           `,
           setup: (editor: any) => {
-            // Add custom handling to preserve variables structure
-            editor.on('BeforeSetContent', (e: any) => {
-              // Wrap standalone variables in spans to prevent TinyMCE from breaking them
-              if (e.content) {
-                e.content = e.content.replace(
-                  /{{([^}]+)}}/g,
-                  '<span class="email-variable" contenteditable="false">{{$1}}</span>'
-                );
-              }
-            });
-
-            editor.on('GetContent', (e: any) => {
-              // Remove the span wrappers when getting content
-              if (e.content) {
-                e.content = e.content.replace(
-                  /<span class="email-variable"[^>]*>{{([^}]+)}}<\/span>/g,
-                  '{{$1}}'
-                );
-              }
-            });
-
+            // No content wrapping - let variables be plain text
+            // TinyMCE will render them normally
+            
             editor.ui.registry.addMenuButton('variables', {
               text: 'Variables',
               icon: 'code-sample',
@@ -164,7 +147,8 @@ export default function TinyMCEEmailEditor({
                         type: 'menuitem',
                         text: `${v.label} - ${v.description}`,
                         onAction: () => {
-                          editor.insertContent(v.value);
+                          // Insert variable as plain text with a space after
+                          editor.insertContent(`${v.value} `);
                         },
                       })),
                   })
@@ -193,7 +177,8 @@ export default function TinyMCEEmailEditor({
               },
               onAction: (autocompleteApi: any, rng: any, value: string) => {
                 editor.selection.setRng(rng);
-                editor.insertContent(value);
+                // Insert variable as plain text with a space after
+                editor.insertContent(`${value} `);
                 autocompleteApi.hide();
               },
             });
@@ -214,7 +199,6 @@ export default function TinyMCEEmailEditor({
               reader.readAsDataURL(blobInfo.blob());
             });
           },
-          protect: [/{{[\s\S]*?}}/g],
           skin: 'oxide',
           content_css: 'default',
         }}

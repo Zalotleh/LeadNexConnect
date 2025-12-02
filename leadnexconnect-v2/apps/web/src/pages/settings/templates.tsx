@@ -1,5 +1,5 @@
-import Layout from '@/components/Layout'
-import { useState, useEffect } from 'react'
+import SettingsLayout from '@/components/SettingsLayout';
+import { useState, useEffect } from 'react';
 import {
   Search,
   Plus,
@@ -250,16 +250,8 @@ export default function TemplatesPage() {
   const filteredTemplates = templates
 
   return (
-    <Layout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Email Templates</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Create and manage reusable email templates for your outreach campaigns
-          </p>
-        </div>
-
+    <SettingsLayout>
+      <div>{/* Removed duplicate header and max-width - handled by SettingsLayout */}
         {/* Search and Filters */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
@@ -663,6 +655,8 @@ export default function TemplatesPage() {
 
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <div
+                    className="prose prose-sm max-w-none text-gray-900"
+                    style={{ color: '#111827' }}
                     dangerouslySetInnerHTML={{
                       __html: selectedTemplate.bodyHtml || selectedTemplate.bodyText.replace(/\n/g, '<br>')
                     }}
@@ -691,6 +685,6 @@ export default function TemplatesPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </SettingsLayout>
   )
 }

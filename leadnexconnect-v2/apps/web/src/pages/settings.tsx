@@ -1,4 +1,4 @@
-import Layout from '@/components/Layout'
+import SettingsLayout from '@/components/SettingsLayout'
 import { Save, TestTube, Eye, EyeOff } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
@@ -220,22 +220,17 @@ export default function Settings() {
 
   if (loading) {
     return (
-      <Layout>
+      <SettingsLayout>
         <div className="flex items-center justify-center h-96">
           <div className="text-gray-500">Loading settings...</div>
         </div>
-      </Layout>
+      </SettingsLayout>
     )
   }
 
   return (
-    <Layout>
+    <SettingsLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-2">Manage your account and preferences</p>
-        </div>
-
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">AI API Keys</h2>
@@ -661,6 +656,6 @@ export default function Settings() {
           </button>
         </div>
       </div>
-    </Layout>
+    </SettingsLayout>
   )
 }
