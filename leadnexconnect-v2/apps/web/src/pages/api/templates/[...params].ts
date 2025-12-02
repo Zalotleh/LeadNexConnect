@@ -29,7 +29,9 @@ export default async function handler(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
+      body: req.method !== 'GET' && req.body && Object.keys(req.body).length > 0 
+        ? JSON.stringify(req.body) 
+        : undefined,
     });
 
     const data = await response.json();
