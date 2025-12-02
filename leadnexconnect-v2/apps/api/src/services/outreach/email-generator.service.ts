@@ -387,13 +387,36 @@ Format your response EXACTLY as:
 SUBJECT: [your subject line]
 
 BODY:
-[your email body - must end with {{signature}}]
+[your email body in HTML format - must end with {{signature}}]
 
-Do not include any other text or additional formatting.`;
+CRITICAL HTML FORMATTING RULES:
+1. Use proper HTML structure with email-compatible tags
+2. Use <p> tags for paragraphs (not <div>)
+3. Use <strong> for bold text
+4. Use <a href="VARIABLE"> for links (e.g., <a href="{{signUpLink}}">Sign up now</a>)
+5. Use <ul> and <li> for bullet lists if needed
+6. Keep HTML simple and email-client compatible
+7. Variables like {{signUpLink}}, {{signature}} must remain as-is (will be replaced by backend)
+8. Use inline styles sparingly, prefer clean semantic HTML
+
+HTML Example Structure:
+<p>Hi {{contactName}},</p>
+<p>[Role/industry-specific hook mentioning pain point]</p>
+<p>[One sentence about BookNex solution]</p>
+<p><strong>🎉 Black Friday Special</strong> - 50% off your first year with code <strong>BOOKNEX100</strong> (ends December 7)</p>
+<p>[Brief value proposition with specific benefit]</p>
+<p>
+  <a href="{{signUpLink}}">Sign up now</a> | 
+  <a href="{{featuresLink}}">Explore features</a> | 
+  <a href="{{demoLink}}">Book a demo</a>
+</p>
+<p>{{signature}}</p>
+
+Do not include any other text, markdown formatting, or additional formatting outside the SUBJECT and BODY sections.`;
   }
 
   /**
-   * Parse AI response into subject and body
+   * Parse AI response into subject and body (now handles HTML)
    */
   private parseAIResponse(response: string): {
     subject: string;
@@ -409,8 +432,9 @@ Do not include any other text or additional formatting.`;
         subject = line.replace('SUBJECT:', '').trim();
       } else if (line.startsWith('BODY:')) {
         inBody = true;
-      } else if (inBody && line.trim()) {
-        bodyLines.push(line.trim());
+      } else if (inBody) {
+        // Include all lines in body, even empty ones (for HTML structure)
+        bodyLines.push(line);
       }
     }
 
@@ -420,19 +444,28 @@ Do not include any other text or additional formatting.`;
     }
 
     if (bodyLines.length === 0) {
-      bodyLines = response.split('\n').filter(l => l.trim() && !l.startsWith('SUBJECT:'));
+      bodyLines = response.split('\n').filter(l => !l.startsWith('SUBJECT:') && !l.startsWith('BODY:'));
     }
+
+    // Join body lines, preserving HTML structure
+    const bodyText = bodyLines.join('\n').trim();
 
     return {
       subject,
-      bodyText: bodyLines.join('\n\n'),
+      bodyText, // Now contains HTML
     };
   }
 
   /**
-   * Convert plain text to HTML
+   * Convert plain text to HTML (fallback for non-AI generated emails)
    */
   private convertToHtml(text: string): string {
+    // Check if text already contains HTML tags
+    if (text.includes('<p>') || text.includes('<div>') || text.includes('<br')) {
+      return text; // Already HTML, return as-is
+    }
+    
+    // Convert plain text to HTML
     return text
       .split('\n\n')
       .map(paragraph => `<p>${paragraph.replace(/\n/g, '<br>')}</p>`)
