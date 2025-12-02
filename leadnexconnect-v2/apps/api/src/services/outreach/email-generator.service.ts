@@ -12,6 +12,7 @@ interface GenerateEmailParams {
   city?: string;
   country?: string;
   followUpStage?: string;
+  additionalInstructions?: string; // Custom instructions from workflow or user
 }
 
 export class EmailGeneratorService {
@@ -173,7 +174,7 @@ export class EmailGeneratorService {
   }
 
   /**
-   * Build AI prompt for Claude
+   * Build the AI prompt for Claude
    */
   private buildAIPrompt(params: GenerateEmailParams & {
     jobTitle?: string;
@@ -312,7 +313,11 @@ Email Context: ${isFollowUp ? (isSecondFollowUp ? 'This is a SECOND follow-up em
 Product: BookNex - All-in-one booking and CRM platform
 Industry Pain Point: ${painPoint}
 
-BLACK FRIDAY SPECIAL OFFER (Active Now - Ends December 7, 2024):
+${params.additionalInstructions ? `
+🎯 ADDITIONAL CUSTOM INSTRUCTIONS (IMPORTANT - Follow these carefully):
+${params.additionalInstructions}
+
+` : ''}BLACK FRIDAY SPECIAL OFFER (Active Now - Ends December 7, 2024):
 - Offer Code: BOOKNEX100
 - Discount: 50% off first year
 - Deadline: December 7, 2024
