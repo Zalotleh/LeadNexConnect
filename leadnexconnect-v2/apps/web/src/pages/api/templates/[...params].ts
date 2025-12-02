@@ -12,8 +12,9 @@ export default async function handler(
     : `${backendUrl}/api/templates`;
 
   try {
-    const { id } = req.query;
-    const url = id ? `${apiUrl}/${id}` : apiUrl;
+    const { params } = req.query;
+    const pathParts = Array.isArray(params) ? params : [params];
+    const url = `${apiUrl}/${pathParts.join('/')}`;
 
     // Forward the request to the backend API
     const response = await fetch(url, {
@@ -21,7 +22,7 @@ export default async function handler(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
+      body: req.method !== 'GET' && req.method !== 'DELETE' ? JSON.stringify(req.body) : undefined,
     });
 
     const data = await response.json();

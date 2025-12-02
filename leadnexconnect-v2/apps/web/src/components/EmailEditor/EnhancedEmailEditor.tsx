@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Palette, Code, Sparkles, Save, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Palette, Code, Sparkles, Save, X, FileText, ChevronDown } from 'lucide-react';
 import { getAllEmailVariables } from '@/lib/emailVariables';
 import EmailEditor from '../EmailEditor';
 import TinyMCEEmailEditor from './TinyMCEEmailEditor';
@@ -45,13 +45,72 @@ export default function EnhancedEmailEditor({
   
   // Template states
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [showLoadTemplateModal, setShowLoadTemplateModal] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [templateCategory, setTemplateCategory] = useState<string>('');
   const [templateForm, setTemplateForm] = useState({
     name: '',
     description: '',
     subject: defaultSubject,
     category: 'general' as 'initial_outreach' | 'follow_up' | 'meeting_request' | 'introduction' | 'product_demo' | 'partnership' | 'general' | 'other'
   });
+
+  // Load templates when modal opens
+  useEffect(() => {
+    if (showLoadTemplateModal && enableTemplates) {
+      loadTemplates();
+    }
+  }, [showLoadTemplateModal, templateSearch, templateCategory]);
+
+  const loadTemplates = async () => {
+    setIsLoadingTemplates(true);
+    try {
+      const params = new URLSearchParams();
+      if (templateSearch) params.append('search', templateSearch);
+      if (templateCategory) params.append('category', templateCategory);
+      
+      const url = params.toString() ? `/api/templates?${params}` : '/api/templates';
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error('Failed to load templates');
+      }
+      
+      const data = await response.json();
+      setTemplates(data);
+    } catch (error: any) {
+      console.error('Template load error:', error);
+      toast.error('Failed to load templates');
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
+  const handleLoadTemplate = async (template: any) => {
+    try {
+      // Load the template content into the editor
+      onChange(template.bodyHtml || template.bodyText);
+      
+      // Increment usage count
+      await fetch(`/api/templates/${template.id}/use`, {
+        method: 'POST',
+      });
+      
+      toast.success(`Loaded template: ${template.name}`);
+      setShowLoadTemplateModal(false);
+      
+      // Switch to visual mode if we have HTML
+      if (template.bodyHtml) {
+        setEditorMode('visual');
+      }
+    } catch (error: any) {
+      console.error('Template load error:', error);
+      toast.error('Failed to load template');
+    }
+  };
 
   const handleAIGenerate = async () => {
     if (!aiContext || !aiContext.companyName || !aiContext.industry) {
@@ -154,6 +213,19 @@ export default function EnhancedEmailEditor({
         </label>
 
         <div className="flex items-center gap-2">
+          {/* Load Template Button */}
+          {enableTemplates && (
+            <button
+              type="button"
+              onClick={() => setShowLoadTemplateModal(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors shadow-sm"
+              title="Load from template"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Load Template
+            </button>
+          )}
+
           {/* Save as Template Button */}
           {enableTemplates && value && value.trim() !== '' && (
             <button
@@ -343,6 +415,108 @@ export default function EnhancedEmailEditor({
               >
                 <Save className={`w-4 h-4 ${isSavingTemplate ? 'animate-spin' : ''}`} />
                 {isSavingTemplate ? 'Saving...' : 'Save Template'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Load Template Modal */}
+      {showLoadTemplateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Load Template</h3>
+              <button
+                onClick={() => setShowLoadTemplateModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search and Filter */}
+            <div className="p-4 border-b space-y-3">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={templateSearch}
+                  onChange={(e) => setTemplateSearch(e.target.value)}
+                  placeholder="Search templates..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <select
+                  value={templateCategory}
+                  onChange={(e) => setTemplateCategory(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="">All Categories</option>
+                  <option value="initial_outreach">Initial Outreach</option>
+                  <option value="follow_up">Follow Up</option>
+                  <option value="meeting_request">Meeting Request</option>
+                  <option value="introduction">Introduction</option>
+                  <option value="product_demo">Product Demo</option>
+                  <option value="partnership">Partnership</option>
+                  <option value="general">General</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Templates List */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {isLoadingTemplates ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                  <p className="text-gray-500 mt-2">Loading templates...</p>
+                </div>
+              ) : templates.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">No templates found</p>
+                  <p className="text-sm text-gray-400 mt-1">Try adjusting your search or create a new template</p>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {templates.map((template) => (
+                    <div
+                      key={template.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-primary-500 hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => handleLoadTemplate(template)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">{template.name}</h4>
+                          {template.description && (
+                            <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+                          )}
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-primary-100 text-primary-700">
+                              {template.category?.replace('_', ' ')}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Used {template.usageCount || 0} times
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronDown className="w-5 h-5 text-gray-400 transform -rotate-90" />
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-sm font-medium text-gray-700">Subject:</p>
+                        <p className="text-sm text-gray-600 mt-1">{template.subject}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50">
+              <button
+                onClick={() => setShowLoadTemplateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                Cancel
               </button>
             </div>
           </div>
