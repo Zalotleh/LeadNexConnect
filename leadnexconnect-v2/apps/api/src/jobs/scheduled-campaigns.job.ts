@@ -97,14 +97,8 @@ export class ScheduledCampaignsJob {
             scheduledFor: startDate.toISOString(),
           });
 
-          // Mark as running by updating lastRunAt to NOW (not startDate)
-          // This prevents duplicate execution
-          await db
-            .update(campaigns)
-            .set({ lastRunAt: now })
-            .where(eq(campaigns.id, campaign.id));
-
-          // Call the execute endpoint
+          // Call the execute endpoint first
+          // The execute endpoint will set lastRunAt after successful execution
           await axios.post(
             `${this.apiBaseUrl}/api/campaigns/${campaign.id}/execute`,
             {},
@@ -112,7 +106,7 @@ export class ScheduledCampaignsJob {
               headers: {
                 'Content-Type': 'application/json',
               },
-              timeout: 5000, // 5 second timeout
+              timeout: 30000, // 30 second timeout for email queueing
             }
           );
 

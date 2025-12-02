@@ -702,21 +702,6 @@ export class CampaignsController {
         targetCities: campaign.targetCities,
       });
 
-      // Safety check: If campaign has startDate and lastRunAt >= startDate, it's already been executed
-      if (campaign.startDate && campaign.lastRunAt) {
-        const startDate = new Date(campaign.startDate);
-        const lastRunAt = new Date(campaign.lastRunAt);
-        
-        if (lastRunAt >= startDate) {
-          logger.warn('[CampaignsController] Campaign already executed, skipping duplicate execution', {
-            campaignId,
-            startDate: startDate.toISOString(),
-            lastRunAt: lastRunAt.toISOString(),
-          });
-          return;
-        }
-      }
-
       // Check if this is a manual campaign with pre-selected leads
       if (campaign.campaignType === 'manual') {
         await this.executeManualCampaign(campaignId, campaign);
