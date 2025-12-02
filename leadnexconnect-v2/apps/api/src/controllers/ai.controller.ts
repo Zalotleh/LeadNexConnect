@@ -1,8 +1,11 @@
 import { Request, Response } from 'express'
 import { anthropicService } from '../services/ai/anthropic.service'
+import { EmailGeneratorService } from '../services/outreach/email-generator.service'
 import { logger } from '../utils/logger'
 
 class AIController {
+  private emailGeneratorService = new EmailGeneratorService();
+
   async generateEmailContent(req: Request, res: Response) {
     try {
       const {
@@ -10,40 +13,38 @@ class AIController {
         companyName,
         contactName,
         website,
-        location,
-        companySize,
-        tone = 'professional',
-        purpose,
-        productService,
-        callToAction
+        city,
+        country,
+        followUpStage,
+        additionalInstructions,
+        jobTitle
       } = req.body
 
       logger.info('Received request to generate email content', { 
         industry, 
-        tone,
-        companyName 
+        companyName,
+        contactName
       })
 
       // Validate required fields
-      if (!industry && !companyName) {
+      if (!industry || !companyName) {
         return res.status(400).json({
           success: false,
-          message: 'At least industry or company name is required for context'
+          message: 'Industry and company name are required'
         })
       }
 
-      // Generate email content using Anthropic
-      const result = await anthropicService.generateEmailContent({
+      // Generate email content using AI (now returns HTML)
+      const result = await this.emailGeneratorService.generateWithAI({
         industry,
         companyName,
         contactName,
-        website,
-        location,
-        companySize,
-        tone,
-        purpose,
-        productService,
-        callToAction
+        city,
+        country,
+        followUpStage,
+        additionalInstructions,
+        jobTitle,
+        website
       })
 
       res.json({
