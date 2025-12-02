@@ -69,6 +69,17 @@ export const scrapingStatusEnum = pgEnum('scraping_status', [
   'cancelled',
 ]);
 
+export const templateCategoryEnum = pgEnum('template_category', [
+  'initial_outreach',
+  'follow_up',
+  'meeting_request',
+  'introduction',
+  'product_demo',
+  'partnership',
+  'general',
+  'other',
+]);
+
 // Main Tables
 
 export const leads = pgTable('leads', {
@@ -255,6 +266,7 @@ export const emailTemplates = pgTable('email_templates', {
   // Basic Info
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
+  category: templateCategoryEnum('category').default('general'),
   
   // Classification
   industry: varchar('industry', { length: 100 }),
@@ -271,6 +283,7 @@ export const emailTemplates = pgTable('email_templates', {
   // Status
   isActive: boolean('is_active').default(true),
   isDefault: boolean('is_default').default(false),
+  usageCount: integer('usage_count').default(0),
   
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
