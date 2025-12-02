@@ -28,22 +28,41 @@ export default function GrapeJSEmailEditor({
     const initEditor = async () => {
       if (typeof window === 'undefined' || !editorRef.current) return;
 
-      const grapesjs = (await import('grapesjs')).default;
-      const grapesjsPresetNewsletter = (await import('grapesjs-preset-newsletter')).default;
+      // Load CSS files dynamically
+      const loadCSS = (href: string) => {
+        return new Promise((resolve, reject) => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = href;
+          link.onload = resolve;
+          link.onerror = reject;
+          document.head.appendChild(link);
+        });
+      };
 
-      const editorInstance = grapesjs.init({
-        container: editorRef.current,
-        height: '100%',
-        width: 'auto',
-        plugins: [grapesjsPresetNewsletter],
-        pluginsOpts: {
-          'grapesjs-preset-newsletter': {
-            modalTitleImport: 'Import Template',
-            // Add custom blocks for variables
-            blocks: emailVariables.map(v => v.value),
+      try {
+        // Load GrapeJS CSS first
+        await loadCSS('https://unpkg.com/grapesjs@0.21.7/dist/css/grapes.min.css');
+        
+        // Import GrapeJS modules
+        const grapesjs = (await import('grapesjs')).default;
+        const grapesjsPresetNewsletter = (await import('grapesjs-preset-newsletter')).default;
+
+        const editorInstance = grapesjs.init({
+          container: editorRef.current,
+          height: '100%',
+          width: 'auto',
+          fromElement: false,
+          plugins: [grapesjsPresetNewsletter],
+          pluginsOpts: {
+            'grapesjs-preset-newsletter': {
+              modalTitleImport: 'Import Template',
+            },
           },
-        },
-        storageManager: false,
+          storageManager: false,
+          assetManager: {
+            embedAsBase64: true,
+          },
         canvas: {
           styles: [
             'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
@@ -172,6 +191,9 @@ export default function GrapeJSEmailEditor({
       });
 
       setEditor(editorInstance);
+    } catch (error) {
+      console.error('Failed to initialize GrapeJS editor:', error);
+    }
     };
 
     initEditor();

@@ -42,10 +42,8 @@ body {
 
 /* ========================================
    GrapeJS Email Editor Styles
+   Note: GrapeJS CSS is loaded dynamically in the component
    ======================================== */
-
-/* Import GrapeJS core CSS */
-@import 'grapesjs/dist/css/grapes.min.css';
 
 /* Custom GrapeJS Overrides */
 .gjs-cv-canvas {
