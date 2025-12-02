@@ -1,23 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Eye, Code, Monitor, Smartphone, Save, X } from 'lucide-react';
+import { getAllEmailVariables, EmailVariable } from '@/lib/emailVariables';
 
 interface GrapeJSEmailEditorProps {
   value: string;
   onChange: (html: string) => void;
   onClose?: () => void;
-  variables?: Array<{ label: string; value: string }>;
+  variables?: EmailVariable[];
 }
 
 export default function GrapeJSEmailEditor({
   value,
   onChange,
   onClose,
-  variables = [],
+  variables,
 }: GrapeJSEmailEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [editor, setEditor] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [showPreview, setShowPreview] = useState(false);
+
+  // Use provided variables or get all from manager
+  const emailVariables = variables || getAllEmailVariables();
 
   useEffect(() => {
     // Dynamically import GrapeJS only on client side
@@ -36,7 +40,7 @@ export default function GrapeJSEmailEditor({
           'grapesjs-preset-newsletter': {
             modalTitleImport: 'Import Template',
             // Add custom blocks for variables
-            blocks: variables.map(v => v.value),
+            blocks: emailVariables.map(v => v.value),
           },
         },
         storageManager: false,
@@ -89,11 +93,11 @@ export default function GrapeJSEmailEditor({
               category: 'Variables',
               content: '<div style="padding: 10px;">{{companyName}}</div>',
             },
-            ...variables.map((variable, idx) => ({
+            ...emailVariables.map((variable, idx) => ({
               id: `var-${idx}`,
               label: variable.label,
-              category: 'Variables',
-              content: `<span style="color: #6366f1; font-weight: 600;">${variable.value}</span>`,
+              category: `Variables - ${variable.category}`,
+              content: `<span style="color: #6366f1; font-weight: 600; padding: 2px 6px; background: #f0f0f0; border-radius: 4px;">${variable.value}</span>`,
             })),
           ],
         },

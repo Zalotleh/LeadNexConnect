@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Plus, Loader, Sparkles } from 'lucide-react';
 import WorkflowSelector from '../WorkflowSelector';
-import EmailEditor from '../EmailEditor';
+import EnhancedEmailEditor from '../EmailEditor/EnhancedEmailEditor';
 
 interface CreateCampaignForm {
   name: string;
@@ -131,13 +131,14 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                 />
               </div>
 
-              <EmailEditor
+              <EnhancedEmailEditor
                 label="Email Body"
                 value={createCampaignForm.emailBody}
-                onChange={(value) => onFormChange({ ...createCampaignForm, emailBody: value })}
+                onChange={(value: string) => onFormChange({ ...createCampaignForm, emailBody: value })}
                 placeholder="Hi {{contactName}},&#10;&#10;I noticed {{companyName}} and wanted to reach out...&#10;&#10;Click 'Insert Variable' above to add personalization"
                 rows={8}
                 required
+                enableVisualEditor={true}
               />
             </>
           )}

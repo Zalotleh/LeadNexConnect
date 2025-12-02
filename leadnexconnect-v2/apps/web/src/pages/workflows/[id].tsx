@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
-import EmailEditor from '@/components/EmailEditor'
+import EnhancedEmailEditor from '@/components/EmailEditor/EnhancedEmailEditor'
 import api from '@/services/api'
 import { toast } from 'react-hot-toast'
 import {
@@ -438,12 +438,13 @@ export default function WorkflowDetail() {
                     {/* Body */}
                     <div>
                       {isEditing ? (
-                        <EmailEditor
+                        <EnhancedEmailEditor
                           label="Email Body"
                           value={editForm.steps[index].body}
-                          onChange={(value) => updateStep(index, 'body', value)}
+                          onChange={(value: string) => updateStep(index, 'body', value)}
                           placeholder="Email body..."
                           rows={8}
+                          enableVisualEditor={true}
                         />
                       ) : (
                         <>

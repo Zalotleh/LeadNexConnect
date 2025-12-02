@@ -1,6 +1,6 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { Palette, Code, Eye } from 'lucide-react';
-import { EMAIL_VARIABLES } from '../EmailEditor';
+import { getAllEmailVariables } from '@/lib/emailVariables';
 
 // Lazy load GrapeJS editor to avoid SSR issues
 const GrapeJSEmailEditor = lazy(() => import('./GrapeJSEmailEditor'));
@@ -150,10 +150,7 @@ export default function EnhancedEmailEditor({
             value={value}
             onChange={onChange}
             onClose={handleCloseVisualEditor}
-            variables={EMAIL_VARIABLES.map(v => ({
-              label: v.label,
-              value: v.value,
-            }))}
+            variables={getAllEmailVariables()}
           />
         </Suspense>
       )}
