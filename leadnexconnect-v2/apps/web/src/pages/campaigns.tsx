@@ -66,6 +66,11 @@ export default function Campaigns() {
   const [newCountry, setNewCountry] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set())
+  const [showBulkStartConfirm, setShowBulkStartConfirm] = useState(false)
+  const [showBulkPauseConfirm, setShowBulkPauseConfirm] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false)
   
   const [formData, setFormData] = useState<CampaignFormData>({
     name: '',
@@ -240,6 +245,161 @@ export default function Campaigns() {
     }
   }
 
+  // Bulk Actions
+  const handleSelectCampaign = (campaignId: string) => {
+    const newSelected = new Set(selectedCampaigns)
+    if (newSelected.has(campaignId)) {
+      newSelected.delete(campaignId)
+    } else {
+      newSelected.add(campaignId)
+    }
+    setSelectedCampaigns(newSelected)
+  }
+
+  const handleSelectAll = () => {
+    if (selectedCampaigns.size === filteredCampaigns.length) {
+      setSelectedCampaigns(new Set())
+    } else {
+      setSelectedCampaigns(new Set(filteredCampaigns.map(c => c.id)))
+    }
+  }
+
+  const handleBulkStart = () => {
+    setShowBulkStartConfirm(true)
+  }
+
+  const handleBulkPause = () => {
+    setShowBulkPauseConfirm(true)
+  }
+
+  const handleBulkDelete = () => {
+    setShowBulkDeleteConfirm(true)
+  }
+
+  const confirmBulkStart = async () => {
+    try {
+      setIsBulkProcessing(true)
+      const campaignsToStart = Array.from(selectedCampaigns).filter(id => {
+        const campaign = campaigns.find(c => c.id === id)
+        return campaign && campaign.status !== 'active'
+      })
+
+      if (campaignsToStart.length === 0) {
+        toast.success('All selected campaigns are already active')
+        setShowBulkStartConfirm(false)
+        return
+      }
+
+      let successCount = 0
+      let failCount = 0
+
+      for (const campaignId of campaignsToStart) {
+        try {
+          await api.post(`/campaigns/${campaignId}/start`)
+          successCount++
+        } catch (error) {
+          failCount++
+          console.error(`Failed to start campaign ${campaignId}:`, error)
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Started ${successCount} campaign${successCount > 1 ? 's' : ''} successfully!`)
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to start ${failCount} campaign${failCount > 1 ? 's' : ''}`)
+      }
+
+      fetchCampaigns()
+      setSelectedCampaigns(new Set())
+      setShowBulkStartConfirm(false)
+    } catch (error: any) {
+      toast.error('Failed to start campaigns')
+      console.error(error)
+    } finally {
+      setIsBulkProcessing(false)
+    }
+  }
+
+  const confirmBulkPause = async () => {
+    try {
+      setIsBulkProcessing(true)
+      const campaignsToPause = Array.from(selectedCampaigns).filter(id => {
+        const campaign = campaigns.find(c => c.id === id)
+        return campaign && campaign.status === 'active'
+      })
+
+      if (campaignsToPause.length === 0) {
+        toast.success('No active campaigns selected to pause')
+        setShowBulkPauseConfirm(false)
+        return
+      }
+
+      let successCount = 0
+      let failCount = 0
+
+      for (const campaignId of campaignsToPause) {
+        try {
+          await api.post(`/campaigns/${campaignId}/pause`)
+          successCount++
+        } catch (error) {
+          failCount++
+          console.error(`Failed to pause campaign ${campaignId}:`, error)
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Paused ${successCount} campaign${successCount > 1 ? 's' : ''} successfully!`)
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to pause ${failCount} campaign${failCount > 1 ? 's' : ''}`)
+      }
+
+      fetchCampaigns()
+      setSelectedCampaigns(new Set())
+      setShowBulkPauseConfirm(false)
+    } catch (error: any) {
+      toast.error('Failed to pause campaigns')
+      console.error(error)
+    } finally {
+      setIsBulkProcessing(false)
+    }
+  }
+
+  const confirmBulkDelete = async () => {
+    try {
+      setIsBulkProcessing(true)
+      const campaignsToDelete = Array.from(selectedCampaigns)
+      let successCount = 0
+      let failCount = 0
+
+      for (const campaignId of campaignsToDelete) {
+        try {
+          await api.delete(`/campaigns/${campaignId}`)
+          successCount++
+        } catch (error) {
+          failCount++
+          console.error(`Failed to delete campaign ${campaignId}:`, error)
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Deleted ${successCount} campaign${successCount > 1 ? 's' : ''} successfully!`)
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to delete ${failCount} campaign${failCount > 1 ? 's' : ''}`)
+      }
+
+      fetchCampaigns()
+      setSelectedCampaigns(new Set())
+      setShowBulkDeleteConfirm(false)
+    } catch (error: any) {
+      toast.error('Failed to delete campaigns')
+      console.error(error)
+    } finally {
+      setIsBulkProcessing(false)
+    }
+  }
 
   const calculateOpenRate = (campaign: Campaign) => {
     if (campaign.emailsSent === 0) return 0
@@ -445,22 +605,71 @@ export default function Campaigns() {
               </div>
             </div>
 
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 mr-2">Status:</span>
-              {['all', 'active', 'paused', 'draft', 'completed'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                    statusFilter === status
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
+            {/* Status Filter and Bulk Actions */}
+            <div className="flex items-center justify-between gap-4">
+              {/* Status Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 mr-2">Status:</span>
+                {['all', 'active', 'paused', 'draft', 'completed'].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                      statusFilter === status
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Bulk Actions */}
+              {filteredCampaigns.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSelectAll}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      selectedCampaigns.size === filteredCampaigns.length
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Check className="w-4 h-4 inline mr-1" />
+                    {selectedCampaigns.size === filteredCampaigns.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                  
+                  {selectedCampaigns.size > 0 && (
+                    <>
+                      <span className="text-sm text-gray-600">
+                        {selectedCampaigns.size} selected
+                      </span>
+                      <button
+                        onClick={handleBulkStart}
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-1"
+                      >
+                        <Play className="w-4 h-4" />
+                        Start
+                      </button>
+                      <button
+                        onClick={handleBulkPause}
+                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1"
+                      >
+                        <Pause className="w-4 h-4" />
+                        Pause
+                      </button>
+                      <button
+                        onClick={handleBulkDelete}
+                        className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 flex items-center gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -495,31 +704,57 @@ export default function Campaigns() {
               filteredCampaigns.map((campaign) => (
               <div 
                 key={campaign.id} 
-                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                className="bg-white rounded-lg shadow hover:shadow-xl transition-shadow flex flex-col cursor-pointer"
+                className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
+                  selectedCampaigns.has(campaign.id) ? 'ring-2 ring-primary-500' : ''
+                }`}
               >
                 <div className="p-6 flex-1">
-                  {/* Header */}
+                  {/* Header with Checkbox */}
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 truncate mb-2">{campaign.name}</h3>
-                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                        campaign.status === 'active' ? 'bg-green-100 text-green-800' :
-                        campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {campaign.status}
-                      </span>
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedCampaigns.has(campaign.id)}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleSelectCampaign(campaign.id)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h3 
+                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                          className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-primary-600"
+                        >
+                          {campaign.name}
+                        </h3>
+                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                          campaign.status === 'active' ? 'bg-green-100 text-green-800' :
+                          campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {campaign.status}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Description */}
                   {campaign.description && (
-                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{campaign.description}</p>
+                    <p 
+                      onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                      className="text-gray-600 text-sm mb-3 line-clamp-2"
+                    >
+                      {campaign.description}
+                    </p>
                   )}
 
                   {/* Tags */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4">
+                  <div 
+                    onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                    className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4"
+                  >
                     {campaign.industry && (
                       <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
                         <TrendingUp className="w-3 h-3" />
@@ -1084,6 +1319,45 @@ export default function Campaigns() {
           cancelText="Cancel"
           variant="warning"
           isLoading={isPausing}
+        />
+
+        {/* Bulk Start Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showBulkStartConfirm}
+          onClose={() => setShowBulkStartConfirm(false)}
+          onConfirm={confirmBulkStart}
+          title="Start Selected Campaigns"
+          message={`Are you ready to start ${selectedCampaigns.size} campaign${selectedCampaigns.size > 1 ? 's' : ''}? Active campaigns will be skipped. Emails will be sent according to each campaign's schedule settings.`}
+          confirmText={`Start ${selectedCampaigns.size} Campaign${selectedCampaigns.size > 1 ? 's' : ''}`}
+          cancelText="Cancel"
+          variant="success"
+          isLoading={isBulkProcessing}
+        />
+
+        {/* Bulk Pause Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showBulkPauseConfirm}
+          onClose={() => setShowBulkPauseConfirm(false)}
+          onConfirm={confirmBulkPause}
+          title="Pause Selected Campaigns"
+          message={`This will pause ${selectedCampaigns.size} campaign${selectedCampaigns.size > 1 ? 's' : ''}. Only active campaigns will be affected. Paused/inactive campaigns will be skipped. Scheduled emails will not be sent while paused.`}
+          confirmText={`Pause ${selectedCampaigns.size} Campaign${selectedCampaigns.size > 1 ? 's' : ''}`}
+          cancelText="Cancel"
+          variant="warning"
+          isLoading={isBulkProcessing}
+        />
+
+        {/* Bulk Delete Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showBulkDeleteConfirm}
+          onClose={() => setShowBulkDeleteConfirm(false)}
+          onConfirm={confirmBulkDelete}
+          title="Delete Selected Campaigns"
+          message={`Are you absolutely sure you want to delete ${selectedCampaigns.size} campaign${selectedCampaigns.size > 1 ? 's' : ''}? This action cannot be undone. All campaign data, leads, and email history will be permanently removed.`}
+          confirmText={`Delete ${selectedCampaigns.size} Campaign${selectedCampaigns.size > 1 ? 's' : ''}`}
+          cancelText="Cancel"
+          variant="danger"
+          isLoading={isBulkProcessing}
         />
       </div>
     </Layout>

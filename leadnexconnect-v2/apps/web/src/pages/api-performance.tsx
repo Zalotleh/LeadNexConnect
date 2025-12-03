@@ -274,71 +274,222 @@ export default function APIPerformance() {
           )}
         </div>
 
-        {/* Conversion Funnel */}
+        {/* API Source Comparison & Recommendations */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Conversion Funnel</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-6">API Source Comparison & Investment Guide</h2>
           {reportLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
+          ) : sources.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No API data available yet. Start generating leads to see API performance metrics.
+            </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="relative">
-                  <div className="w-full h-32 bg-blue-100 rounded-t-lg flex items-center justify-center">
-                    <Users className="w-12 h-12 text-blue-600" />
-                  </div>
-                  <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white rounded-full w-16 h-16 flex items-center justify-center font-bold text-xl">
-                    {totalLeads}
+            <div className="space-y-6">
+              {/* Best Overall Value */}
+              <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
+                <div className="flex items-start gap-3">
+                  <Award className="w-6 h-6 text-green-600 mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-green-900 mb-1">🏆 Best Overall Value</h3>
+                    {(() => {
+                      // Calculate value score: (quality * hot_leads%) / cost
+                      const bestValue = [...sources]
+                        .filter(s => s.apiSource !== 'manual_import')
+                        .map(s => ({
+                          ...s,
+                          valueScore: s.leadsGenerated > 0 
+                            ? ((s.avgLeadScore / 100) * (s.hotLeadsPercent / 100) * 100) / (s.costPerLead || 1)
+                            : 0
+                        }))
+                        .sort((a, b) => b.valueScore - a.valueScore)[0]
+                      
+                      return bestValue ? (
+                        <div>
+                          <p className="text-green-800 font-medium text-lg">{getSourceDisplayName(bestValue.apiSource)}</p>
+                          <p className="text-sm text-green-700 mt-1">
+                            Quality: {bestValue.avgLeadScore}/100 • {bestValue.hotLeadsPercent}% Hot Leads • ${bestValue.costPerLead.toFixed(2)}/lead
+                          </p>
+                          <p className="text-xs text-green-600 mt-2">
+                            💡 Best balance of lead quality and cost. Recommended for most campaigns.
+                          </p>
+                        </div>
+                      ) : <p className="text-green-700">No data available</p>
+                    })()}
                   </div>
                 </div>
-                <p className="text-sm font-medium text-gray-900 mt-5">Total Leads</p>
-                <p className="text-xs text-gray-500 mt-1">100%</p>
               </div>
 
-              <div className="text-center">
-                <div className="relative">
-                  <div className="w-full h-32 bg-purple-100 rounded-t-lg flex items-center justify-center">
-                    <Award className="w-12 h-12 text-purple-600" />
+              {/* Comparison Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Highest Quality */}
+                <div className="border border-purple-200 bg-purple-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Award className="w-5 h-5 text-purple-600" />
+                    <h4 className="font-semibold text-purple-900">Highest Quality</h4>
                   </div>
-                  <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-purple-600 text-white rounded-full w-16 h-16 flex items-center justify-center font-bold text-xl">
-                    {totalDemos}
-                  </div>
+                  {(() => {
+                    const highest = [...sources]
+                      .filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0)
+                      .sort((a, b) => b.avgLeadScore - a.avgLeadScore)[0]
+                    return highest ? (
+                      <div>
+                        <p className="text-purple-800 font-medium">{getSourceDisplayName(highest.apiSource)}</p>
+                        <p className="text-2xl font-bold text-purple-900 mt-1">{highest.avgLeadScore}/100</p>
+                        <p className="text-xs text-purple-600 mt-2">
+                          {highest.hotLeadsPercent}% hot leads • ${highest.costPerLead.toFixed(2)}/lead
+                        </p>
+                      </div>
+                    ) : <p className="text-purple-700 text-sm">No data</p>
+                  })()}
                 </div>
-                <p className="text-sm font-medium text-gray-900 mt-5">Demos Booked</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {totalLeads > 0 ? ((totalDemos / totalLeads) * 100).toFixed(1) : '0'}%
-                </p>
+
+                {/* Most Cost Effective */}
+                <div className="border border-blue-200 bg-blue-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <DollarSign className="w-5 h-5 text-blue-600" />
+                    <h4 className="font-semibold text-blue-900">Most Cost Effective</h4>
+                  </div>
+                  {(() => {
+                    const cheapest = [...sources]
+                      .filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0 && s.costPerLead > 0)
+                      .sort((a, b) => a.costPerLead - b.costPerLead)[0]
+                    return cheapest ? (
+                      <div>
+                        <p className="text-blue-800 font-medium">{getSourceDisplayName(cheapest.apiSource)}</p>
+                        <p className="text-2xl font-bold text-blue-900 mt-1">${cheapest.costPerLead.toFixed(2)}</p>
+                        <p className="text-xs text-blue-600 mt-2">
+                          per lead • Quality: {cheapest.avgLeadScore}/100
+                        </p>
+                      </div>
+                    ) : <p className="text-blue-700 text-sm">No data</p>
+                  })()}
+                </div>
+
+                {/* Most Used */}
+                <div className="border border-orange-200 bg-orange-50 p-4 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="w-5 h-5 text-orange-600" />
+                    <h4 className="font-semibold text-orange-900">Most Productive</h4>
+                  </div>
+                  {(() => {
+                    const mostUsed = [...sources]
+                      .filter(s => s.apiSource !== 'manual_import')
+                      .sort((a, b) => b.leadsGenerated - a.leadsGenerated)[0]
+                    return mostUsed ? (
+                      <div>
+                        <p className="text-orange-800 font-medium">{getSourceDisplayName(mostUsed.apiSource)}</p>
+                        <p className="text-2xl font-bold text-orange-900 mt-1">{mostUsed.leadsGenerated}</p>
+                        <p className="text-xs text-orange-600 mt-2">
+                          leads generated • {mostUsed.apiCallsUsed} API calls
+                        </p>
+                      </div>
+                    ) : <p className="text-orange-700 text-sm">No data</p>
+                  })()}
+                </div>
               </div>
 
-              <div className="text-center">
-                <div className="relative">
-                  <div className="w-full h-32 bg-yellow-100 rounded-t-lg flex items-center justify-center">
-                    <Zap className="w-12 h-12 text-yellow-600" />
-                  </div>
-                  <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-yellow-600 text-white rounded-full w-16 h-16 flex items-center justify-center font-bold text-xl">
-                    {totalTrials}
-                  </div>
+              {/* ROI Analysis */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Database className="w-5 h-5 text-gray-600" />
+                  ROI & Efficiency Analysis
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {sources
+                    .filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0)
+                    .map(source => {
+                      const roi = source.customersConverted > 0 
+                        ? (source.customersConverted * 1000) / (source.costPerLead * source.leadsGenerated) // Assuming $1000 customer value
+                        : 0
+                      const efficiency = source.apiCallsUsed > 0 
+                        ? (source.leadsGenerated / source.apiCallsUsed * 100)
+                        : 0
+                      
+                      return (
+                        <div key={source.apiSource} className="flex items-center justify-between p-3 bg-white rounded border">
+                          <div>
+                            <p className="font-medium text-gray-900">{getSourceDisplayName(source.apiSource)}</p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {source.leadsGenerated} leads • {source.customersConverted} customers
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {efficiency.toFixed(0)}% efficiency
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {(source.leadsGenerated / source.apiCallsUsed).toFixed(1)} leads/call
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
                 </div>
-                <p className="text-sm font-medium text-gray-900 mt-5">Trials Started</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {totalDemos > 0 ? ((totalTrials / totalDemos) * 100).toFixed(1) : '0'}%
-                </p>
               </div>
 
-              <div className="text-center">
-                <div className="relative">
-                  <div className="w-full h-32 bg-green-100 rounded-t-lg flex items-center justify-center">
-                    <TrendingUp className="w-12 h-12 text-green-600" />
-                  </div>
-                  <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 bg-green-600 text-white rounded-full w-16 h-16 flex items-center justify-center font-bold text-xl">
-                    {totalCustomers}
-                  </div>
+              {/* Investment Recommendations */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  💡 Smart Investment Tips
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {(() => {
+                    const apiSources = sources.filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0)
+                    const tips = []
+                    
+                    // Check for underutilized quota
+                    const underutilized = apiSources.filter(s => s.quotaPercent < 50)
+                    if (underutilized.length > 0) {
+                      tips.push({
+                        icon: '📊',
+                        text: `You're using less than 50% of your quota on ${underutilized.map(s => getSourceDisplayName(s.apiSource)).join(', ')}. Consider scaling up campaigns before buying new credits.`
+                      })
+                    }
+                    
+                    // Check for high-quality low-usage
+                    const highQualityLowUsage = apiSources.filter(s => s.avgLeadScore >= 80 && s.quotaPercent < 60)
+                    if (highQualityLowUsage.length > 0) {
+                      tips.push({
+                        icon: '🎯',
+                        text: `${highQualityLowUsage.map(s => getSourceDisplayName(s.apiSource)).join(', ')} delivers high-quality leads and has available quota. Great opportunity to increase ROI.`
+                      })
+                    }
+                    
+                    // Check for near quota limit
+                    const nearLimit = apiSources.filter(s => s.quotaPercent >= 80)
+                    if (nearLimit.length > 0) {
+                      tips.push({
+                        icon: '⚠️',
+                        text: `${nearLimit.map(s => getSourceDisplayName(s.apiSource)).join(', ')} approaching quota limit. Consider upgrading plan if performance is good.`
+                      })
+                    }
+                    
+                    // Cost efficiency tip
+                    const sorted = [...apiSources].sort((a, b) => a.costPerLead - b.costPerLead)
+                    if (sorted.length >= 2 && sorted[0].costPerLead < sorted[sorted.length - 1].costPerLead * 0.5) {
+                      tips.push({
+                        icon: '💰',
+                        text: `${getSourceDisplayName(sorted[0].apiSource)} costs ${((1 - sorted[0].costPerLead / sorted[sorted.length - 1].costPerLead) * 100).toFixed(0)}% less per lead than ${getSourceDisplayName(sorted[sorted.length - 1].apiSource)}. Consider reallocating budget.`
+                      })
+                    }
+                    
+                    if (tips.length === 0) {
+                      tips.push({
+                        icon: '✅',
+                        text: 'Your API usage is well-balanced. Continue monitoring performance and adjust based on campaign results.'
+                      })
+                    }
+                    
+                    return tips.map((tip, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-gray-700">
+                        <span className="text-lg flex-shrink-0">{tip.icon}</span>
+                        <p>{tip.text}</p>
+                      </div>
+                    ))
+                  })()}
                 </div>
-                <p className="text-sm font-medium text-gray-900 mt-5">Customers</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {totalTrials > 0 ? ((totalCustomers / totalTrials) * 100).toFixed(1) : '0'}%
-                </p>
               </div>
             </div>
           )}
