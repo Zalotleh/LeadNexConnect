@@ -1,6 +1,6 @@
 import { db } from '@leadnex/database';
-import { apiPerformance, leadSourceRoi } from '@leadnex/database';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { apiPerformance, leadSourceRoi, leads } from '@leadnex/database';
+import { eq, and, gte, lte, lt, sql } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 
 interface APIUsageLog {
@@ -11,7 +11,7 @@ interface APIUsageLog {
 
 export class APIPerformanceService {
   /**
-   * Log API usage
+   * Log API usage - creates or updates performance tracking
    */
   async logAPIUsage(log: APIUsageLog): Promise<void> {
     try {
@@ -33,11 +33,10 @@ export class APIPerformanceService {
         .limit(1);
 
       if (existing.length > 0) {
-        // Update existing record
+        // Update existing record - just increment API calls
         await db
           .update(apiPerformance)
           .set({
-            leadsGenerated: existing[0].leadsGenerated! + log.leadsGenerated,
             apiCallsUsed: existing[0].apiCallsUsed! + log.apiCallsUsed,
           })
           .where(eq(apiPerformance.id, existing[0].id));
@@ -52,7 +51,7 @@ export class APIPerformanceService {
 
         await db.insert(apiPerformance).values({
           apiSource: log.apiSource,
-          leadsGenerated: log.leadsGenerated,
+          leadsGenerated: 0, // Will be calculated from leads table
           apiCallsUsed: log.apiCallsUsed,
           apiCallsLimit: limits[log.apiSource] || 0,
           periodStart: periodStart.toISOString().split('T')[0],
@@ -69,48 +68,259 @@ export class APIPerformanceService {
   }
 
   /**
-   * Get monthly performance report
+   * Get monthly performance report - calculates real-time stats from leads table
    */
   async getMonthlyReport(month?: Date): Promise<any> {
     try {
       const targetMonth = month || new Date();
       const periodStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
-      const periodEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+      periodStart.setHours(0, 0, 0, 0);
+      
+      const periodEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 1);
+      periodEnd.setHours(0, 0, 0, 0);
 
-      const records = await db
+      // Get all leads created in this period
+      const allLeads = await db
         .select()
-        .from(apiPerformance)
+        .from(leads)
         .where(
           and(
-            gte(apiPerformance.periodStart, periodStart.toISOString().split('T')[0]),
-            lte(apiPerformance.periodEnd, periodEnd.toISOString().split('T')[0])
+            gte(leads.createdAt, periodStart),
+            lt(leads.createdAt, periodEnd)
           )
         );
 
+      // Group leads by source and calculate metrics
       const report: Record<string, any> = {};
 
-      for (const record of records) {
-        const quotaPercent = record.apiCallsLimit 
-          ? (record.apiCallsUsed! / record.apiCallsLimit) * 100 
-          : 0;
+      // API source limits (these should ideally come from settings)
+      const apiLimits: Record<string, number> = {
+        apollo: 100,
+        hunter: 50,
+        google_places: 40000,
+        peopledatalabs: 100,
+      };
 
-        report[record.apiSource] = {
-          leadsGenerated: record.leadsGenerated,
-          apiCallsUsed: record.apiCallsUsed,
-          apiCallsLimit: record.apiCallsLimit,
-          quotaPercent: Math.round(quotaPercent),
-          avgLeadScore: record.avgLeadScore ? Number(record.avgLeadScore) : 0,
-          hotLeadsPercent: record.hotLeadsPercent ? Number(record.hotLeadsPercent) : 0,
-          demosBooked: record.demosBooked,
-          trialsStarted: record.trialsStarted,
-          customersConverted: record.customersConverted,
-          costPerLead: record.costPerLead ? Number(record.costPerLead) : 0,
+      // API cost per lead estimates
+      const apiCosts: Record<string, number> = {
+        apollo: 8.75,
+        hunter: 12.5,
+        google_places: 3.5,
+        peopledatalabs: 6,
+      };
+
+      // Group automated leads by source
+      const automatedLeads = allLeads.filter(l => l.sourceType === 'automated');
+      const sourceGroups = automatedLeads.reduce((acc, lead) => {
+        if (!acc[lead.source]) {
+          acc[lead.source] = [];
+        }
+        acc[lead.source].push(lead);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      // Calculate metrics for each API source
+      for (const [source, sourceLeads] of Object.entries(sourceGroups)) {
+        const totalLeads = sourceLeads.length;
+        const avgScore = totalLeads > 0
+          ? Math.round(sourceLeads.reduce((sum, l) => sum + (l.qualityScore || 0), 0) / totalLeads)
+          : 0;
+        const hotLeads = sourceLeads.filter(l => (l.qualityScore || 0) >= 80).length;
+        const hotLeadsPercent = totalLeads > 0 ? Math.round((hotLeads / totalLeads) * 100) : 0;
+
+        // Count conversions based on lead status
+        const demosBooked = sourceLeads.filter(l => 
+          ['contacted', 'follow_up_1', 'follow_up_2', 'responded', 'interested', 'converted'].includes(l.status)
+        ).length;
+        const trialsStarted = sourceLeads.filter(l => 
+          ['interested', 'converted'].includes(l.status)
+        ).length;
+        const customersConverted = sourceLeads.filter(l => l.status === 'converted').length;
+
+        // Check if we have recorded API usage data for this source
+        const apiRecord = await db
+          .select()
+          .from(apiPerformance)
+          .where(
+            and(
+              eq(apiPerformance.apiSource, source),
+              gte(apiPerformance.periodStart, periodStart.toISOString().split('T')[0]),
+              lte(apiPerformance.periodEnd, periodEnd.toISOString().split('T')[0])
+            )
+          )
+          .limit(1);
+
+        const apiCallsUsed = apiRecord[0]?.apiCallsUsed || totalLeads; // Estimate 1 call per lead if no data
+        const apiCallsLimit = apiLimits[source] || 0;
+        const quotaPercent = apiCallsLimit > 0 ? Math.round((apiCallsUsed / apiCallsLimit) * 100) : 0;
+        const costPerLead = apiCosts[source] || 0;
+
+        report[source] = {
+          leadsGenerated: totalLeads,
+          apiCallsUsed,
+          apiCallsLimit,
+          quotaPercent,
+          avgLeadScore: avgScore,
+          hotLeadsPercent,
+          demosBooked,
+          trialsStarted,
+          customersConverted,
+          costPerLead,
+        };
+      }
+
+      // Add imported leads statistics
+      const importedLeads = allLeads.filter(l => l.sourceType === 'manual_import');
+      
+      if (importedLeads.length > 0) {
+        const totalImported = importedLeads.length;
+        const avgScore = Math.round(
+          importedLeads.reduce((sum, l) => sum + (l.qualityScore || 0), 0) / totalImported
+        );
+        const hotLeads = importedLeads.filter(l => (l.qualityScore || 0) >= 80).length;
+        const hotLeadsPercent = Math.round((hotLeads / totalImported) * 100);
+
+        // Count conversions for imported leads
+        const demosBooked = importedLeads.filter(l => 
+          l.status && ['contacted', 'follow_up_1', 'follow_up_2', 'responded', 'interested', 'converted'].includes(l.status)
+        ).length;
+        const trialsStarted = importedLeads.filter(l => 
+          l.status && ['interested', 'converted'].includes(l.status)
+        ).length;
+        const customersConverted = importedLeads.filter(l => l.status === 'converted').length;
+
+        report['manual_import'] = {
+          leadsGenerated: totalImported,
+          apiCallsUsed: 0,
+          apiCallsLimit: 0,
+          quotaPercent: 0,
+          avgLeadScore: avgScore,
+          hotLeadsPercent,
+          demosBooked,
+          trialsStarted,
+          customersConverted,
+          costPerLead: 0,
         };
       }
 
       return report;
     } catch (error: any) {
       logger.error('[APIPerformance] Error getting monthly report', {
+        error: error.message,
+      });
+      return {};
+    }
+  }
+
+  /**
+   * Get all-time performance report
+   */
+  async getAllTimeReport(): Promise<any> {
+    try {
+      // Get ALL leads (no date filter)
+      const allLeads = await db.select().from(leads);
+
+      // Group leads by source and calculate metrics
+      const report: Record<string, any> = {};
+
+      // API source limits
+      const apiLimits: Record<string, number> = {
+        apollo: 100,
+        hunter: 50,
+        google_places: 40000,
+        peopledatalabs: 100,
+      };
+
+      // API cost per lead estimates
+      const apiCosts: Record<string, number> = {
+        apollo: 8.75,
+        hunter: 12.5,
+        google_places: 3.5,
+        peopledatalabs: 6,
+      };
+
+      // Group automated leads by source
+      const automatedLeads = allLeads.filter(l => l.sourceType === 'automated');
+      const sourceGroups = automatedLeads.reduce((acc, lead) => {
+        if (!acc[lead.source]) {
+          acc[lead.source] = [];
+        }
+        acc[lead.source].push(lead);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      // Calculate metrics for each API source
+      for (const [source, sourceLeads] of Object.entries(sourceGroups)) {
+        const totalLeads = sourceLeads.length;
+        const avgScore = totalLeads > 0
+          ? Math.round(sourceLeads.reduce((sum, l) => sum + (l.qualityScore || 0), 0) / totalLeads)
+          : 0;
+        const hotLeads = sourceLeads.filter(l => (l.qualityScore || 0) >= 80).length;
+        const hotLeadsPercent = totalLeads > 0 ? Math.round((hotLeads / totalLeads) * 100) : 0;
+
+        const demosBooked = sourceLeads.filter(l => 
+          ['contacted', 'follow_up_1', 'follow_up_2', 'responded', 'interested', 'converted'].includes(l.status)
+        ).length;
+        const trialsStarted = sourceLeads.filter(l => 
+          ['interested', 'converted'].includes(l.status)
+        ).length;
+        const customersConverted = sourceLeads.filter(l => l.status === 'converted').length;
+
+        const apiCallsUsed = totalLeads; // Estimate
+        const apiCallsLimit = apiLimits[source] || 0;
+        const quotaPercent = 0; // No quota for all-time view
+        const costPerLead = apiCosts[source] || 0;
+
+        report[source] = {
+          leadsGenerated: totalLeads,
+          apiCallsUsed,
+          apiCallsLimit,
+          quotaPercent,
+          avgLeadScore: avgScore,
+          hotLeadsPercent,
+          demosBooked,
+          trialsStarted,
+          customersConverted,
+          costPerLead,
+        };
+      }
+
+      // Add imported leads statistics
+      const importedLeads = allLeads.filter(l => l.sourceType === 'manual_import');
+      
+      if (importedLeads.length > 0) {
+        const totalImported = importedLeads.length;
+        const avgScore = Math.round(
+          importedLeads.reduce((sum, l) => sum + (l.qualityScore || 0), 0) / totalImported
+        );
+        const hotLeads = importedLeads.filter(l => (l.qualityScore || 0) >= 80).length;
+        const hotLeadsPercent = Math.round((hotLeads / totalImported) * 100);
+
+        const demosBooked = importedLeads.filter(l => 
+          l.status && ['contacted', 'follow_up_1', 'follow_up_2', 'responded', 'interested', 'converted'].includes(l.status)
+        ).length;
+        const trialsStarted = importedLeads.filter(l => 
+          l.status && ['interested', 'converted'].includes(l.status)
+        ).length;
+        const customersConverted = importedLeads.filter(l => l.status === 'converted').length;
+
+        report['manual_import'] = {
+          leadsGenerated: totalImported,
+          apiCallsUsed: 0,
+          apiCallsLimit: 0,
+          quotaPercent: 0,
+          avgLeadScore: avgScore,
+          hotLeadsPercent,
+          demosBooked,
+          trialsStarted,
+          customersConverted,
+          costPerLead: 0,
+        };
+      }
+
+      return report;
+    } catch (error: any) {
+      logger.error('[APIPerformance] Error getting all-time report', {
         error: error.message,
       });
       return {};

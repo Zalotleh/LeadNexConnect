@@ -7,6 +7,11 @@ import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory } from '@leadnex/shared'
 
+const months = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+]
+
 interface CampaignFormData {
   name: string
   description: string
@@ -41,6 +46,9 @@ interface Campaign {
 }
 
 export default function Campaigns() {
+  const [dateViewMode, setDateViewMode] = useState<'monthly' | 'allTime'>('allTime')
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [showModal, setShowModal] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -262,8 +270,19 @@ export default function Campaigns() {
     return [...array, value]
   }
 
-  // Filter campaigns based on search and status
-  const filteredCampaigns = campaigns.filter((campaign) => {
+  // Filter campaigns by date first
+  const dateFilteredCampaigns = campaigns.filter((campaign) => {
+    if (dateViewMode === 'allTime') return true
+    
+    const campaignDate = new Date(campaign.createdAt)
+    const campaignMonth = campaignDate.getMonth() + 1
+    const campaignYear = campaignDate.getFullYear()
+    
+    return campaignMonth === selectedMonth && campaignYear === selectedYear
+  })
+
+  // Then filter by search and status
+  const filteredCampaigns = dateFilteredCampaigns.filter((campaign) => {
     // Status filter
     if (statusFilter !== 'all' && campaign.status !== statusFilter) {
       return false
@@ -288,17 +307,71 @@ export default function Campaigns() {
     <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold text-gray-900">Campaigns</h1>
             <p className="text-gray-600 mt-2">Manage your email campaigns</p>
           </div>
-          <button 
-            onClick={handleCreateCampaign}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-          >
-            <Plus className="w-4 h-4 inline mr-2" />
-            New Campaign
-          </button>
+          <div className="flex items-center space-x-4">
+            {/* Date Filter Controls */}
+            <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setDateViewMode('monthly')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  dateViewMode === 'monthly'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setDateViewMode('allTime')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  dateViewMode === 'allTime'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All Time
+              </button>
+            </div>
+            
+            {/* Month/Year selectors - only show in monthly mode */}
+            {dateViewMode === 'monthly' && (
+              <>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {months.map((month, idx) => (
+                    <option key={month} value={idx + 1}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {[2024, 2025, 2026].map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+            
+            <button 
+              onClick={handleCreateCampaign}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+            >
+              <Plus className="w-4 h-4 inline mr-2" />
+              New Campaign
+            </button>
+          </div>
         </div>
 
         {/* Overview Stats */}

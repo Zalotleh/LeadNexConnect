@@ -206,10 +206,13 @@ export default function EnhancedEmailEditor({
       }
       
       const data = await response.json();
-      setTemplates(data);
+      // Ensure we extract the array from the response structure
+      const templatesArray = Array.isArray(data) ? data : (data.data || data.templates || []);
+      setTemplates(templatesArray);
     } catch (error: any) {
       console.error('Template load error:', error);
       toast.error('Failed to load templates');
+      setTemplates([]); // Set empty array on error to prevent map error
     } finally {
       setIsLoadingTemplates(false);
     }
@@ -637,7 +640,7 @@ export default function EnhancedEmailEditor({
               <div className="grid gap-3 max-h-[50vh] overflow-y-auto">
                 {isLoadingTemplates ? (
                   <div className="text-sm text-gray-600">Loading templates...</div>
-                ) : templates.length === 0 ? (
+                ) : !Array.isArray(templates) || templates.length === 0 ? (
                   <div className="text-sm text-gray-600">No templates found.</div>
                 ) : (
                   templates.map((t) => (

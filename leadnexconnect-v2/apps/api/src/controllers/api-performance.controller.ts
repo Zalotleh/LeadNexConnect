@@ -8,8 +8,24 @@ export class APIPerformanceController {
    */
   async getMonthlyReport(req: Request, res: Response) {
     try {
-      const { month, year } = req.query;
+      const { month, year, allTime } = req.query;
       
+      if (allTime === 'true') {
+        // Get all-time performance
+        const report = await apiPerformanceService.getAllTimeReport();
+        
+        res.json({
+          success: true,
+          data: {
+            period: {
+              type: 'all-time',
+            },
+            performance: report,
+          },
+        });
+        return;
+      }
+
       const targetDate = month && year 
         ? new Date(Number(year), Number(month) - 1, 1)
         : new Date();

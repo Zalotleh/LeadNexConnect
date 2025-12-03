@@ -25,11 +25,11 @@ export function useLeadsData({
   searchQuery,
   generating
 }: UseLeadsDataParams) {
-  // Fetch ALL leads without sourceType filter for accurate counts
+  // Fetch ALL leads without sourceType filter for accurate counts (with high limit)
   const { data: allLeadsData, isLoading: allLeadsLoading, refetch: refetchAllLeads } = useQuery({
     queryKey: ['all-leads'],
     queryFn: async () => {
-      return await leadsService.getAll({})
+      return await leadsService.getAll({ limit: 10000 } as any)
     },
   })
 

@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from './Layout';
-import { Settings, FileText, Variable } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
@@ -17,18 +17,6 @@ export default function SettingsLayout({ children }: SettingsLayoutProps) {
       href: '/settings',
       icon: Settings,
       description: 'API keys and email configuration',
-    },
-    {
-      name: 'Templates',
-      href: '/settings/templates',
-      icon: FileText,
-      description: 'Manage email templates',
-    },
-    {
-      name: 'Variables',
-      href: '/settings/variables',
-      icon: Variable,
-      description: 'Custom email variables',
     },
   ];
 
@@ -46,7 +34,7 @@ export default function SettingsLayout({ children }: SettingsLayoutProps) {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
           <p className="text-gray-600">
-            Manage your application settings, templates, and custom variables
+            Manage your application settings and configurations
           </p>
         </div>
 

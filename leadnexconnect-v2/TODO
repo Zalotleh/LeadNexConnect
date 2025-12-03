@@ -1,0 +1,13 @@
+fix the mobile view issue < 642 a black color covers half of the view, in leads page leads viewv  sarts at 1010, batches view starts at 724, campaigns page starts at 749
+redesign the settings page, create a tab for API settings, another one for SMTP, create a user intuitive to shuffle between SMTP providers, based on limits maybe, create a documentation on how set up smtp for each or add a link for each smtp provider documentations, the same for API
+clean the unused and unnecessary files
+create an overview comprehensive project structure and data flow, features to share with claude/ai
+comment out the seed data insertioninside seed.ts file.
+
+"Qualified/Unqualified" tracking - These aren't real statuses. Use quality score tiers (Hot/Warm/Cold) instead
+Auto-detecting "Responded" - Requires email service webhook integration (planned)
+Auto-detecting "Interested" - Requires AI analysis of email replies or manual update
+Email webhook integration to auto-update responded status
+AI sentiment analysis for auto-detecting interest level
+Custom status fields for your specific workflow
+Bulk status updates from campaign analytics

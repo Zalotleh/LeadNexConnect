@@ -5,11 +5,15 @@ import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import leadsService, { Lead } from '@/services/leads.service'
 import { aiAPI, campaignsAPI, leadsAPI } from '@/services/api'
-import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, TrendingUp, Target } from 'lucide-react'
+import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, Flame, Thermometer, Snowflake, TrendingUp } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
 
+const months = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+]
 // Extracted Components
 import { useLeadsData } from '@/hooks/useLeadsData'
 import ImportCSVDialog from '@/components/leads/ImportCSVDialog'
@@ -23,6 +27,9 @@ import { BatchesView } from '@/components/leads/BatchesView'
 export default function Leads() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const [dateViewMode, setDateViewMode] = useState<'monthly' | 'allTime'>('allTime')
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')
   const [viewMode, setViewMode] = useState<'table' | 'batches'>('table')
   
@@ -104,6 +111,17 @@ export default function Leads() {
     activeTab,
     viewMode,
     generating,
+  })
+
+  // Apply date filtering to allLeads for stats calculation
+  const dateFilteredLeads = allLeads.filter((lead: any) => {
+    if (dateViewMode === 'allTime') return true
+    
+    const leadDate = new Date(lead.createdAt)
+    const leadMonth = leadDate.getMonth() + 1
+    const leadYear = leadDate.getFullYear()
+    
+    return leadMonth === selectedMonth && leadYear === selectedYear
   })
 
   // Client-side filtering for score and tier
@@ -716,10 +734,13 @@ export default function Leads() {
     const colors: Record<string, string> = {
       new: 'bg-blue-100 text-blue-800',
       contacted: 'bg-yellow-100 text-yellow-800',
-      qualified: 'bg-green-100 text-green-800',
-      unqualified: 'bg-gray-100 text-gray-800',
       responded: 'bg-purple-100 text-purple-800',
       interested: 'bg-teal-100 text-teal-800',
+      converted: 'bg-green-100 text-green-800',
+      not_interested: 'bg-gray-100 text-gray-800',
+      follow_up_1: 'bg-orange-100 text-orange-800',
+      follow_up_2: 'bg-orange-100 text-orange-800',
+      invalid: 'bg-red-100 text-red-800',
     }
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
@@ -727,11 +748,64 @@ export default function Leads() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header with Date Filter */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Leads Management</h1>
             <p className="text-gray-600 mt-2">Manage and track your leads and batches</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            {/* View Mode Toggle */}
+            <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setDateViewMode('monthly')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  dateViewMode === 'monthly'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setDateViewMode('allTime')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  dateViewMode === 'allTime'
+                    ? 'bg-white text-primary-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All Time
+              </button>
+            </div>
+            
+            {/* Month/Year selectors - only show in monthly mode */}
+            {dateViewMode === 'monthly' && (
+              <>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {months.map((month, idx) => (
+                    <option key={month} value={idx + 1}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {[2024, 2025, 2026].map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
         </div>
 
@@ -838,11 +912,14 @@ export default function Leads() {
         {/* Stats Cards - Different for each view */}
         {viewMode === 'table' ? (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
+            <div 
+              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setTierFilter('all')}
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Leads</p>
-                  <p className="text-2xl font-bold text-gray-900">{leads.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{allLeads.length}</p>
                 </div>
                 <Users className="w-8 h-8 text-blue-500" />
               </div>
@@ -855,12 +932,18 @@ export default function Leads() {
                 <div>
                   <p className="text-sm text-gray-600">Hot Leads</p>
                   <p className="text-2xl font-bold text-red-600">
-                    {leads.filter((l: any) => (l.qualityScore || l.score || 0) >= 80).length}
+                    {dateFilteredLeads.filter((l: any) => {
+                      const score = l.qualityScore || l.score || 0
+                      // Apply active tab filter
+                      if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
+                      if (activeTab === 'generated' && l.sourceType !== 'automated') return false
+                      return score >= 80
+                    }).length}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Score 80+</p>
                 </div>
                 <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-red-600" />
+                  <Flame className="w-5 h-5 text-red-600" />
                 </div>
               </div>
             </div>
@@ -872,15 +955,18 @@ export default function Leads() {
                 <div>
                   <p className="text-sm text-gray-600">Warm Leads</p>
                   <p className="text-2xl font-bold text-yellow-600">
-                    {leads.filter((l: any) => {
+                    {dateFilteredLeads.filter((l: any) => {
                       const score = l.qualityScore || l.score || 0
+                      // Apply active tab filter
+                      if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
+                      if (activeTab === 'generated' && l.sourceType !== 'automated') return false
                       return score >= 60 && score < 80
                     }).length}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Score 60-79</p>
                 </div>
                 <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                  <Target className="w-5 h-5 text-yellow-600" />
+                  <Thermometer className="w-5 h-5 text-yellow-600" />
                 </div>
               </div>
             </div>
@@ -892,74 +978,143 @@ export default function Leads() {
                 <div>
                   <p className="text-sm text-gray-600">Cold Leads</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {leads.filter((l: any) => (l.qualityScore || l.score || 0) < 60).length}
+                    {dateFilteredLeads.filter((l: any) => {
+                      const score = l.qualityScore || l.score || 0
+                      // Apply active tab filter
+                      if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
+                      if (activeTab === 'generated' && l.sourceType !== 'automated') return false
+                      return score < 60
+                    }).length}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">Score &lt;60</p>
                 </div>
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Qualified</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {leads.filter((l: any) => l.status === 'qualified' || l.status === 'interested').length}
-                  </p>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                  <span className="text-green-600 font-bold">Q</span>
+                  <Snowflake className="w-5 h-5 text-blue-600" />
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Batches</p>
-                  <p className="text-2xl font-bold text-gray-900">{batches.length}</p>
+          <>
+            {/* Batch View - First row: General Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Batches</p>
+                    <p className="text-2xl font-bold text-gray-900">{batches.length}</p>
+                  </div>
+                  <Package className="w-8 h-8 text-blue-500" />
                 </div>
-                <Package className="w-8 h-8 text-blue-500" />
+              </div>
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Total Leads in Batches</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0)}
+                    </p>
+                  </div>
+                  <Users className="w-8 h-8 text-green-500" />
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Avg Leads per Batch</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {batches.length > 0 ? Math.round(batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0) / batches.length) : 0}
+                    </p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-purple-500" />
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Active Campaigns</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {batches.reduce((sum: number, batch: any) => sum + (batch.activeCampaignCount || 0), 0)}
+                    </p>
+                  </div>
+                  <Zap className="w-8 h-8 text-orange-500" />
+                </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Leads in Batches</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0)}
-                  </p>
+            
+            {/* Batch View - Second row: Lead Quality Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div 
+                className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setTierFilter(tierFilter === 'hot' ? 'all' : 'hot')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Hot Leads</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {dateFilteredLeads.filter((l: any) => {
+                        const score = l.qualityScore || l.score || 0
+                        // Apply active tab filter for batches
+                        if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
+                        if (activeTab === 'generated' && l.sourceType !== 'automated') return false
+                        return score >= 80
+                      }).length}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Score 80+</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                    <Flame className="w-5 h-5 text-red-600" />
+                  </div>
                 </div>
-                <Users className="w-8 h-8 text-green-500" />
+              </div>
+              <div 
+                className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setTierFilter(tierFilter === 'warm' ? 'all' : 'warm')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Warm Leads</p>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {dateFilteredLeads.filter((l: any) => {
+                        const score = l.qualityScore || l.score || 0
+                        // Apply active tab filter for batches
+                        if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
+                        if (activeTab === 'generated' && l.sourceType !== 'automated') return false
+                        return score >= 60 && score < 80
+                      }).length}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Score 60-79</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                    <Thermometer className="w-5 h-5 text-yellow-600" />
+                  </div>
+                </div>
+              </div>
+              <div 
+                className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setTierFilter(tierFilter === 'cold' ? 'all' : 'cold')}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Cold Leads</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {dateFilteredLeads.filter((l: any) => {
+                        const score = l.qualityScore || l.score || 0
+                        // Apply active tab filter for batches
+                        if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
+                        if (activeTab === 'generated' && l.sourceType !== 'automated') return false
+                        return score < 60
+                      }).length}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Score &lt;60</p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                    <Snowflake className="w-5 h-5 text-blue-600" />
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Avg Leads per Batch</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {batches.length > 0 ? Math.round(batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0) / batches.length) : 0}
-                  </p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-purple-500" />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Active Campaigns</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {batches.reduce((sum: number, batch: any) => sum + (batch.activeCampaignCount || 0), 0)}
-                  </p>
-                </div>
-                <Zap className="w-8 h-8 text-orange-500" />
-              </div>
-            </div>
-          </div>
+          </>
         )}
 
         {/* Category Tabs - Different for each view */}
@@ -1074,7 +1229,7 @@ export default function Leads() {
           {viewMode === 'table' && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600 mr-2">Status:</span>
-              {['all', 'new', 'contacted', 'qualified', 'responded', 'interested', 'unqualified'].map((status) => (
+              {['all', 'new', 'contacted', 'responded', 'interested', 'converted'].map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}

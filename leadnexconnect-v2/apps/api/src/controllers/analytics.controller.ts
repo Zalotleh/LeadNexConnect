@@ -1,20 +1,44 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
 import { leads, campaigns, emails } from '@leadnex/database';
-import { eq, gte, sql } from 'drizzle-orm';
+import { eq, gte, sql, and, lt } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
 export class AnalyticsController {
   /**
    * GET /api/analytics/dashboard - Get dashboard statistics
+   * Query params: month, year, allTime
    */
   async getDashboardStats(req: Request, res: Response) {
     try {
-      logger.info('[AnalyticsController] Getting dashboard stats');
+      const { month, year, allTime } = req.query;
+      logger.info('[AnalyticsController] Getting dashboard stats', { month, year, allTime });
 
-      // Total leads
-      const allLeads = await db.select().from(leads);
+      // Build date filter
+      let dateFilter;
+      if (!allTime && month && year) {
+        const selectedMonth = parseInt(month as string);
+        const selectedYear = parseInt(year as string);
+        const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
+        const periodEnd = new Date(selectedYear, selectedMonth, 1);
+        
+        dateFilter = and(
+          gte(leads.createdAt, periodStart),
+          lt(leads.createdAt, periodEnd)
+        );
+      }
+
+      // Total leads with date filter
+      const allLeads = dateFilter
+        ? await db.select().from(leads).where(dateFilter)
+        : await db.select().from(leads);
+      
       const totalLeads = allLeads.length;
+
+      // Leads by quality score (hot/warm/cold)
+      const hotLeads = allLeads.filter((l) => (l.qualityScore || 0) >= 80).length;
+      const warmLeads = allLeads.filter((l) => (l.qualityScore || 0) >= 60 && (l.qualityScore || 0) < 80).length;
+      const coldLeads = allLeads.filter((l) => (l.qualityScore || 0) < 60).length;
 
       // Leads by status
       const newLeads = allLeads.filter((l) => l.status === 'new').length;
@@ -66,8 +90,19 @@ export class AnalyticsController {
       res.json({
         success: true,
         data: {
+          // Dashboard summary stats (for main dashboard)
+          totalLeads,
+          hotLeads,
+          warmLeads,
+          coldLeads,
+          activeCampaigns,
+          emailsSent: totalEmailsSent,
+          // Detailed breakdown (for analytics page)
           leads: {
             total: totalLeads,
+            hot: hotLeads,
+            warm: warmLeads,
+            cold: coldLeads,
             new: newLeads,
             contacted: contactedLeads,
             interested: interestedLeads,

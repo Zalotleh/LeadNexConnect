@@ -28,7 +28,7 @@ api.interceptors.response.use(
 
 // API Performance endpoints
 export const apiPerformanceAPI = {
-  getMonthlyReport: (params?: { month?: number; year?: number }) =>
+  getMonthlyReport: (params?: { month?: number; year?: number; allTime?: boolean }) =>
     api.get('/performance/report', { params }),
   getROISummary: () => api.get('/performance/roi'),
   updateConversion: (data: {
@@ -41,7 +41,8 @@ export const apiPerformanceAPI = {
 
 // Enhanced Dashboard endpoints
 export const dashboardAPI = {
-  getStats: () => api.get('/analytics/dashboard'),
+  getStats: (params?: { month?: number; year?: number; allTime?: boolean }) => 
+    api.get('/analytics/dashboard', { params }),
   getLeadsByTier: () => api.get('/leads/by-tier'),
   getRecentLeads: (limit: number = 10) => api.get(`/leads?limit=${limit}&sort=-createdAt`),
 }

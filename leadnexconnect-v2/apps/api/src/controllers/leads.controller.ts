@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
 import { leads, leadBatches, emails, campaigns } from '@leadnex/database';
-import { eq, and, gte, lte, ilike, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, ilike, desc, sql } from 'drizzle-orm';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
 import { hunterService } from '../services/lead-generation/hunter.service';
@@ -62,6 +62,14 @@ export class LeadsController {
         query = query.where(and(...filters)) as any;
       }
 
+      // Get total count with filters applied (before pagination)
+      let countQuery = db.select({ count: sql<number>`count(*)::int` }).from(leads);
+      if (filters.length > 0) {
+        countQuery = countQuery.where(and(...filters)) as any;
+      }
+      const totalResult = await countQuery;
+      const total = totalResult[0]?.count || 0;
+
       // Pagination
       const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
       query = query.limit(parseInt(limit as string)).offset(offset) as any;
@@ -69,16 +77,13 @@ export class LeadsController {
 
       const results = await query;
 
-      // Get total count
-      const total = await db.select().from(leads);
-
       res.json({
         success: true,
         data: results,
         meta: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
-          total: total.length,
+          total: total,
         },
       });
     } catch (error: any) {

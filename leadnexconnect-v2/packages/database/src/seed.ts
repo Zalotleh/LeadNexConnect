@@ -1,10 +1,230 @@
 import { db } from './index';
-import { emailTemplates, settings, customVariables } from './schema';
+import { emailTemplates, settings, customVariables, leads, campaigns, apiPerformance } from './schema';
 
 async function seed() {
   console.log('🌱 Seeding database...');
 
   try {
+    // Seed Sample Leads
+    console.log('Creating sample leads...');
+
+    const sampleLeads = [
+      {
+        companyName: 'Serenity Spa & Wellness',
+        industry: 'spa',
+        website: 'https://serenityspa.example.com',
+        city: 'Dubai',
+        country: 'UAE',
+        source: 'google_places',
+        qualityScore: 85,
+        status: 'new' as const,
+        contactName: 'Sarah Ahmed',
+        contactEmail: 'sarah@serenityspa.example.com',
+        phoneNumber: '+971-4-123-4567',
+      },
+      {
+        companyName: 'Desert Tours LLC',
+        industry: 'tours',
+        website: 'https://deserttours.example.com',
+        city: 'Abu Dhabi',
+        country: 'UAE',
+        source: 'apollo',
+        qualityScore: 72,
+        status: 'contacted' as const,
+        contactName: 'Mohammed Ali',
+        contactEmail: 'mohammed@deserttours.example.com',
+        phoneNumber: '+971-2-987-6543',
+      },
+      {
+        companyName: 'Luxury Yacht Rentals',
+        industry: 'tours',
+        website: 'https://luxuryyachts.example.com',
+        city: 'Dubai',
+        country: 'UAE',
+        source: 'hunter',
+        qualityScore: 91,
+        status: 'interested' as const,
+        contactName: 'Fatima Hassan',
+        contactEmail: 'fatima@luxuryyachts.example.com',
+        phoneNumber: '+971-4-555-7890',
+      },
+      {
+        companyName: 'City Health Clinic',
+        industry: 'clinic',
+        website: 'https://cityhealthclinic.example.com',
+        city: 'Sharjah',
+        country: 'UAE',
+        source: 'peopledatalabs',
+        qualityScore: 45,
+        status: 'new' as const,
+        contactName: 'Dr. Ahmed Khalil',
+        contactEmail: 'ahmed@cityhealthclinic.example.com',
+        phoneNumber: '+971-6-432-1098',
+      },
+      {
+        companyName: 'Oasis Retreat Center',
+        industry: 'spa',
+        website: 'https://oasisretreat.example.com',
+        city: 'Dubai',
+        country: 'UAE',
+        source: 'google_places',
+        qualityScore: 68,
+        status: 'new' as const,
+        contactName: 'Layla Rahman',
+        contactEmail: 'layla@oasisretreat.example.com',
+        phoneNumber: '+971-4-222-3344',
+      },
+      // Imported leads
+      {
+        companyName: 'Premium Properties Real Estate',
+        industry: 'real_estate',
+        website: 'https://premiumproperties.example.com',
+        city: 'Dubai',
+        country: 'UAE',
+        source: 'csv_import',
+        sourceType: 'manual_import' as const,
+        qualityScore: 82,
+        status: 'contacted' as const,
+        contactName: 'Sarah Mitchell',
+        contactEmail: 'sarah@premiumproperties.example.com',
+        phoneNumber: '+971-4-555-7890',
+      },
+      {
+        companyName: 'TechStart Innovation Hub',
+        industry: 'technology',
+        website: 'https://techstart.example.com',
+        city: 'Abu Dhabi',
+        country: 'UAE',
+        source: 'excel_import',
+        sourceType: 'manual_import' as const,
+        qualityScore: 78,
+        status: 'interested' as const,
+        contactName: 'Mohammed Ali',
+        contactEmail: 'mohammed@techstart.example.com',
+        phoneNumber: '+971-2-666-8901',
+      },
+      {
+        companyName: 'Elite Consulting Group',
+        industry: 'consulting',
+        website: 'https://eliteconsulting.example.com',
+        city: 'Dubai',
+        country: 'UAE',
+        source: 'manual_entry',
+        sourceType: 'manual_import' as const,
+        qualityScore: 91,
+        status: 'converted' as const,
+        contactName: 'Fatima Hassan',
+        contactEmail: 'fatima@eliteconsulting.example.com',
+        phoneNumber: '+971-4-777-9012',
+      },
+    ];
+
+    for (const lead of sampleLeads) {
+      await db.insert(leads).values(lead);
+    }
+
+    console.log('✅ Sample leads created (including imported leads)');
+
+    // Seed Sample Campaigns
+    console.log('Creating sample campaigns...');
+
+    const sampleCampaigns = [
+      {
+        name: 'Spa & Wellness Q4 Campaign',
+        industry: 'spa',
+        status: 'active' as const,
+        targetCity: 'Dubai',
+        targetCountry: 'UAE',
+        dailyLimit: 50,
+      },
+      {
+        name: 'Tour Operators Outreach',
+        industry: 'tours',
+        status: 'active' as const,
+        targetCity: 'Dubai',
+        targetCountry: 'UAE',
+        dailyLimit: 30,
+      },
+    ];
+
+    for (const campaign of sampleCampaigns) {
+      await db.insert(campaigns).values(campaign);
+    }
+
+    console.log('✅ Sample campaigns created');
+
+    // Seed API Performance Data
+    console.log('Creating API performance data...');
+
+    const currentMonth = new Date();
+    const periodStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+    const periodEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+
+    const apiPerformanceData = [
+      {
+        apiSource: 'google_places',
+        leadsGenerated: 45,
+        apiCallsUsed: 150,
+        apiCallsLimit: 40000,
+        periodStart: periodStart.toISOString().split('T')[0],
+        periodEnd: periodEnd.toISOString().split('T')[0],
+        avgLeadScore: '78',
+        hotLeadsPercent: '35',
+        demosBooked: 8,
+        trialsStarted: 5,
+        customersConverted: 2,
+        costPerLead: '3.50',
+      },
+      {
+        apiSource: 'apollo',
+        leadsGenerated: 32,
+        apiCallsUsed: 48,
+        apiCallsLimit: 100,
+        periodStart: periodStart.toISOString().split('T')[0],
+        periodEnd: periodEnd.toISOString().split('T')[0],
+        avgLeadScore: '82',
+        hotLeadsPercent: '45',
+        demosBooked: 12,
+        trialsStarted: 7,
+        customersConverted: 3,
+        costPerLead: '8.75',
+      },
+      {
+        apiSource: 'hunter',
+        leadsGenerated: 18,
+        apiCallsUsed: 22,
+        apiCallsLimit: 50,
+        periodStart: periodStart.toISOString().split('T')[0],
+        periodEnd: periodEnd.toISOString().split('T')[0],
+        avgLeadScore: '71',
+        hotLeadsPercent: '28',
+        demosBooked: 4,
+        trialsStarted: 2,
+        customersConverted: 1,
+        costPerLead: '12.50',
+      },
+      {
+        apiSource: 'peopledatalabs',
+        leadsGenerated: 25,
+        apiCallsUsed: 35,
+        apiCallsLimit: 100,
+        periodStart: periodStart.toISOString().split('T')[0],
+        periodEnd: periodEnd.toISOString().split('T')[0],
+        avgLeadScore: '65',
+        hotLeadsPercent: '20',
+        demosBooked: 3,
+        trialsStarted: 1,
+        customersConverted: 0,
+        costPerLead: '6.00',
+      },
+    ];
+
+    for (const apiData of apiPerformanceData) {
+      await db.insert(apiPerformance).values(apiData);
+    }
+
+    console.log('✅ API performance data created');
+
     // Seed Email Templates
     console.log('Creating email templates...');
 

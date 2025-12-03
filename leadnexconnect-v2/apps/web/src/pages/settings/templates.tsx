@@ -1,4 +1,4 @@
-import SettingsLayout from '@/components/SettingsLayout';
+import Layout from '@/components/Layout';
 import { useState, useEffect } from 'react';
 import {
   Search,
@@ -250,8 +250,16 @@ export default function TemplatesPage() {
   const filteredTemplates = templates
 
   return (
-    <SettingsLayout>
-      <div>{/* Removed duplicate header and max-width - handled by SettingsLayout */}
+    <Layout>
+      <div className="max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Email Templates</h1>
+          <p className="text-gray-600">
+            Create and manage email templates for your campaigns
+          </p>
+        </div>
+
         {/* Search and Filters */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
@@ -685,6 +693,6 @@ export default function TemplatesPage() {
           </div>
         )}
       </div>
-    </SettingsLayout>
+    </Layout>
   )
 }

@@ -1,4 +1,4 @@
-import SettingsLayout from '@/components/SettingsLayout';
+import Layout from '@/components/Layout';
 import { useState, useEffect } from 'react';
 import { 
   Plus, 
@@ -267,8 +267,16 @@ export default function VariablesPage() {
   const filteredVariables = variables;
 
   return (
-    <SettingsLayout>
-      <div>{/* Removed duplicate header - handled by SettingsLayout */}
+    <Layout>
+      <div className="max-w-7xl mx-auto">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Custom Variables</h1>
+          <p className="text-gray-600">
+            Create and manage custom variables for personalized email templates
+          </p>
+        </div>
+
         {/* Search and Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -835,6 +843,6 @@ export default function VariablesPage() {
           </div>
         )}
       </div>
-    </SettingsLayout>
+    </Layout>
   );
 }
