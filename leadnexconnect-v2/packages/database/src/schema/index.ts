@@ -539,6 +539,73 @@ export const customVariables = pgTable('custom_variables', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// API Configuration (User-defined API keys, limits, and costs)
+export const apiConfig = pgTable('api_config', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  apiSource: varchar('api_source', { length: 50 }).notNull().unique(), // apollo, hunter, google_places, peopledatalabs
+  
+  // API Credentials
+  apiKey: varchar('api_key', { length: 500 }),
+  apiSecret: varchar('api_secret', { length: 500 }),
+  
+  // Plan Details
+  planName: varchar('plan_name', { length: 100 }),
+  monthlyLimit: integer('monthly_limit').default(0),
+  costPerLead: decimal('cost_per_lead', { precision: 10, scale: 2 }).default('0'),
+  costPerAPICall: decimal('cost_per_api_call', { precision: 10, scale: 2 }).default('0'),
+  
+  // Status
+  isActive: boolean('is_active').default(true),
+  
+  // Documentation & Setup
+  documentationUrl: varchar('documentation_url', { length: 500 }),
+  setupNotes: text('setup_notes'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// SMTP Configuration (User-defined SMTP providers)
+export const smtpConfig = pgTable('smtp_config', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  // Provider Info
+  provider: varchar('provider', { length: 100 }).notNull(), // gmail, outlook, sendgrid, mailgun, ses, custom
+  providerName: varchar('provider_name', { length: 100 }).notNull(),
+  
+  // SMTP Settings
+  host: varchar('host', { length: 255 }).notNull(),
+  port: integer('port').notNull(),
+  secure: boolean('secure').default(true), // Use TLS
+  username: varchar('username', { length: 255 }),
+  password: varchar('password', { length: 500 }),
+  fromEmail: varchar('from_email', { length: 255 }).notNull(),
+  fromName: varchar('from_name', { length: 255 }),
+  
+  // Limits
+  dailyLimit: integer('daily_limit').default(0),
+  hourlyLimit: integer('hourly_limit').default(0),
+  
+  // Status & Priority
+  isActive: boolean('is_active').default(true),
+  isPrimary: boolean('is_primary').default(false), // Primary SMTP to use
+  priority: integer('priority').default(0), // For fallback order
+  
+  // Documentation & Setup
+  documentationUrl: varchar('documentation_url', { length: 500 }),
+  setupNotes: text('setup_notes'),
+  
+  // Usage Tracking
+  emailsSentToday: integer('emails_sent_today').default(0),
+  emailsSentThisHour: integer('emails_sent_this_hour').default(0),
+  lastResetAt: timestamp('last_reset_at').defaultNow(),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Relations
 export const leadsRelations = relations(leads, ({ many, one }) => ({
   emails: many(emails),

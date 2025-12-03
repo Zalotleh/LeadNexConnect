@@ -1,10 +1,15 @@
 import SettingsLayout from '@/components/SettingsLayout'
-import { Save, TestTube, Eye, EyeOff } from 'lucide-react'
+import { Save, TestTube, Eye, EyeOff, Settings as SettingsIcon, Server, Mail } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
+import ApiConfigTab from '@/components/ApiConfigTab'
+import SmtpConfigTab from '@/components/SmtpConfigTab'
+
+type TabType = 'general' | 'api' | 'smtp';
 
 export default function Settings() {
+  const [activeTab, setActiveTab] = useState<TabType>('general');
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -231,6 +236,97 @@ export default function Settings() {
   return (
     <SettingsLayout>
       <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <p className="text-gray-500 mt-2">Manage your application settings and integrations</p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('general')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'general'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <SettingsIcon className="w-4 h-4" />
+              General Settings
+            </button>
+            <button
+              onClick={() => setActiveTab('api')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'api'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Server className="w-4 h-4" />
+              API Configuration
+            </button>
+            <button
+              onClick={() => setActiveTab('smtp')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'smtp'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              SMTP Configuration
+            </button>
+          </nav>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'general' && (
+          <GeneralSettingsTab
+            settings={settings}
+            showKeys={showKeys}
+            loading={loading}
+            saving={saving}
+            testing={testing}
+            modifiedFields={modifiedFields}
+            onFieldChange={handleFieldChange}
+            onToggleKeyVisibility={toggleKeyVisibility}
+            onSave={handleSave}
+            onTestSMTP={handleTestSMTP}
+          />
+        )}
+
+        {activeTab === 'api' && <ApiConfigTab />}
+
+        {activeTab === 'smtp' && <SmtpConfigTab />}
+      </div>
+    </SettingsLayout>
+  )
+}
+
+// Extract General Settings Tab as separate component
+function GeneralSettingsTab({
+  settings,
+  showKeys,
+  loading,
+  saving,
+  testing,
+  modifiedFields,
+  onFieldChange,
+  onToggleKeyVisibility,
+  onSave,
+  onTestSMTP,
+}: any) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">AI API Keys</h2>
@@ -244,13 +340,13 @@ export default function Settings() {
                 <input
                   type={showKeys.anthropicApiKey ? "text" : "password"}
                   value={settings.anthropicApiKey}
-                  onChange={(e) => handleFieldChange('anthropicApiKey', e.target.value)}
+                  onChange={(e) => onFieldChange('anthropicApiKey', e.target.value)}
                   placeholder="sk-ant-..."
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('anthropicApiKey')}
+                  onClick={() => onToggleKeyVisibility('anthropicApiKey')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.anthropicApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -274,13 +370,13 @@ export default function Settings() {
                 <input
                   type={showKeys.apolloApiKey ? "text" : "password"}
                   value={settings.apolloApiKey}
-                  onChange={(e) => handleFieldChange('apolloApiKey', e.target.value)}
+                  onChange={(e) => onFieldChange('apolloApiKey', e.target.value)}
                   placeholder="Enter your Apollo.io API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('apolloApiKey')}
+                  onClick={() => onToggleKeyVisibility('apolloApiKey')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.apolloApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -296,13 +392,13 @@ export default function Settings() {
                 <input
                   type={showKeys.hunterApiKey ? "text" : "password"}
                   value={settings.hunterApiKey}
-                  onChange={(e) => handleFieldChange('hunterApiKey', e.target.value)}
+                  onChange={(e) => onFieldChange('hunterApiKey', e.target.value)}
                   placeholder="Enter your Hunter.io API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('hunterApiKey')}
+                  onClick={() => onToggleKeyVisibility('hunterApiKey')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.hunterApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -318,13 +414,13 @@ export default function Settings() {
                 <input
                   type={showKeys.peopleDataLabsApiKey ? "text" : "password"}
                   value={settings.peopleDataLabsApiKey}
-                  onChange={(e) => handleFieldChange('peopleDataLabsApiKey', e.target.value)}
+                  onChange={(e) => onFieldChange('peopleDataLabsApiKey', e.target.value)}
                   placeholder="Enter your PDL API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('peopleDataLabsApiKey')}
+                  onClick={() => onToggleKeyVisibility('peopleDataLabsApiKey')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.peopleDataLabsApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -340,13 +436,13 @@ export default function Settings() {
                 <input
                   type={showKeys.googlePlacesApiKey ? "text" : "password"}
                   value={settings.googlePlacesApiKey}
-                  onChange={(e) => handleFieldChange('googlePlacesApiKey', e.target.value)}
+                  onChange={(e) => onFieldChange('googlePlacesApiKey', e.target.value)}
                   placeholder="Enter your Google Places API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('googlePlacesApiKey')}
+                  onClick={() => onToggleKeyVisibility('googlePlacesApiKey')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.googlePlacesApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -362,13 +458,13 @@ export default function Settings() {
                 <input
                   type={showKeys.googleCustomSearchApiKey ? "text" : "password"}
                   value={settings.googleCustomSearchApiKey}
-                  onChange={(e) => handleFieldChange('googleCustomSearchApiKey', e.target.value)}
+                  onChange={(e) => onFieldChange('googleCustomSearchApiKey', e.target.value)}
                   placeholder="Enter your Google Custom Search API key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('googleCustomSearchApiKey')}
+                  onClick={() => onToggleKeyVisibility('googleCustomSearchApiKey')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.googleCustomSearchApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -384,13 +480,13 @@ export default function Settings() {
                 <input
                   type={showKeys.googleCustomSearchEngineId ? "text" : "password"}
                   value={settings.googleCustomSearchEngineId}
-                  onChange={(e) => handleFieldChange('googleCustomSearchEngineId', e.target.value)}
+                  onChange={(e) => onFieldChange('googleCustomSearchEngineId', e.target.value)}
                   placeholder="Enter your Custom Search Engine ID"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('googleCustomSearchEngineId')}
+                  onClick={() => onToggleKeyVisibility('googleCustomSearchEngineId')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.googleCustomSearchEngineId ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -412,7 +508,7 @@ export default function Settings() {
               </label>
               <select
                 value={settings.smtpProvider}
-                onChange={(e) => handleFieldChange('smtpProvider', e.target.value)}
+                onChange={(e) => onFieldChange('smtpProvider', e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="smtp2go">SMTP2GO</option>
@@ -430,7 +526,7 @@ export default function Settings() {
                 <input
                   type="text"
                   value={settings.smtpHost}
-                  onChange={(e) => handleFieldChange('smtpHost', e.target.value)}
+                  onChange={(e) => onFieldChange('smtpHost', e.target.value)}
                   placeholder="mail-eu.smtp2go.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -442,7 +538,7 @@ export default function Settings() {
                 <input
                   type="number"
                   value={settings.smtpPort}
-                  onChange={(e) => handleFieldChange('smtpPort', e.target.value)}
+                  onChange={(e) => onFieldChange('smtpPort', e.target.value)}
                   placeholder="2525"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -455,7 +551,7 @@ export default function Settings() {
               <input
                 type="text"
                 value={settings.smtpUser}
-                onChange={(e) => handleFieldChange('smtpUser', e.target.value)}
+                onChange={(e) => onFieldChange('smtpUser', e.target.value)}
                 placeholder="your-smtp-username"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
@@ -468,13 +564,13 @@ export default function Settings() {
                 <input
                   type={showKeys.smtpPass ? "text" : "password"}
                   value={settings.smtpPass}
-                  onChange={(e) => handleFieldChange('smtpPass', e.target.value)}
+                  onChange={(e) => onFieldChange('smtpPass', e.target.value)}
                   placeholder="Enter your SMTP password"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('smtpPass')}
+                  onClick={() => onToggleKeyVisibility('smtpPass')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.smtpPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -489,7 +585,7 @@ export default function Settings() {
                 <input
                   type="text"
                   value={settings.fromName}
-                  onChange={(e) => handleFieldChange('fromName', e.target.value)}
+                  onChange={(e) => onFieldChange('fromName', e.target.value)}
                   placeholder="Your Company Name"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -501,7 +597,7 @@ export default function Settings() {
                 <input
                   type="email"
                   value={settings.fromEmail}
-                  onChange={(e) => handleFieldChange('fromEmail', e.target.value)}
+                  onChange={(e) => onFieldChange('fromEmail', e.target.value)}
                   placeholder="noreply@yourcompany.com"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
@@ -509,7 +605,7 @@ export default function Settings() {
             </div>
             <div>
               <button
-                onClick={handleTestSMTP}
+                onClick={onTestSMTP}
                 disabled={testing || !settings.smtpHost || !settings.smtpPort}
                 className="px-4 py-2 text-sm font-medium text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -535,13 +631,13 @@ export default function Settings() {
                 <input
                   type={showKeys.awsAccessKeyId ? "text" : "password"}
                   value={settings.awsAccessKeyId}
-                  onChange={(e) => handleFieldChange('awsAccessKeyId', e.target.value)}
+                  onChange={(e) => onFieldChange('awsAccessKeyId', e.target.value)}
                   placeholder="AKIA..."
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('awsAccessKeyId')}
+                  onClick={() => onToggleKeyVisibility('awsAccessKeyId')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.awsAccessKeyId ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -557,13 +653,13 @@ export default function Settings() {
                 <input
                   type={showKeys.awsSecretAccessKey ? "text" : "password"}
                   value={settings.awsSecretAccessKey}
-                  onChange={(e) => handleFieldChange('awsSecretAccessKey', e.target.value)}
+                  onChange={(e) => onFieldChange('awsSecretAccessKey', e.target.value)}
                   placeholder="Enter your AWS secret access key"
                   className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
                 <button
                   type="button"
-                  onClick={() => toggleKeyVisibility('awsSecretAccessKey')}
+                  onClick={() => onToggleKeyVisibility('awsSecretAccessKey')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showKeys.awsSecretAccessKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -577,7 +673,7 @@ export default function Settings() {
               </label>
               <select
                 value={settings.awsRegion}
-                onChange={(e) => handleFieldChange('awsRegion', e.target.value)}
+                onChange={(e) => onFieldChange('awsRegion', e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="us-east-1">US East (N. Virginia) - us-east-1</option>
@@ -621,7 +717,7 @@ export default function Settings() {
               <input
                 type="number"
                 value={settings.emailsPerHour}
-                onChange={(e) => handleFieldChange('emailsPerHour', parseInt(e.target.value))}
+                onChange={(e) => onFieldChange('emailsPerHour', parseInt(e.target.value))}
                 min="1"
                 max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -635,7 +731,7 @@ export default function Settings() {
               <input
                 type="number"
                 value={settings.dailyEmailLimit}
-                onChange={(e) => handleFieldChange('dailyEmailLimit', parseInt(e.target.value))}
+                onChange={(e) => onFieldChange('dailyEmailLimit', parseInt(e.target.value))}
                 min="1"
                 max="5000"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -647,7 +743,7 @@ export default function Settings() {
 
         <div className="flex justify-end">
           <button 
-            onClick={handleSave}
+            onClick={onSave}
             disabled={saving}
             className="px-6 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -656,6 +752,5 @@ export default function Settings() {
           </button>
         </div>
       </div>
-    </SettingsLayout>
   )
 }

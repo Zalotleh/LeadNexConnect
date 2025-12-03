@@ -4,6 +4,7 @@ import { db, settings } from '@leadnex/database';
 import { emails, leads } from '@leadnex/database';
 import { eq } from 'drizzle-orm';
 import { settingsService } from '../settings.service';
+import { configService } from '../config.service';
 
 interface SMTPConfig {
   provider: 'smtp2go' | 'sendgrid' | 'gmail' | 'wordpress' | 'generic';
@@ -21,6 +22,7 @@ interface SMTPConfig {
 export class EmailSenderService {
   private transporter: nodemailer.Transporter | null = null;
   private currentConfig: SMTPConfig | null = null;
+  private currentSmtpConfigId: string | null = null; // Track which SMTP config is being used
 
   /**
    * Convert plain text to HTML with proper formatting
@@ -226,15 +228,44 @@ export class EmailSenderService {
 
   /**
    * Get SMTP configuration from database settings or environment
+   * Now supports smart failover from configService
    */
   private async getSMTPConfig(): Promise<SMTPConfig> {
     try {
-      // Try to get individual SMTP settings from database via settingsService
+      // First try to get SMTP config from the new config service
+      const smtpConfig = await configService.getNextAvailableSmtpConfig();
+      
+      if (smtpConfig) {
+        logger.info('[EmailSender] Using SMTP config from configService', {
+          provider: smtpConfig.provider,
+          host: smtpConfig.host,
+          isPrimary: smtpConfig.isPrimary,
+        });
+        
+        // Store the config ID for tracking email usage
+        this.currentSmtpConfigId = smtpConfig.id;
+        
+        return {
+          provider: smtpConfig.provider as any,
+          host: smtpConfig.host,
+          port: smtpConfig.port,
+          secure: smtpConfig.secure || false,
+          auth: {
+            user: smtpConfig.username || '',
+            pass: smtpConfig.password || '',
+          },
+          fromName: smtpConfig.fromName || 'LeadNex Connect',
+          fromEmail: smtpConfig.fromEmail,
+        };
+      }
+      
+      // Fallback to old settings service for backward compatibility
+      this.currentSmtpConfigId = null;
       const provider = await settingsService.get('smtpProvider', null);
       
       // If we have a provider in database, use database settings
       if (provider) {
-        logger.info('[EmailSender] Using SMTP config from database settings');
+        logger.info('[EmailSender] Using SMTP config from legacy settings service');
         
         const config = {
           provider,
@@ -496,6 +527,18 @@ export class EmailSenderService {
             emailsSent: (lead[0].emailsSent || 0) + 1,
           })
           .where(eq(leads.id, params.leadId));
+      }
+
+      // Increment email counter for SMTP config (for rate limiting)
+      if (this.currentSmtpConfigId) {
+        try {
+          await configService.incrementEmailsSent(this.currentSmtpConfigId);
+        } catch (error: any) {
+          logger.warn('[EmailSender] Failed to increment SMTP counter', {
+            error: error.message,
+            smtpConfigId: this.currentSmtpConfigId,
+          });
+        }
       }
 
       logger.info('[EmailSender] Email sent successfully', {

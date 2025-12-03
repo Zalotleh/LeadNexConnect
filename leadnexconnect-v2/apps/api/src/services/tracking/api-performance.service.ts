@@ -1,7 +1,8 @@
 import { db } from '@leadnex/database';
-import { apiPerformance, leadSourceRoi, leads } from '@leadnex/database';
+import { apiPerformance, leadSourceRoi, leads, apiConfig } from '@leadnex/database';
 import { eq, and, gte, lte, lt, sql } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
+import { configService } from '../config.service';
 
 interface APIUsageLog {
   apiSource: string;
@@ -10,11 +11,93 @@ interface APIUsageLog {
 }
 
 export class APIPerformanceService {
+  private apiLimitsCache: Record<string, number> = {};
+  private apiCostsCache: Record<string, { perLead: number; perCall: number }> = {};
+  private cacheExpiry: number = 0;
+  private cacheDuration = 5 * 60 * 1000; // 5 minutes
+
+  /**
+   * Get API limits and costs from database (with caching)
+   */
+  private async getApiConfigsFromDB(): Promise<void> {
+    const now = Date.now();
+    
+    // Return cached data if still valid
+    if (this.cacheExpiry > now) {
+      return;
+    }
+
+    try {
+      const configs = await configService.getActiveApiConfigs();
+      
+      // Reset caches
+      this.apiLimitsCache = {};
+      this.apiCostsCache = {};
+      
+      // Populate from database
+      for (const config of configs) {
+        this.apiLimitsCache[config.apiSource] = config.monthlyLimit || 0;
+        this.apiCostsCache[config.apiSource] = {
+          perLead: parseFloat(config.costPerLead || '0'),
+          perCall: parseFloat(config.costPerAPICall || '0'),
+        };
+      }
+      
+      // Set default values if not in database
+      const defaults = [
+        { source: 'apollo', limit: 100, costPerLead: 8.75, costPerCall: 0 },
+        { source: 'hunter', limit: 50, costPerLead: 12.5, costPerCall: 0 },
+        { source: 'google_places', limit: 40000, costPerLead: 3.5, costPerCall: 0 },
+        { source: 'peopledatalabs', limit: 100, costPerLead: 6, costPerCall: 0 },
+      ];
+      
+      for (const def of defaults) {
+        if (!this.apiLimitsCache[def.source]) {
+          this.apiLimitsCache[def.source] = def.limit;
+          this.apiCostsCache[def.source] = {
+            perLead: def.costPerLead,
+            perCall: def.costPerCall,
+          };
+        }
+      }
+      
+      // Update cache expiry
+      this.cacheExpiry = now + this.cacheDuration;
+      
+      logger.info('[APIPerformance] API configs cached from database', {
+        sources: Object.keys(this.apiLimitsCache),
+      });
+    } catch (error: any) {
+      logger.error('[APIPerformance] Error loading API configs from database', {
+        error: error.message,
+      });
+      
+      // Fall back to hardcoded defaults on error
+      this.apiLimitsCache = {
+        apollo: 100,
+        hunter: 50,
+        google_places: 40000,
+        peopledatalabs: 100,
+      };
+      this.apiCostsCache = {
+        apollo: { perLead: 8.75, perCall: 0 },
+        hunter: { perLead: 12.5, perCall: 0 },
+        google_places: { perLead: 3.5, perCall: 0 },
+        peopledatalabs: { perLead: 6, perCall: 0 },
+      };
+      
+      // Still set cache expiry to avoid repeated failed queries
+      this.cacheExpiry = now + this.cacheDuration;
+    }
+  }
   /**
    * Log API usage - creates or updates performance tracking
    */
   async logAPIUsage(log: APIUsageLog): Promise<void> {
     try {
+      // Ensure we have latest config
+      await this.getApiConfigsFromDB();
+      
       const today = new Date();
       const periodStart = new Date(today.getFullYear(), today.getMonth(), 1);
       const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -41,19 +124,12 @@ export class APIPerformanceService {
           })
           .where(eq(apiPerformance.id, existing[0].id));
       } else {
-        // Create new record
-        const limits: Record<string, number> = {
-          apollo: 100,
-          hunter: 50,
-          google_places: 40000,
-          peopledatalabs: 100,
-        };
-
+        // Create new record with limit from config
         await db.insert(apiPerformance).values({
           apiSource: log.apiSource,
           leadsGenerated: 0, // Will be calculated from leads table
           apiCallsUsed: log.apiCallsUsed,
-          apiCallsLimit: limits[log.apiSource] || 0,
+          apiCallsLimit: this.apiLimitsCache[log.apiSource] || 0,
           periodStart: periodStart.toISOString().split('T')[0],
           periodEnd: periodEnd.toISOString().split('T')[0],
         });
@@ -72,6 +148,9 @@ export class APIPerformanceService {
    */
   async getMonthlyReport(month?: Date): Promise<any> {
     try {
+      // Load API configs from database
+      await this.getApiConfigsFromDB();
+      
       const targetMonth = month || new Date();
       const periodStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
       periodStart.setHours(0, 0, 0, 0);
@@ -92,22 +171,6 @@ export class APIPerformanceService {
 
       // Group leads by source and calculate metrics
       const report: Record<string, any> = {};
-
-      // API source limits (these should ideally come from settings)
-      const apiLimits: Record<string, number> = {
-        apollo: 100,
-        hunter: 50,
-        google_places: 40000,
-        peopledatalabs: 100,
-      };
-
-      // API cost per lead estimates
-      const apiCosts: Record<string, number> = {
-        apollo: 8.75,
-        hunter: 12.5,
-        google_places: 3.5,
-        peopledatalabs: 6,
-      };
 
       // Group automated leads by source
       const automatedLeads = allLeads.filter(l => l.sourceType === 'automated');
@@ -151,9 +214,9 @@ export class APIPerformanceService {
           .limit(1);
 
         const apiCallsUsed = apiRecord[0]?.apiCallsUsed || totalLeads; // Estimate 1 call per lead if no data
-        const apiCallsLimit = apiLimits[source] || 0;
+        const apiCallsLimit = this.apiLimitsCache[source] || 0;
         const quotaPercent = apiCallsLimit > 0 ? Math.round((apiCallsUsed / apiCallsLimit) * 100) : 0;
-        const costPerLead = apiCosts[source] || 0;
+        const costPerLead = this.apiCostsCache[source]?.perLead || 0;
 
         report[source] = {
           leadsGenerated: totalLeads,
@@ -217,27 +280,14 @@ export class APIPerformanceService {
    */
   async getAllTimeReport(): Promise<any> {
     try {
+      // Load API configs from database
+      await this.getApiConfigsFromDB();
+      
       // Get ALL leads (no date filter)
       const allLeads = await db.select().from(leads);
 
       // Group leads by source and calculate metrics
       const report: Record<string, any> = {};
-
-      // API source limits
-      const apiLimits: Record<string, number> = {
-        apollo: 100,
-        hunter: 50,
-        google_places: 40000,
-        peopledatalabs: 100,
-      };
-
-      // API cost per lead estimates
-      const apiCosts: Record<string, number> = {
-        apollo: 8.75,
-        hunter: 12.5,
-        google_places: 3.5,
-        peopledatalabs: 6,
-      };
 
       // Group automated leads by source
       const automatedLeads = allLeads.filter(l => l.sourceType === 'automated');
@@ -267,9 +317,9 @@ export class APIPerformanceService {
         const customersConverted = sourceLeads.filter(l => l.status === 'converted').length;
 
         const apiCallsUsed = totalLeads; // Estimate
-        const apiCallsLimit = apiLimits[source] || 0;
+        const apiCallsLimit = this.apiLimitsCache[source] || 0;
         const quotaPercent = 0; // No quota for all-time view
-        const costPerLead = apiCosts[source] || 0;
+        const costPerLead = this.apiCostsCache[source]?.perLead || 0;
 
         report[source] = {
           leadsGenerated: totalLeads,
