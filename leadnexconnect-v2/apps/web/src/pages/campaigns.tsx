@@ -1,5 +1,6 @@
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import ProgressDialog from '@/components/ProgressDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
 import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search } from 'lucide-react'
 import { useState, useEffect } from 'react'
@@ -71,6 +72,9 @@ export default function Campaigns() {
   const [showBulkPauseConfirm, setShowBulkPauseConfirm] = useState(false)
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
   const [isBulkProcessing, setIsBulkProcessing] = useState(false)
+  const [showProgressDialog, setShowProgressDialog] = useState(false)
+  const [progressTitle, setProgressTitle] = useState('')
+  const [progressMessage, setProgressMessage] = useState('')
   
   const [formData, setFormData] = useState<CampaignFormData>({
     name: '',
@@ -186,12 +190,24 @@ export default function Campaigns() {
     
     try {
       setIsStarting(true)
+      setShowStartConfirm(false)
+      
+      // Show progress dialog
+      setProgressTitle('Starting Campaign')
+      setProgressMessage('Initializing campaign execution...')
+      setShowProgressDialog(true)
+      
       await api.post(`/campaigns/${campaignToStart}/start`)
+      
+      setProgressMessage('Campaign started successfully!')
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      setShowProgressDialog(false)
       toast.success('Campaign started successfully!')
       fetchCampaigns()
-      setShowStartConfirm(false)
       setCampaignToStart(null)
     } catch (error: any) {
+      setShowProgressDialog(false)
       toast.error('Failed to start campaign')
       console.error(error)
     } finally {
@@ -1358,6 +1374,14 @@ export default function Campaigns() {
           cancelText="Cancel"
           variant="danger"
           isLoading={isBulkProcessing}
+        />
+
+        {/* Progress Dialog */}
+        <ProgressDialog
+          isOpen={showProgressDialog}
+          title={progressTitle}
+          message={progressMessage}
+          indeterminate={true}
         />
       </div>
     </Layout>

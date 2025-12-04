@@ -3,6 +3,8 @@ import { useRouter } from 'next/router'
 import { useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import ProgressDialog from '@/components/ProgressDialog'
+import ResultDialog from '@/components/ResultDialog'
 import leadsService, { Lead } from '@/services/leads.service'
 import { aiAPI, campaignsAPI, leadsAPI } from '@/services/api'
 import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, Flame, Thermometer, Snowflake, TrendingUp } from 'lucide-react'
@@ -45,6 +47,15 @@ export default function Leads() {
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState('')
+  const [showProgressDialog, setShowProgressDialog] = useState(false)
+  const [progressTitle, setProgressTitle] = useState('')
+  const [progressMessage, setProgressMessage] = useState('')
+  const [showResultDialog, setShowResultDialog] = useState(false)
+  const [resultData, setResultData] = useState<{ title: string; message?: string; stats: Array<{ label: string; value: number | string; highlight?: boolean }>; variant: 'success' | 'warning' | 'error' | 'info' }>({
+    title: '',
+    stats: [],
+    variant: 'success'
+  })
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
@@ -168,10 +179,16 @@ export default function Leads() {
 
     try {
       setGenerating(true)
-      setGenerationProgress(`Generating leads from ${generateForm.source}...`)
-
-      // Close modal and switch to batch view
+      
+      // Close generate modal
       setShowGenerateModal(false)
+      
+      // Show progress dialog
+      setProgressTitle('Generating Leads')
+      setProgressMessage(`Connecting to ${generateForm.source === 'apollo' ? 'Apollo.io' : generateForm.source === 'google_places' ? 'Google Places' : 'PeopleDataLabs'}...`)
+      setShowProgressDialog(true)
+      
+      // Switch to batch view
       setViewMode('batches')
 
       // Use the new unified generation endpoint with batch name
@@ -184,7 +201,7 @@ export default function Leads() {
         maxResults: generateForm.maxResults,
       })
 
-      setGenerationProgress('Analyzing websites and scoring leads...')
+      setProgressMessage('Analyzing websites and scoring leads...')
       
       // Wait for analysis to complete
       await new Promise(resolve => setTimeout(resolve, 1500))
@@ -194,15 +211,23 @@ export default function Leads() {
       const duplicatesCount = data?.duplicates || 0
       const byTier = data?.byTier || { hot: 0, warm: 0, cold: 0 }
       
-      let message = `✅ Generated ${savedCount} leads!`
-      if (byTier.hot > 0 || byTier.warm > 0 || byTier.cold > 0) {
-        message += `\n🔥 ${byTier.hot} hot | ⚡ ${byTier.warm} warm | ❄️ ${byTier.cold} cold`
-      }
-      if (duplicatesCount > 0) {
-        message += `\n(${duplicatesCount} duplicates skipped)`
-      }
-
-      toast.success(message, { duration: 5000 })
+      // Hide progress dialog
+      setShowProgressDialog(false)
+      
+      // Show result dialog with statistics
+      setResultData({
+        title: 'Leads Generated Successfully!',
+        message: `Successfully generated and analyzed ${savedCount} new leads`,
+        variant: 'success',
+        stats: [
+          { label: '🔥 Hot Leads', value: byTier.hot, highlight: byTier.hot > 0 },
+          { label: '⚡ Warm Leads', value: byTier.warm },
+          { label: '❄️ Cold Leads', value: byTier.cold },
+          { label: 'Total Generated', value: savedCount, highlight: true },
+          ...(duplicatesCount > 0 ? [{ label: 'Duplicates Skipped', value: duplicatesCount }] : [])
+        ]
+      })
+      setShowResultDialog(true)
       
       // Refresh both leads and batches - force refetch
       await Promise.all([
@@ -222,6 +247,7 @@ export default function Leads() {
         maxResults: 50,
       })
     } catch (error: any) {
+      setShowProgressDialog(false)
       toast.error(error.response?.data?.error?.message || 'Failed to generate leads')
       console.error(error)
       
@@ -236,6 +262,11 @@ export default function Leads() {
   const handleExport = async () => {
     try {
       if (viewMode === 'batches') {
+        // Show progress
+        setProgressTitle('Exporting Batches')
+        setProgressMessage('Preparing batch data...')
+        setShowProgressDialog(true)
+        
         // Export batches as CSV
         const batchesData = batches || [];
         const csvContent = [
@@ -251,6 +282,8 @@ export default function Leads() {
           ].join(','))
         ].join('\n');
 
+        setProgressMessage('Generating CSV file...')
+        
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -261,10 +294,13 @@ export default function Leads() {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
         
+        setShowProgressDialog(false)
         toast.success('Batches exported successfully!');
       } else {
         // Export leads from table view
-        toast.loading('Exporting leads...');
+        setProgressTitle('Exporting Leads')
+        setProgressMessage('Fetching lead data...')
+        setShowProgressDialog(true)
         
         const params = new URLSearchParams();
         if (statusFilter !== 'all') params.append('status', statusFilter);
@@ -275,6 +311,8 @@ export default function Leads() {
 
         const queryString = params.toString();
         const url = `/leads/export${queryString ? '?' + queryString : ''}`;
+        
+        setProgressMessage('Generating CSV file...')
         
         // Fetch the CSV data
         const response = await api.get(url);
@@ -290,11 +328,11 @@ export default function Leads() {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(downloadUrl);
         
-        toast.dismiss();
+        setShowProgressDialog(false)
         toast.success('Leads exported successfully!');
       }
     } catch (error: any) {
-      toast.dismiss();
+      setShowProgressDialog(false)
       toast.error(error.response?.data?.error?.message || 'Failed to export');
     }
   }
@@ -324,12 +362,22 @@ export default function Leads() {
 
     setIsImporting(true);
     
+    // Close import dialog
+    setShowImportDialog(false);
+    
+    // Show progress dialog
+    setProgressTitle('Importing Leads')
+    setProgressMessage('Reading CSV file...')
+    setShowProgressDialog(true)
+    
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const csvData = event.target?.result as string;
         
         try {
+          setProgressMessage('Processing and validating leads...')
+          
           const response = await api.post('/leads/import', {
             csvData,
             industry: importForm.industry,
@@ -341,34 +389,22 @@ export default function Leads() {
             const { imported, duplicates, totalLeads } = response.data.data;
             const failed = totalLeads - imported - duplicates;
             
-            // Build detailed success message
-            let message = `📊 Import Complete!\n\n`;
-            message += `✅ Successfully added: ${imported} leads\n`;
-            if (duplicates > 0) {
-              message += `⚠️ Duplicates skipped: ${duplicates} leads\n`;
-            }
-            if (failed > 0) {
-              message += `❌ Failed to import: ${failed} leads\n`;
-            }
-            message += `📦 Total processed: ${totalLeads} leads`;
+            // Hide progress dialog
+            setShowProgressDialog(false)
             
-            // Show appropriate toast based on results
-            if (imported === 0 && duplicates > 0) {
-              toast.error(`All ${duplicates} leads were duplicates. No new leads added.`, {
-                duration: 6000,
-                style: { maxWidth: '500px' }
-              });
-            } else if (imported > 0 && duplicates === 0) {
-              toast.success(message, { 
-                duration: 5000,
-                style: { maxWidth: '500px', whiteSpace: 'pre-line' }
-              });
-            } else {
-              toast.success(message, { 
-                duration: 6000,
-                style: { maxWidth: '500px', whiteSpace: 'pre-line' }
-              });
-            }
+            // Show result dialog
+            setResultData({
+              title: 'Import Complete!',
+              message: `Processed ${totalLeads} leads from CSV file`,
+              variant: imported === 0 && duplicates > 0 ? 'warning' : 'success',
+              stats: [
+                { label: '✅ Successfully Added', value: imported, highlight: imported > 0 },
+                ...(duplicates > 0 ? [{ label: '⚠️ Duplicates Skipped', value: duplicates }] : []),
+                ...(failed > 0 ? [{ label: '❌ Failed to Import', value: failed }] : []),
+                { label: '📦 Total Processed', value: totalLeads, highlight: true }
+              ]
+            })
+            setShowResultDialog(true)
             
             refetch();
             refetchBatches();
@@ -378,11 +414,11 @@ export default function Leads() {
               setViewMode('batches');
             }
             
-            // Close dialog
-            setShowImportDialog(false);
+            // Reset import form
             setImportFile(null);
           }
         } catch (error: any) {
+          setShowProgressDialog(false)
           toast.error(error.response?.data?.error?.message || 'Failed to import leads');
         } finally {
           setIsImporting(false);
@@ -390,6 +426,7 @@ export default function Leads() {
       };
       reader.readAsText(importFile);
     } catch (error: any) {
+      setShowProgressDialog(false)
       toast.error('Failed to read file');
       setIsImporting(false);
     }
@@ -1509,6 +1546,24 @@ export default function Leads() {
           message={`Are you sure you want to delete ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}? This action cannot be undone.`}
           confirmText="Delete"
           isLoading={isDeleting}
+        />
+
+        {/* Progress Dialog */}
+        <ProgressDialog
+          isOpen={showProgressDialog}
+          title={progressTitle}
+          message={progressMessage}
+          indeterminate={true}
+        />
+
+        {/* Result Dialog */}
+        <ResultDialog
+          isOpen={showResultDialog}
+          onClose={() => setShowResultDialog(false)}
+          title={resultData.title}
+          message={resultData.message}
+          variant={resultData.variant}
+          stats={resultData.stats}
         />
       </div>
     </Layout>
