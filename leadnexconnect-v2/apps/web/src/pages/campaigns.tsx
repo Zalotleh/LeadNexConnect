@@ -724,10 +724,10 @@ export default function Campaigns() {
                   selectedCampaigns.has(campaign.id) ? 'ring-2 ring-primary-500' : ''
                 }`}
               >
-                <div className="p-6 flex-1">
+                <div className="p-4 lg:p-6 flex-1">
                   {/* Header with Checkbox */}
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
                       <input
                         type="checkbox"
                         checked={selectedCampaigns.has(campaign.id)}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Home, Users, Mail, TrendingUp, Settings, Workflow, FileText, Variable, ChevronDown, ChevronRight, Activity } from 'lucide-react'
+import { Home, Users, Mail, TrendingUp, Settings, Workflow, FileText, Variable, ChevronDown, ChevronRight, Activity, Menu, X } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -11,6 +11,7 @@ export default function Layout({ children }: LayoutProps) {
   const router = useRouter()
   const [isContentOpen, setIsContentOpen] = useState(true)
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(true)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -36,12 +37,28 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Mobile menu overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
+      <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
+        isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-center h-16 border-b px-4">
-            <h1 className="text-2xl font-bold text-primary-600">LeadNexConnect</h1>
+          <div className="flex items-center justify-between h-16 border-b px-4">
+            <h1 className="text-xl lg:text-2xl font-bold text-primary-600">LeadNexConnect</h1>
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="lg:hidden p-2 rounded-md hover:bg-gray-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Navigation */}
@@ -192,10 +209,16 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="pl-64">
+      <div className="lg:pl-64">
         {/* Top bar */}
         <header className="bg-white shadow-sm h-16">
-          <div className="flex items-center justify-between h-full px-8">
+          <div className="flex items-center justify-between h-full px-4 lg:px-8">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2 rounded-md hover:bg-gray-100"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
             <div className="flex-1">
               {/* Search removed - use page-specific search instead */}
             </div>
@@ -203,7 +226,7 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="p-8">{children}</main>
+        <main className="p-4 lg:p-8">{children}</main>
       </div>
     </div>
   )

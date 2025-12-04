@@ -278,7 +278,7 @@ export default function TemplatesPage() {
               <button
                 onClick={() => setShowCategoryFilter(!showCategoryFilter)}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors ${
-                  selectedCategory ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300'
+                  selectedCategory ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 text-gray-700'
                 }`}
               >
                 <Filter className="w-4 h-4" />

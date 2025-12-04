@@ -46,7 +46,7 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
     <div className="bg-white rounded-lg shadow overflow-hidden">
       {/* Bulk Actions Bar */}
       {selectedBatches.size > 0 && (
-        <div className="bg-primary-50 border-b border-primary-200 px-6 py-4 flex items-center justify-between">
+        <div className="bg-primary-50 border-b border-primary-200 px-4 lg:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
           <div className="flex items-center space-x-4">
             <span className="text-sm font-medium text-primary-900">
               {selectedBatches.size} batch{selectedBatches.size !== 1 ? 'es' : ''} selected
@@ -60,15 +60,16 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
           </div>
           <button
             onClick={onDeleteSelected}
-            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+            className="px-3 lg:px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" />
-            Delete Selected
+            <span className="hidden sm:inline">Delete Selected</span>
+            <span className="sm:hidden">Delete</span>
           </button>
         </div>
       )}
       
-      <div className="p-6 space-y-4">
+      <div className="p-4 lg:p-6 space-y-4">
         {/* Loading Card - Show when generating */}
         {generating && (
           <div className="border-2 border-primary-500 rounded-lg overflow-hidden bg-primary-50 animate-pulse">
