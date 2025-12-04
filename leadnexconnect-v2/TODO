@@ -1,9 +1,13 @@
-inside Email Templates page, the Category button has white text color on white background, fix it
-fix the mobile view issue < 642 a black color covers half of the view, in leads page leads viewv  sarts at 1010, batches view starts at 724, campaigns page starts at 749
-redesign the settings page, create a tab for API settings, another one for SMTP, create a user intuitive to shuffle between SMTP providers, based on limits maybe, create a documentation on how set up smtp for each or add a link for each smtp provider documentations, the same for API
-clean the unused and unnecessary files
-create an overview comprehensive project structure and data flow, features to share with claude/ai
-comment out the seed data insertioninside seed.ts file.
+✅ COMPLETED: Create comprehensive documentation (docs/ folder with 6 files)
+   - 01-PROJECT-OVERVIEW.md - Project status, features, metrics
+   - 02-DATABASE-SCHEMA.md - Complete database documentation
+   - 03-API-ENDPOINTS.md - All 82+ API endpoints
+   - 04-FEATURE-DOCUMENTATION.md - Detailed feature workflows
+   - 06-DATA-FLOW.md - Architecture and data flow diagrams
+   - 09-KNOWN-ISSUES.md - Bugs, limitations, roadmap
+   - README.md - Documentation index
+
+comment out the seed data insertion inside seed.ts file.
 
 "Qualified/Unqualified" tracking - These aren't real statuses. Use quality score tiers (Hot/Warm/Cold) instead
 Auto-detecting "Responded" - Requires email service webhook integration (planned)
@@ -12,131 +16,3 @@ Email webhook integration to auto-update responded status
 AI sentiment analysis for auto-detecting interest level
 Custom status fields for your specific workflow
 Bulk status updates from campaign analytics
-
- Implementation Complete!
-I've successfully implemented the full user-configurable API and SMTP settings system. Here's what has been completed:
-
-🗄️ Database Layer
-✅ Created api_config table with 13 fields for API source configuration
-✅ Created smtp_config table with 22 fields for SMTP provider configuration
-✅ Migration applied successfully - tables are live in the database
-🔧 Backend Services (API)
-config.service.ts - Complete CRUD operations for API & SMTP configs:
-
-API config management (create, read, update, delete)
-SMTP config management with priority and primary flag support
-Smart SMTP failover logic (getNextAvailableSmtpConfig)
-Email usage tracking (hourly/daily limits with auto-reset)
-Built-in documentation URLs for all providers
-api-performance.service.ts - Updated to use database configs:
-
-Fetches API limits and costs from apiConfig table
-5-minute caching to reduce DB queries
-Falls back to defaults if config unavailable
-All quota calculations now use user-configured data
-email-sender.service.ts - Smart SMTP failover:
-
-Uses configService.getNextAvailableSmtpConfig() for automatic failover
-Checks hourly/daily limits before sending
-Falls back to next priority SMTP if primary is at limit
-Increments email counters after successful sends
-Backward compatible with legacy settings
-🌐 API Endpoints
-API Configuration (/api/config/apis):
-
-GET /apis - List all (masked credentials)
-GET /apis/:source - Get specific (masked)
-GET /apis/:source/unmasked - Get unmasked for editing
-POST /apis - Create or update
-DELETE /apis/:source - Delete
-SMTP Configuration (/api/config/smtp):
-
-GET /smtp - List all (sorted by priority, masked passwords)
-GET /smtp/:id - Get specific (masked)
-GET /smtp/:id/unmasked - Get unmasked for editing
-POST /smtp - Create
-PUT /smtp/:id - Update
-DELETE /smtp/:id - Delete
-POST /smtp/test - Test SMTP connection
-🎨 Frontend Components (Web)
-config.service.ts - Frontend API client for all config endpoints
-
-ApiConfigTab.tsx - API configuration management:
-
-Grid display of all API configurations
-Shows monthly limits, costs, active status
-Add/Edit/Delete operations
-Documentation links for each provider
-Visual indicators for active/inactive status
-ApiConfigDialog.tsx - API configuration form:
-
-Provider selection (Apollo, Hunter, Google Places, PeopleDataLabs)
-Secure API key/secret fields with show/hide
-Plan name, monthly limit inputs
-Cost per lead and per API call
-Active toggle and setup notes
-Direct links to API documentation
-SmtpConfigTab.tsx - SMTP configuration management:
-
-List view with primary and active badges
-Real-time usage bars (daily/hourly limits)
-Priority level display
-Color-coded usage indicators (green/yellow/red)
-Add/Edit/Delete operations
-Documentation links for each provider
-SmtpConfigDialog.tsx - SMTP configuration form:
-
-Provider selection (Gmail, Outlook, SendGrid, Mailgun, AWS SES, Custom)
-Connection settings (host, port, SSL/TLS)
-Authentication (username/password with secure input)
-From email and name configuration
-Daily/hourly limits and priority
-Primary provider flag
-Test connection button
-Setup notes field
-settings.tsx - Redesigned with tabs:
-
-General Settings tab - Legacy API keys and SMTP settings
-API Configuration tab - New API config management
-SMTP Configuration tab - New SMTP config management
-Clean tab navigation with icons
-📋 Built-in Documentation
-API Providers:
-
-Apollo: https://www.apollo.io/api
-Hunter: https://hunter.io/api-documentation
-Google Places: https://developers.google.com/maps/documentation/places/web-service
-PeopleDataLabs: https://docs.peopledatalabs.com/
-SMTP Providers:
-
-Gmail: https://support.google.com/mail/answer/7126229
-Outlook: https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings
-SendGrid: https://docs.sendgrid.com/for-developers/sending-email/integrating-with-the-smtp-api
-Mailgun: https://documentation.mailgun.com/en/latest/user_manual.html#smtp
-AWS SES: https://docs.aws.amazon.com/ses/latest/dg/send-email-smtp.html
-🚀 Key Features
-Smart SMTP Failover: Automatically switches to backup SMTP when primary hits limits
-Real-time Usage Tracking: Tracks emails sent per hour/day with automatic resets
-Priority-based Selection: Uses highest priority active SMTP first
-Secure Credential Storage: Passwords/API keys masked in UI, only revealed when needed
-Test Connections: Test SMTP settings before saving
-Active/Inactive Toggles: Enable/disable providers without deleting
-Documentation Integration: Direct links to setup guides for each provider
-Backward Compatible: Works with legacy settings, migrates seamlessly
-📊 How It Works
-User configures API sources in Settings > API Configuration tab
-API Performance dashboard now shows accurate quota and cost data
-User adds multiple SMTP providers with limits and priorities
-Email sending automatically selects best available SMTP:
-Checks primary first
-Falls back to next priority if limit reached
-Increments usage counters after send
-Resets hourly/daily counters automatically
-🎉 Result
-No more hardcoded API limits or costs
-Accurate API Performance metrics based on actual user plans
-Automatic email failover prevents sending failures
-Complete transparency and control for users
-Professional UI with clear documentation links
-The system is now fully functional and ready for use! Users can configure their API providers and SMTP settings through the Settings page, and the system will automatically use these configurations for lead generation and email sending. 🎯
-
