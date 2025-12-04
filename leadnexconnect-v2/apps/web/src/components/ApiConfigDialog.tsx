@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { configService, ApiConfig } from '@/services/config.service';
 import toast from 'react-hot-toast';
+import InlineError from './InlineError';
 
 interface ApiConfigDialogProps {
   config: ApiConfig | null;
@@ -13,6 +14,7 @@ export default function ApiConfigDialog({ config, onClose }: ApiConfigDialogProp
   const [saving, setSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
+  const [errors, setErrors] = useState<{ apiSource?: string; apiSecret?: string }>({});
 
   const [formData, setFormData] = useState({
     apiSource: config?.apiSource || '',
@@ -31,15 +33,30 @@ export default function ApiConfigDialog({ config, onClose }: ApiConfigDialogProp
     { value: 'hunter', label: 'Hunter.io', docUrl: 'https://hunter.io/api-documentation' },
     { value: 'google_places', label: 'Google Places', docUrl: 'https://developers.google.com/maps/documentation/places/web-service' },
     { value: 'peopledatalabs', label: 'PeopleDataLabs', docUrl: 'https://docs.peopledatalabs.com/' },
+    { value: 'google_custom_search', label: 'Google Custom Search', docUrl: 'https://developers.google.com/custom-search/v1/overview' },
   ];
 
   const selectedSource = apiSourceOptions.find(opt => opt.value === formData.apiSource);
 
+  const validateForm = () => {
+    const newErrors: { apiSource?: string; apiSecret?: string } = {};
+    
+    if (!formData.apiSource) {
+      newErrors.apiSource = 'Please select an API source';
+    }
+    
+    if (formData.apiSource === 'google_custom_search' && !formData.apiSecret) {
+      newErrors.apiSecret = 'Custom Search Engine ID is required for Google Custom Search';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.apiSource) {
-      toast.error('Please select an API source');
+    if (!validateForm()) {
       return;
     }
 
@@ -89,9 +106,12 @@ export default function ApiConfigDialog({ config, onClose }: ApiConfigDialogProp
             </label>
             <select
               value={formData.apiSource}
-              onChange={(e) => setFormData({ ...formData, apiSource: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, apiSource: e.target.value });
+                setErrors({ ...errors, apiSource: undefined });
+              }}
               disabled={isEditing}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100"
+              className={`w-full px-4 py-2 border ${errors.apiSource ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100`}
               required
             >
               <option value="">Select an API source</option>
@@ -101,6 +121,7 @@ export default function ApiConfigDialog({ config, onClose }: ApiConfigDialogProp
                 </option>
               ))}
             </select>
+            <InlineError message={errors.apiSource || ''} visible={!!errors.apiSource} />
             {selectedSource && (
               <a
                 href={selectedSource.docUrl}
@@ -138,15 +159,19 @@ export default function ApiConfigDialog({ config, onClose }: ApiConfigDialogProp
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              API Secret (if required)
+              {formData.apiSource === 'google_custom_search' ? 'Custom Search Engine ID *' : 'API Secret (if required)'}
             </label>
             <div className="relative">
               <input
                 type={showApiSecret ? 'text' : 'password'}
                 value={formData.apiSecret}
-                onChange={(e) => setFormData({ ...formData, apiSecret: e.target.value })}
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Enter your API secret"
+                onChange={(e) => {
+                  setFormData({ ...formData, apiSecret: e.target.value });
+                  setErrors({ ...errors, apiSecret: undefined });
+                }}
+                className={`w-full px-4 py-2 pr-10 border ${errors.apiSecret ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
+                placeholder={formData.apiSource === 'google_custom_search' ? 'Enter your Search Engine ID (cx parameter)' : 'Enter your API secret'}
+                required={formData.apiSource === 'google_custom_search'}
               />
               <button
                 type="button"
@@ -156,6 +181,12 @@ export default function ApiConfigDialog({ config, onClose }: ApiConfigDialogProp
                 {showApiSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            <InlineError message={errors.apiSecret || ''} visible={!!errors.apiSecret} />
+            {formData.apiSource === 'google_custom_search' && (
+              <p className="text-xs text-gray-500 mt-1">
+                Get this from <a href="https://programmablesearchengine.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">Programmable Search Engine</a>
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

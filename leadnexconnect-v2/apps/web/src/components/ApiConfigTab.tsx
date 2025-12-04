@@ -81,6 +81,7 @@ export default function ApiConfigTab() {
       hunter: 'Hunter.io',
       google_places: 'Google Places',
       peopledatalabs: 'PeopleDataLabs',
+      google_custom_search: 'Google Custom Search',
     };
     return labels[source] || source;
   };
@@ -188,6 +189,18 @@ export default function ApiConfigTab() {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">API Key:</span>
                       <span className="text-sm font-mono text-gray-500">{config.apiKey}</span>
+                    </div>
+                  )}
+                  {config.apiSecret && config.apiSource === 'google_custom_search' && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Search Engine ID:</span>
+                      <span className="text-sm font-mono text-gray-500">{config.apiSecret}</span>
+                    </div>
+                  )}
+                  {config.apiSecret && config.apiSource !== 'google_custom_search' && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">API Secret:</span>
+                      <span className="text-sm font-mono text-gray-500">{config.apiSecret}</span>
                     </div>
                   )}
                 </div>

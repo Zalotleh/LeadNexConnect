@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { leadsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 import WorkflowSelector from '../WorkflowSelector';
+import InlineError from '../InlineError';
 
 interface Batch {
   id: number;
@@ -233,6 +234,7 @@ const BatchAnalyticsModal: React.FC<BatchAnalyticsModalProps> = ({ show, batch, 
 
 const BatchCampaignModal: React.FC<BatchCampaignModalProps> = ({ show, batch, onClose, onCreateCampaign }) => {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string>('');
   
   if (!show || !batch) return null;
 
@@ -241,7 +243,7 @@ const BatchCampaignModal: React.FC<BatchCampaignModalProps> = ({ show, batch, on
     const description = (document.getElementById('batchCampaignDescription') as HTMLTextAreaElement).value;
 
     if (!name.trim()) {
-      toast.error('Please enter a campaign name');
+      setNameError('Campaign name is required');
       return;
     }
 
@@ -306,9 +308,11 @@ const BatchCampaignModal: React.FC<BatchCampaignModalProps> = ({ show, batch, on
               type="text"
               defaultValue={`Campaign - ${batch.name}`}
               id="batchCampaignName"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              onChange={() => setNameError('')}
+              className={`w-full px-4 py-2 border ${nameError ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
               placeholder="e.g., NYC Hotels Outreach - March 2024"
             />
+            <InlineError message={nameError} visible={!!nameError} />
           </div>
 
           <div>

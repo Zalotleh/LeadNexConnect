@@ -10,6 +10,9 @@ import { emailGeneratorService } from '../services/outreach/email-generator.serv
 import { emailQueueService } from '../services/outreach/email-queue.service';
 
 export class CampaignsController {
+  // In-memory lock to prevent duplicate campaign executions
+  private static executingCampaigns: Set<string> = new Set();
+  
   /**
    * GET /api/campaigns - Get all campaigns
    */
@@ -606,6 +609,15 @@ export class CampaignsController {
 
       const campaign = campaignResult[0];
 
+      // Prevent starting if already active or running
+      if (campaign.status === 'active') {
+        logger.warn('[CampaignsController] Campaign already active, skipping duplicate start', { id });
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Campaign is already active' },
+        });
+      }
+
       // Determine if campaign is scheduled for future
       const scheduledStartDate = campaign.startDate ? new Date(campaign.startDate) : new Date();
       const now = new Date();
@@ -690,6 +702,17 @@ export class CampaignsController {
    * Execute campaign: Generate leads and send emails
    */
   private async executeCampaign(campaignId: string, campaign: any) {
+    // Check if campaign is already executing
+    if (CampaignsController.executingCampaigns.has(campaignId)) {
+      logger.warn('[CampaignsController] Campaign already executing, skipping duplicate', {
+        campaignId,
+      });
+      return;
+    }
+
+    // Add to executing set
+    CampaignsController.executingCampaigns.add(campaignId);
+
     try {
       logger.info('[CampaignsController] Executing campaign', {
         campaignId,
@@ -722,6 +745,10 @@ export class CampaignsController {
         .update(campaigns)
         .set({ status: 'paused' })
         .where(eq(campaigns.id, campaignId));
+    } finally {
+      // Always remove the campaign from the executing set
+      CampaignsController.executingCampaigns.delete(campaignId);
+      logger.info('[CampaignsController] Removed campaign from executing set', { campaignId });
     }
   }
 

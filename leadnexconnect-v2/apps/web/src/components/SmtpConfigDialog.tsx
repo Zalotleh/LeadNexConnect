@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Eye, EyeOff, ExternalLink, TestTube } from 'lucide-react';
 import { configService, SmtpConfig } from '@/services/config.service';
 import toast from 'react-hot-toast';
+import InlineError from './InlineError';
 
 interface SmtpConfigDialogProps {
   config: SmtpConfig | null;
@@ -13,6 +14,7 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{ provider?: string; host?: string; port?: string; fromEmail?: string }>({});
 
   const [formData, setFormData] = useState({
     provider: config?.provider || '',
@@ -43,9 +45,45 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
 
   const selectedProvider = providerOptions.find(opt => opt.value === formData.provider);
 
+  const validateForm = () => {
+    const newErrors: { provider?: string; host?: string; port?: string; fromEmail?: string } = {};
+    
+    if (!formData.provider) {
+      newErrors.provider = 'Please select a provider';
+    }
+    
+    if (!formData.host) {
+      newErrors.host = 'SMTP host is required';
+    }
+    
+    if (!formData.port) {
+      newErrors.port = 'SMTP port is required';
+    }
+    
+    if (!formData.fromEmail) {
+      newErrors.fromEmail = 'From email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.fromEmail)) {
+      newErrors.fromEmail = 'Please enter a valid email address';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleTestConnection = async () => {
-    if (!formData.host || !formData.port) {
-      toast.error('Please enter host and port');
+    // Only validate host and port for connection test
+    const testErrors: { host?: string; port?: string } = {};
+    
+    if (!formData.host) {
+      testErrors.host = 'SMTP host is required for testing';
+    }
+    
+    if (!formData.port) {
+      testErrors.port = 'SMTP port is required for testing';
+    }
+    
+    if (Object.keys(testErrors).length > 0) {
+      setErrors({ ...errors, ...testErrors });
       return;
     }
 
@@ -75,8 +113,7 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.provider || !formData.host || !formData.fromEmail) {
-      toast.error('Please fill in all required fields');
+    if (!validateForm()) {
       return;
     }
 
@@ -153,8 +190,11 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
               </label>
               <select
                 value={formData.provider}
-                onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                onChange={(e) => {
+                  setFormData({ ...formData, provider: e.target.value });
+                  setErrors({ ...errors, provider: undefined });
+                }}
+                className={`w-full px-4 py-2 border ${errors.provider ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
                 required
               >
                 <option value="">Select a provider</option>
@@ -164,6 +204,7 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
                   </option>
                 ))}
               </select>
+              <InlineError message={errors.provider || ''} visible={!!errors.provider} />
               {selectedProvider && selectedProvider.docUrl && (
                 <a
                   href={selectedProvider.docUrl}
@@ -199,11 +240,15 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
               <input
                 type="text"
                 value={formData.host}
-                onChange={(e) => setFormData({ ...formData, host: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                onChange={(e) => {
+                  setFormData({ ...formData, host: e.target.value });
+                  setErrors({ ...errors, host: undefined });
+                }}
+                className={`w-full px-4 py-2 border ${errors.host ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
                 placeholder="smtp.example.com"
                 required
               />
+              <InlineError message={errors.host || ''} visible={!!errors.host} />
             </div>
 
             <div>
@@ -213,13 +258,17 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
               <input
                 type="number"
                 value={formData.port}
-                onChange={(e) => setFormData({ ...formData, port: parseInt(e.target.value) || 587 })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                onChange={(e) => {
+                  setFormData({ ...formData, port: parseInt(e.target.value) || 587 });
+                  setErrors({ ...errors, port: undefined });
+                }}
+                className={`w-full px-4 py-2 border ${errors.port ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
                 placeholder="587"
                 min="1"
                 max="65535"
                 required
               />
+              <InlineError message={errors.port || ''} visible={!!errors.port} />
             </div>
           </div>
 
@@ -295,11 +344,15 @@ export default function SmtpConfigDialog({ config, onClose }: SmtpConfigDialogPr
               <input
                 type="email"
                 value={formData.fromEmail}
-                onChange={(e) => setFormData({ ...formData, fromEmail: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                onChange={(e) => {
+                  setFormData({ ...formData, fromEmail: e.target.value });
+                  setErrors({ ...errors, fromEmail: undefined });
+                }}
+                className={`w-full px-4 py-2 border ${errors.fromEmail ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
                 placeholder="noreply@example.com"
                 required
               />
+              <InlineError message={errors.fromEmail || ''} visible={!!errors.fromEmail} />
             </div>
 
             <div>

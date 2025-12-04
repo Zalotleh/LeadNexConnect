@@ -5,6 +5,7 @@ import EmailEditor from '../EmailEditor';
 import TinyMCEEmailEditor from './TinyMCEEmailEditor';
 import toast from 'react-hot-toast';
 import api from '@/services/api';
+import InlineError from '../InlineError';
 
 interface EnhancedEmailEditorProps {
   label: string;
@@ -110,6 +111,7 @@ export default function EnhancedEmailEditor({
     subject: defaultSubject,
     category: 'general' as 'initial_outreach' | 'follow_up' | 'meeting_request' | 'introduction' | 'product_demo' | 'partnership' | 'general' | 'other'
   });
+  const [templateErrors, setTemplateErrors] = useState<{ name?: string; subject?: string; body?: string }>({});
 
   // Preview states
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -301,13 +303,23 @@ export default function EnhancedEmailEditor({
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!templateForm.name || !templateForm.subject) {
-      toast.error('Template name and subject are required');
-      return;
+    // Validate form
+    const errors: { name?: string; subject?: string; body?: string } = {};
+    
+    if (!templateForm.name || !templateForm.name.trim()) {
+      errors.name = 'Template name is required';
     }
-
+    
+    if (!templateForm.subject || !templateForm.subject.trim()) {
+      errors.subject = 'Subject is required';
+    }
+    
     if (!value || value.trim() === '') {
-      toast.error('Email body cannot be empty');
+      errors.body = 'Email body cannot be empty';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setTemplateErrors(errors);
       return;
     }
 
@@ -498,7 +510,10 @@ export default function EnhancedEmailEditor({
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">Save as Template</h3>
               <button
-                onClick={() => setShowSaveTemplateModal(false)}
+                onClick={() => {
+                  setShowSaveTemplateModal(false);
+                  setTemplateErrors({});
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="w-5 h-5" />
@@ -506,6 +521,13 @@ export default function EnhancedEmailEditor({
             </div>
 
             <div className="p-4 space-y-4">
+              {/* Body Error (show at top if exists) */}
+              {templateErrors.body && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <InlineError message={templateErrors.body} visible={true} />
+                </div>
+              )}
+              
               {/* Template Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -514,10 +536,14 @@ export default function EnhancedEmailEditor({
                 <input
                   type="text"
                   value={templateForm.name}
-                  onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                  onChange={(e) => {
+                    setTemplateForm({ ...templateForm, name: e.target.value });
+                    setTemplateErrors({ ...templateErrors, name: undefined });
+                  }}
                   placeholder="e.g., Initial Outreach - Tech Industry"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className={`w-full px-3 py-2 border ${templateErrors.name ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
                 />
+                <InlineError message={templateErrors.name || ''} visible={!!templateErrors.name} />
               </div>
 
               {/* Description */}
@@ -542,10 +568,14 @@ export default function EnhancedEmailEditor({
                 <input
                   type="text"
                   value={templateForm.subject}
-                  onChange={(e) => setTemplateForm({ ...templateForm, subject: e.target.value })}
+                  onChange={(e) => {
+                    setTemplateForm({ ...templateForm, subject: e.target.value });
+                    setTemplateErrors({ ...templateErrors, subject: undefined });
+                  }}
                   placeholder="Email subject line"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className={`w-full px-3 py-2 border ${templateErrors.subject ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500`}
                 />
+                <InlineError message={templateErrors.subject || ''} visible={!!templateErrors.subject} />
               </div>
 
               {/* Category */}
