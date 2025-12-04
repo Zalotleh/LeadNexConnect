@@ -1,10 +1,35 @@
 import { db } from './index';
 import { emailTemplates, settings, customVariables, leads, campaigns, apiPerformance } from './schema';
 
+/**
+ * ⚠️ SEED DATA COMMENTED OUT FOR PRODUCTION
+ * 
+ * This seed file contains sample/test data that should NOT be inserted in production.
+ * 
+ * To use seed data for development/testing:
+ * 1. Uncomment the seed data insertion code below
+ * 2. Run: npm run db:seed
+ * 3. Remember to comment it out again before deploying
+ * 
+ * The seed data includes:
+ * - Sample leads (5 leads)
+ * - Sample campaigns
+ * - API performance data
+ * - Email templates (7 templates)
+ * - Settings
+ * - Custom variables (10 variables)
+ */
+
 async function seed() {
   console.log('🌱 Seeding database...');
+  console.log('⚠️  Seed data is currently COMMENTED OUT to prevent accidental insertion in production.');
+  console.log('💡 To enable seed data, uncomment the code in packages/database/src/seed.ts');
 
   try {
+    /* ============================================================================
+     * SEED DATA COMMENTED OUT - UNCOMMENT BELOW TO USE IN DEVELOPMENT
+     * ============================================================================
+     
     // Seed Sample Leads
     console.log('Creating sample leads...');
 
@@ -674,9 +699,12 @@ BookNex Solutions</p>`,
       }
     }
 
-    console.log('🎉 Database seeded successfully!');
+    ============================================================================ */
+
+    console.log('✅ Seed function completed (no data inserted - seed data is commented out)');
+    console.log('🎉 Database seeding skipped successfully!');
   } catch (error) {
-    console.error('❌ Error seeding database:', error);
+    console.error('❌ Error in seed function:', error);
     throw error;
   }
 }
