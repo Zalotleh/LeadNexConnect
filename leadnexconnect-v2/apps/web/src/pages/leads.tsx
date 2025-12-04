@@ -715,22 +715,46 @@ export default function Leads() {
   const confirmDeleteBatches = async () => {
     try {
       setIsDeleting(true)
-      toast.loading(`Deleting ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''}...`)
+      setShowDeleteBatchesConfirm(false)
+      
+      // Show progress dialog
+      setProgressTitle('Deleting Batches')
+      setProgressMessage(`Removing ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''} and their associated leads...`)
+      setShowProgressDialog(true)
       
       // Delete each batch
-      await Promise.all(
+      const results = await Promise.allSettled(
         Array.from(selectedBatches).map(batchId => 
           api.delete(`/leads/batches/${batchId}`)
         )
       )
       
-      toast.dismiss()
-      toast.success(`Successfully deleted ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''}`)
-      setShowDeleteBatchesConfirm(false)
-      setSelectedBatches(new Set())
-      refetchBatches()
+      const successful = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+      
+      setShowProgressDialog(false)
+      
+      // Show result dialog
+      setResultData({
+        title: failed === 0 ? 'Batches Deleted Successfully' : 'Batch Deletion Completed',
+        message: failed === 0 
+          ? 'All selected batches have been removed from your workspace.'
+          : 'Some batches could not be deleted. See details below.',
+        variant: failed === 0 ? 'success' : 'warning',
+        stats: [
+          { label: '✅ Successfully Deleted', value: successful.toString(), highlight: successful > 0 },
+          ...(failed > 0 ? [{ label: '❌ Failed to Delete', value: failed.toString(), highlight: true }] : []),
+          { label: '📦 Total Selected', value: selectedBatches.size.toString() }
+        ]
+      })
+      setShowResultDialog(true)
+      
+      if (successful > 0) {
+        setSelectedBatches(new Set())
+        refetchBatches()
+      }
     } catch (error: any) {
-      toast.dismiss()
+      setShowProgressDialog(false)
       toast.error(error.response?.data?.error?.message || 'Failed to delete batches')
     } finally {
       setIsDeleting(false)
@@ -745,22 +769,46 @@ export default function Leads() {
   const confirmDeleteLeads = async () => {
     try {
       setIsDeleting(true)
-      toast.loading(`Deleting ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}...`)
+      setShowDeleteLeadsConfirm(false)
+      
+      // Show progress dialog
+      setProgressTitle('Deleting Leads')
+      setProgressMessage(`Removing ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''} from your workspace...`)
+      setShowProgressDialog(true)
       
       // Delete each lead
-      await Promise.all(
+      const results = await Promise.allSettled(
         Array.from(selectedLeads).map(leadId => 
           api.delete(`/leads/${leadId}`)
         )
       )
       
-      toast.dismiss()
-      toast.success(`Successfully deleted ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}`)
-      setShowDeleteLeadsConfirm(false)
-      setSelectedLeads(new Set())
-      refetch()
+      const successful = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+      
+      setShowProgressDialog(false)
+      
+      // Show result dialog
+      setResultData({
+        title: failed === 0 ? 'Leads Deleted Successfully' : 'Lead Deletion Completed',
+        message: failed === 0 
+          ? 'All selected leads have been removed from your workspace.'
+          : 'Some leads could not be deleted. See details below.',
+        variant: failed === 0 ? 'success' : 'warning',
+        stats: [
+          { label: '✅ Successfully Deleted', value: successful.toString(), highlight: successful > 0 },
+          ...(failed > 0 ? [{ label: '❌ Failed to Delete', value: failed.toString(), highlight: true }] : []),
+          { label: '📦 Total Selected', value: selectedLeads.size.toString() }
+        ]
+      })
+      setShowResultDialog(true)
+      
+      if (successful > 0) {
+        setSelectedLeads(new Set())
+        refetch()
+      }
     } catch (error: any) {
-      toast.dismiss()
+      setShowProgressDialog(false)
       toast.error(error.response?.data?.error?.message || 'Failed to delete leads')
     } finally {
       setIsDeleting(false)
