@@ -36,7 +36,7 @@ export default function Layout({ children }: LayoutProps) {
   const isAnalyticsActive = () => analyticsSubmenu.some(item => router.pathname === item.href)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Mobile menu overlay */}
       {isMobileMenuOpen && (
         <div
@@ -209,10 +209,10 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Top bar */}
-        <header className="bg-white shadow-sm h-16">
-          <div className="flex items-center justify-between h-full px-4 lg:px-8">
+        <header className="bg-white shadow-sm h-16 w-full max-w-full">
+          <div className="flex items-center justify-between h-full px-4 lg:px-8 max-w-full">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 rounded-md hover:bg-gray-100 text-gray-700"
@@ -226,7 +226,7 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Page content */}
-        <main className="p-4 lg:p-8">{children}</main>
+        <main className="p-4 lg:p-8 w-full max-w-full overflow-x-hidden">{children}</main>
       </div>
     </div>
   )

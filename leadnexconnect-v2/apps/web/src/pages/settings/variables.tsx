@@ -268,7 +268,7 @@ export default function VariablesPage() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto max-w-full overflow-x-hidden">
         {/* Page Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Custom Variables</h1>

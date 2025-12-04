@@ -832,7 +832,7 @@ export default function Leads() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-6 max-w-full overflow-x-hidden">
         {/* Header with Date Filter */}
         <div className="flex items-center justify-between">
           <div>
