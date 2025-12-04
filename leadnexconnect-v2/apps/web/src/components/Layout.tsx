@@ -215,7 +215,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between h-full px-4 lg:px-8">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-md hover:bg-gray-100"
+              className="lg:hidden p-2 rounded-md hover:bg-gray-100 text-gray-700"
             >
               <Menu className="w-6 h-6" />
             </button>
