@@ -454,7 +454,7 @@ export default function TemplatesPage() {
         {/* Edit/Create Modal */}
         {showEditModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">
                   {selectedTemplate ? 'Edit Template' : 'Create Template'}
@@ -608,7 +608,7 @@ export default function TemplatesPage() {
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && selectedTemplate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[90vw] sm:max-w-md">
               <div className="p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Delete Template</h2>
                 <p className="text-gray-600 mb-6">
@@ -640,7 +640,7 @@ export default function TemplatesPage() {
         {/* Preview Modal */}
         {showPreviewModal && selectedTemplate && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto">
               <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Preview: {selectedTemplate.name}</h2>
                 <button

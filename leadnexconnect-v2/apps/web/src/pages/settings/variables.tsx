@@ -432,7 +432,7 @@ export default function VariablesPage() {
         {/* Add Variable Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900">
                   Add Custom Variable
@@ -573,7 +573,7 @@ export default function VariablesPage() {
         {/* Edit Variable Modal */}
         {showEditModal && selectedVariable && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900">
                   Edit Variable
@@ -717,7 +717,7 @@ export default function VariablesPage() {
         {/* Delete Confirmation Modal */}
         {showDeleteModal && selectedVariable && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[90vw] sm:max-w-md">
               <div className="p-6">
                 <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
                   <AlertCircle className="w-6 h-6 text-red-600" />
@@ -772,7 +772,7 @@ export default function VariablesPage() {
         {/* Test Variable Modal */}
         {showTestModal && selectedVariable && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] sm:max-w-2xl">
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900">
                   Test Variable

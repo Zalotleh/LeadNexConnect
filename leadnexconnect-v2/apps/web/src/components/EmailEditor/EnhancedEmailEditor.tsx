@@ -623,7 +623,7 @@ export default function EnhancedEmailEditor({
       {/* Load Template Modal */}
       {showLoadTemplateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-full md:max-w-3xl">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">Load Template</h3>
               <button
@@ -724,7 +724,7 @@ export default function EnhancedEmailEditor({
       {/* Email Preview Modal */}
       {showPreviewModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-full lg:max-w-6xl max-h-[90vh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-900">Email Preview</h3>
