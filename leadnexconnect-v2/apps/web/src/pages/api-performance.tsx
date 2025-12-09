@@ -262,8 +262,17 @@ export default function APIPerformance() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Avg Cost Per Lead</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">${avgCostPerLead.toFixed(2)}</p>
-                    <p className="text-xs text-gray-500 mt-1">Total: ${(avgCostPerLead * totalLeads).toFixed(2)}</p>
+                    {avgCostPerLead > 0 ? (
+                      <>
+                        <p className="text-3xl font-bold text-gray-900 mt-2">${avgCostPerLead.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500 mt-1">Total: ${(avgCostPerLead * totalLeads).toFixed(2)}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-3xl font-bold text-green-600 mt-2">Free</p>
+                        <p className="text-xs text-gray-500 mt-1">No API costs configured</p>
+                      </>
+                    )}
                   </div>
                   <div className="bg-yellow-50 rounded-full p-3">
                     <DollarSign className="w-6 h-6 text-yellow-600" />
@@ -640,10 +649,10 @@ export default function APIPerformance() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {source.apiSource === 'manual_import' ? (
                           <div>
-                            <div className="text-sm font-bold text-gray-400">$0.00</div>
-                            <div className="text-xs text-gray-500 italic">No API cost</div>
+                            <div className="text-sm font-bold text-green-600">Free</div>
+                            <div className="text-xs text-gray-500 italic">Imported</div>
                           </div>
-                        ) : (
+                        ) : source.costPerLead > 0 ? (
                           <>
                             <div className="text-lg font-bold text-gray-900">
                               ${source.costPerLead.toFixed(2)}
@@ -652,6 +661,11 @@ export default function APIPerformance() {
                               Total: ${(source.costPerLead * source.leadsGenerated).toFixed(2)}
                             </div>
                           </>
+                        ) : (
+                          <div>
+                            <div className="text-sm font-bold text-green-600">Free</div>
+                            <div className="text-xs text-gray-500 italic">No cost set</div>
+                          </div>
                         )}
                       </td>
                     </tr>

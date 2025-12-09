@@ -34,25 +34,30 @@ export class APIPerformanceService {
       this.apiLimitsCache = {};
       this.apiCostsCache = {};
       
+      // Track which sources have been configured in database
+      const configuredSources = new Set<string>();
+
       // Populate from database
       for (const config of configs) {
+        configuredSources.add(config.apiSource);
         this.apiLimitsCache[config.apiSource] = config.monthlyLimit || 0;
         this.apiCostsCache[config.apiSource] = {
           perLead: parseFloat(config.costPerLead || '0'),
           perCall: parseFloat(config.costPerAPICall || '0'),
         };
       }
-      
-      // Set default values if not in database
+
+      // Set default values ONLY for sources not configured in database
       const defaults = [
         { source: 'apollo', limit: 100, costPerLead: 8.75, costPerCall: 0 },
         { source: 'hunter', limit: 50, costPerLead: 12.5, costPerCall: 0 },
         { source: 'google_places', limit: 40000, costPerLead: 3.5, costPerCall: 0 },
         { source: 'peopledatalabs', limit: 100, costPerLead: 6, costPerCall: 0 },
       ];
-      
+
       for (const def of defaults) {
-        if (!this.apiLimitsCache[def.source]) {
+        // Only apply defaults if this source is NOT configured in database
+        if (!configuredSources.has(def.source)) {
           this.apiLimitsCache[def.source] = def.limit;
           this.apiCostsCache[def.source] = {
             perLead: def.costPerLead,

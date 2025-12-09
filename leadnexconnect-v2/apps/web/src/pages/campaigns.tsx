@@ -457,27 +457,36 @@ export default function Campaigns() {
     return campaignMonth === selectedMonth && campaignYear === selectedYear
   })
 
-  // Then filter by search and status
-  const filteredCampaigns = dateFilteredCampaigns.filter((campaign) => {
-    // Status filter
-    if (statusFilter !== 'all' && campaign.status !== statusFilter) {
-      return false
-    }
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      const matchesName = campaign.name?.toLowerCase().includes(query)
-      const matchesDescription = campaign.description?.toLowerCase().includes(query)
-      const matchesIndustry = campaign.industry?.toLowerCase().includes(query)
-      
-      if (!matchesName && !matchesDescription && !matchesIndustry) {
+  // Then filter by search and status, and sort with active campaigns on top
+  const filteredCampaigns = dateFilteredCampaigns
+    .filter((campaign) => {
+      // Status filter
+      if (statusFilter !== 'all' && campaign.status !== statusFilter) {
         return false
       }
-    }
 
-    return true
-  })
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const matchesName = campaign.name?.toLowerCase().includes(query)
+        const matchesDescription = campaign.description?.toLowerCase().includes(query)
+        const matchesIndustry = campaign.industry?.toLowerCase().includes(query)
+
+        if (!matchesName && !matchesDescription && !matchesIndustry) {
+          return false
+        }
+      }
+
+      return true
+    })
+    .sort((a, b) => {
+      // Sort by status: active campaigns first
+      if (a.status === 'active' && b.status !== 'active') return -1
+      if (a.status !== 'active' && b.status === 'active') return 1
+
+      // If both have same status, sort by creation date (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
 
   return (
     <Layout>

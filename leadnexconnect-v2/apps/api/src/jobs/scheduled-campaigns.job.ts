@@ -74,18 +74,37 @@ export class ScheduledCampaignsJob {
           }
 
           const startDate = new Date(campaign.startDate);
-          
-          // Check if campaign has been executed already
-          // A campaign should only be executed once at its scheduled time
+
+          // Check if campaign has a scheduled time (e.g., "10:00")
+          if (campaign.scheduleTime) {
+            const [scheduleHour, scheduleMinute] = campaign.scheduleTime.split(':').map(Number);
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+
+            // Check if current time matches scheduled time (within same minute)
+            const isScheduledTime = currentHour === scheduleHour && currentMinute === scheduleMinute;
+
+            if (!isScheduledTime) {
+              // Not the scheduled time yet, skip
+              continue;
+            }
+          }
+
+          // Check if campaign has been executed today already
+          // Campaigns should run once per day at their scheduled time
           if (campaign.lastRunAt) {
             const lastRunAt = new Date(campaign.lastRunAt);
-            
-            // If lastRunAt is after or equal to startDate, campaign was already executed
-            if (lastRunAt >= startDate) {
-              logger.debug('[ScheduledCampaigns] Campaign already executed, skipping', {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const lastRunDate = new Date(lastRunAt);
+            lastRunDate.setHours(0, 0, 0, 0);
+
+            // If campaign was already run today, skip it
+            if (lastRunDate.getTime() === today.getTime()) {
+              logger.debug('[ScheduledCampaigns] Campaign already executed today, skipping', {
                 campaignId: campaign.id,
-                startDate: startDate.toISOString(),
                 lastRunAt: lastRunAt.toISOString(),
+                today: today.toISOString(),
               });
               continue;
             }

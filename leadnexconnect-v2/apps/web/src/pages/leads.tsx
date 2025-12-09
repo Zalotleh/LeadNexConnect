@@ -103,6 +103,7 @@ export default function Leads() {
     maxScore: 100,
     verificationStatus: 'all',
     source: 'all',
+    withoutContacts: false,
   })
   
   const [generateForm, setGenerateForm] = useState({
@@ -162,8 +163,43 @@ export default function Leads() {
   const industriesByCategory = getIndustriesByCategory()
 
   const countries = [
-    'United States', 'Canada', 'United Kingdom', 'Australia', 
-    'Germany', 'France', 'Spain', 'Italy', 'Other'
+    'United States',
+    'Canada',
+    'United Kingdom',
+    'Australia',
+    'Germany',
+    'France',
+    'Spain',
+    'Italy',
+    'Netherlands',
+    'Belgium',
+    'Switzerland',
+    'Austria',
+    'Sweden',
+    'Norway',
+    'Denmark',
+    'Finland',
+    'Ireland',
+    'Portugal',
+    'Poland',
+    'Czech Republic',
+    'Greece',
+    'New Zealand',
+    'Singapore',
+    'Hong Kong',
+    'Japan',
+    'South Korea',
+    'India',
+    'United Arab Emirates',
+    'Saudi Arabia',
+    'Qatar',
+    'Israel',
+    'Brazil',
+    'Mexico',
+    'Argentina',
+    'Chile',
+    'South Africa',
+    'Other (Manual Entry)'
   ]
 
   const handleGenerateLeads = async () => {
@@ -1395,6 +1431,20 @@ export default function Leads() {
                 />
               </div>
 
+              <div className="md:col-span-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={filters.withoutContacts}
+                    onChange={(e) => setFilters({ ...filters, withoutContacts: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Show only leads without email address
+                  </span>
+                </label>
+              </div>
+
               <div className="md:col-span-4 flex justify-end gap-2">
                 <button
                   onClick={() => {
@@ -1404,6 +1454,7 @@ export default function Leads() {
                       maxScore: 100,
                       verificationStatus: 'all',
                       source: 'all',
+                      withoutContacts: false,
                     })
                     setSearchQuery('')
                     setStatusFilter('all')

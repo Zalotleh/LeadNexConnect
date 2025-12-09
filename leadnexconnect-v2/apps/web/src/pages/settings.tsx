@@ -1,15 +1,15 @@
 import SettingsLayout from '@/components/SettingsLayout'
-import { Save, TestTube, Eye, EyeOff, Settings as SettingsIcon, Server, Mail } from 'lucide-react'
+import { Save, Eye, EyeOff, Settings as SettingsIcon, Server, Mail } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import ApiConfigTab from '@/components/ApiConfigTab'
 import SmtpConfigTab from '@/components/SmtpConfigTab'
 
-type TabType = 'general' | 'api' | 'smtp';
+type TabType = 'api' | 'smtp' | 'ai';
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<TabType>('general');
+  const [activeTab, setActiveTab] = useState<TabType>('api');
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -38,7 +38,7 @@ export default function Settings() {
   const [settings, setSettings] = useState({
     // AI Keys
     anthropicApiKey: '',
-    
+
     // Lead Generation Keys
     apolloApiKey: '',
     hunterApiKey: '',
@@ -46,7 +46,7 @@ export default function Settings() {
     googlePlacesApiKey: '',
     googleCustomSearchApiKey: '',
     googleCustomSearchEngineId: '',
-    
+
     // SMTP Config
     smtpProvider: 'smtp2go',
     smtpHost: '',
@@ -56,15 +56,11 @@ export default function Settings() {
     smtpSecure: 'false',
     fromName: '',
     fromEmail: '',
-    
+
     // AWS SES Config
     awsAccessKeyId: '',
     awsSecretAccessKey: '',
     awsRegion: 'us-east-1',
-    
-    // Email Settings
-    emailsPerHour: 50,
-    dailyEmailLimit: 500,
   })
 
   useEffect(() => {
@@ -146,8 +142,6 @@ export default function Settings() {
           awsAccessKeyId: loadedSettings.awsAccessKeyId || '',
           awsSecretAccessKey: loadedSettings.awsSecretAccessKey || '',
           awsRegion: loadedSettings.awsRegion || 'us-east-1',
-          emailsPerHour: loadedSettings.emailsPerHour || 50,
-          dailyEmailLimit: loadedSettings.dailyEmailLimit || 500,
         })
         
         // Reset modified fields and unmasked values
@@ -177,9 +171,9 @@ export default function Settings() {
       })
       
       // Always include non-sensitive fields
-      const alwaysIncludeFields = ['googleCustomSearchEngineId', 'smtpProvider', 'smtpHost', 'smtpPort', 
-                                    'smtpUser', 'smtpSecure', 'fromName', 'fromEmail', 
-                                    'awsRegion', 'emailsPerHour', 'dailyEmailLimit']
+      const alwaysIncludeFields = ['googleCustomSearchEngineId', 'smtpProvider', 'smtpHost', 'smtpPort',
+                                    'smtpUser', 'smtpSecure', 'fromName', 'fromEmail',
+                                    'awsRegion']
       alwaysIncludeFields.forEach(field => {
         if (modifiedFields.has(field)) {
           dataToSend[field] = (settings as any)[field]
@@ -240,17 +234,6 @@ export default function Settings() {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
             <button
-              onClick={() => setActiveTab('general')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                activeTab === 'general'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <SettingsIcon className="w-4 h-4" />
-              General Settings
-            </button>
-            <button
               onClick={() => setActiveTab('api')}
               className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
                 activeTab === 'api'
@@ -272,35 +255,44 @@ export default function Settings() {
               <Mail className="w-4 h-4" />
               SMTP Configuration
             </button>
+            <button
+              onClick={() => setActiveTab('ai')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === 'ai'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <SettingsIcon className="w-4 h-4" />
+              AI Configuration
+            </button>
           </nav>
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'general' && (
-          <GeneralSettingsTab
+        {activeTab === 'api' && <ApiConfigTab />}
+
+        {activeTab === 'smtp' && <SmtpConfigTab />}
+
+        {activeTab === 'ai' && (
+          <AIConfigTab
             settings={settings}
             showKeys={showKeys}
             loading={loading}
             saving={saving}
-            testing={testing}
             modifiedFields={modifiedFields}
             onFieldChange={handleFieldChange}
             onToggleKeyVisibility={toggleKeyVisibility}
             onSave={handleSave}
-            onTestSMTP={handleTestSMTP}
           />
         )}
-
-        {activeTab === 'api' && <ApiConfigTab />}
-
-        {activeTab === 'smtp' && <SmtpConfigTab />}
       </div>
     </SettingsLayout>
   )
 }
 
-// Extract General Settings Tab as separate component
-function GeneralSettingsTab({
+// AI Configuration Tab
+function AIConfigTab({
   settings,
   showKeys,
   loading,
@@ -320,19 +312,11 @@ function GeneralSettingsTab({
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden">
-      {/* Information Banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm text-blue-800">
-          <strong>Note:</strong> API configurations have been moved to the <strong>API Configuration</strong> tab, 
-          and SMTP settings to the <strong>SMTP Configuration</strong> tab for better organization.
-        </p>
-      </div>
-
       {/* AI Configuration */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">AI Configuration</h2>
-          <p className="text-sm text-gray-500 mt-1">Configure AI services for email generation</p>
+          <p className="text-sm text-gray-500 mt-1">Configure AI services for email generation and content personalization</p>
         </div>
         <div className="p-6 space-y-6">
           <div>
@@ -356,49 +340,9 @@ function GeneralSettingsTab({
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Used for AI-powered email generation and content personalization. 
+              Used for AI-powered email generation and content personalization.
               Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">Anthropic Console</a>
             </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Application Settings */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Application Settings</h2>
-          <p className="text-sm text-gray-500 mt-1">General application preferences</p>
-        </div>
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Emails Per Hour
-              </label>
-              <input
-                type="number"
-                value={settings.emailsPerHour}
-                onChange={(e) => onFieldChange('emailsPerHour', parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="1"
-                max="1000"
-              />
-              <p className="text-xs text-gray-500 mt-1">Maximum emails to send per hour (default: 50)</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Daily Email Limit
-              </label>
-              <input
-                type="number"
-                value={settings.dailyEmailLimit}
-                onChange={(e) => onFieldChange('dailyEmailLimit', parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                min="1"
-                max="10000"
-              />
-              <p className="text-xs text-gray-500 mt-1">Maximum emails to send per day (default: 500)</p>
-            </div>
           </div>
         </div>
       </div>

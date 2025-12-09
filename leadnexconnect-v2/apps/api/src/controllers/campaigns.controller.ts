@@ -1208,8 +1208,11 @@ export class CampaignsController {
    */
   private async executeAutomatedCampaign(campaignId: string, campaign: any) {
     try {
-      // Create batch record first
-      const batchName = `${campaign.name} - ${new Date().toLocaleDateString()}`;
+      // Create batch record first with unique timestamp
+      const timestamp = new Date();
+      const dateStr = timestamp.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      const timeStr = timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const batchName = `${campaign.name} - ${dateStr} ${timeStr}`;
       const batch = await db.insert(leadBatches).values({
         name: batchName,
         uploadedBy: 'system',
@@ -1239,17 +1242,40 @@ export class CampaignsController {
         leadsPerSource,
       });
 
+      // Add variation to search parameters to get different leads each run
+      // Use day of year as a seed to rotate through countries and cities
+      const now = new Date();
+      const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
+
       // 1. Generate leads from enabled sources
       if (campaign.usesApollo) {
         try {
-          logger.info('[CampaignsController] Fetching leads from Apollo.io');
+          // Rotate through target countries to get variety
+          const targetCountries = campaign.targetCountries && campaign.targetCountries.length > 0
+            ? campaign.targetCountries
+            : ['United States'];
+          const countryIndex = dayOfYear % targetCountries.length;
+          const selectedCountry = targetCountries[countryIndex];
+
+          // Calculate page number for pagination (cycles through pages 1-10)
+          // This ensures different results even when targeting the same location
+          const pageNumber = (dayOfYear % 10) + 1;
+
+          logger.info('[CampaignsController] Fetching leads from Apollo.io', {
+            country: selectedCountry,
+            dayOfYear,
+            countryIndex,
+            pageNumber,
+          });
+
           const apolloLeads = await apolloService.searchLeads({
             industry: campaign.industry,
-            country: campaign.targetCountries?.[0] || 'United States',
+            country: selectedCountry,
             maxResults: Math.min(leadsPerSource, 100), // Apollo has daily limits
+            page: pageNumber, // Add pagination for variety
           });
           rawLeads.push(...apolloLeads.map(lead => ({ ...lead, source: 'apollo' })));
-          logger.info(`[CampaignsController] Fetched ${apolloLeads.length} leads from Apollo`);
+          logger.info(`[CampaignsController] Fetched ${apolloLeads.length} leads from Apollo (page ${pageNumber})`);
         } catch (error: any) {
           logger.error('[CampaignsController] Error fetching from Apollo', { error: error.message });
         }
@@ -1257,10 +1283,24 @@ export class CampaignsController {
 
       if (campaign.usesGooglePlaces) {
         try {
-          logger.info('[CampaignsController] Fetching leads from Google Places');
+          // Rotate through target cities to get variety
+          const targetCities = campaign.targetCities && campaign.targetCities.length > 0
+            ? campaign.targetCities
+            : campaign.targetCountries && campaign.targetCountries.length > 0
+              ? campaign.targetCountries
+              : ['United States'];
+          const cityIndex = dayOfYear % targetCities.length;
+          const selectedCity = targetCities[cityIndex];
+
+          logger.info('[CampaignsController] Fetching leads from Google Places', {
+            city: selectedCity,
+            dayOfYear,
+            cityIndex,
+          });
+
           const placesLeads = await googlePlacesService.searchLeads({
             industry: campaign.industry,
-            city: campaign.targetCities?.[0] || campaign.targetCountries?.[0] || 'United States',
+            city: selectedCity,
             maxResults: leadsPerSource,
           });
           rawLeads.push(...placesLeads.map(lead => ({ ...lead, source: 'google_places' })));

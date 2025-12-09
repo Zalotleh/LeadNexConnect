@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
 import { leads, leadBatches, emails, campaigns } from '@leadnex/database';
-import { eq, and, gte, lte, ilike, desc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, ilike, desc, sql, isNull, or } from 'drizzle-orm';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
 import { hunterService } from '../services/lead-generation/hunter.service';
@@ -30,6 +30,7 @@ export class LeadsController {
         minScore,
         search,
         batchId,
+        withoutContacts,
       } = req.query;
 
       logger.info('[LeadsController] Getting leads', { query: req.query });
@@ -45,7 +46,13 @@ export class LeadsController {
       if (sourceType) filters.push(eq(leads.sourceType, sourceType as string));
       if (minScore) filters.push(gte(leads.qualityScore, parseInt(minScore as string)));
       if (batchId) filters.push(eq(leads.batchId, batchId as string));
-      
+
+      // Filter for leads without contact information
+      // A lead is considered "without contacts" if email is null (contactName can be present or null)
+      if (withoutContacts === 'true') {
+        filters.push(isNull(leads.email));
+      }
+
       // Search filter - search in company name, email, contact name
       if (search) {
         const searchTerm = `%${search}%`;

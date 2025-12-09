@@ -12,6 +12,7 @@ interface UseLeadsDataParams {
     maxScore: number
     verificationStatus: string
     source: string
+    withoutContacts: boolean
   }
   searchQuery: string
   generating: boolean
@@ -42,11 +43,12 @@ export function useLeadsData({
       if (filters.industry !== 'all') params.industry = filters.industry
       if (filters.source !== 'all') params.source = filters.source
       if (searchQuery) params.search = searchQuery
-      
+      if (filters.withoutContacts) params.withoutContacts = 'true'
+
       // Filter by source type based on active tab
       if (activeTab === 'imported') params.sourceType = 'manual_import'
       if (activeTab === 'generated') params.sourceType = 'automated'
-      
+
       return await leadsService.getAll(params)
     },
   })

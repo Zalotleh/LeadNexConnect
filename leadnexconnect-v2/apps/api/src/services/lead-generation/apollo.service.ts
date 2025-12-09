@@ -11,6 +11,7 @@ interface ApolloSearchParams {
   country?: string;
   city?: string;
   maxResults?: number;
+  page?: number;
 }
 
 interface ApolloContact {
@@ -53,7 +54,7 @@ export class ApolloService {
 
       // Build search query for /people/search endpoint (free tier compatible)
       const searchQuery: any = {
-        page: 1,
+        page: params.page || 1, // Use provided page number, default to 1
         per_page: Math.min(params.maxResults || 10, 25), // Free tier limit
         person_titles: [
           'owner',
