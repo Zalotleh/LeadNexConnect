@@ -163,19 +163,38 @@ export const leads = pgTable('leads', {
 
 export const campaigns = pgTable('campaigns', {
   id: uuid('id').defaultRandom().primaryKey(),
-  
+
   // Basic Info
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
-  campaignType: varchar('campaign_type', { length: 50 }).default('automated'), // 'automated' or 'manual'
-  batchId: uuid('batch_id'), // References leadBatches - tracks which batch was used for lead generation
-  
+
+  // NEW: Campaign Type Classification (PROMPT 1)
+  // Values: 'lead_generation' | 'outreach' | 'fully_automated'
+  campaignType: varchar('campaign_type', { length: 50 }).notNull().default('outreach'),
+
+  // DEPRECATED: Old batchId - replaced by batchIds array
+  batchId: uuid('batch_id'), // Keep for backward compatibility
+
+  // NEW: Lead Generation Config (for lead_generation & fully_automated types)
+  leadSources: jsonb('lead_sources').$type<string[]>(), // ['apollo', 'google_places', 'hunter']
+  maxResultsPerRun: integer('max_results_per_run'),
+
+  // NEW: Outreach Config (for outreach & fully_automated types)
+  batchIds: jsonb('batch_ids').$type<string[]>(), // Multiple batches support
+  useWorkflow: boolean('use_workflow').default(false),
+
+  // NEW: Automation Config (for fully_automated type)
+  isRecurring: boolean('is_recurring').default(false),
+  recurringInterval: varchar('recurring_interval', { length: 50 }), // 'daily' | 'every_2_days' | 'weekly' | 'monthly'
+  nextRunAt: timestamp('next_run_at'),
+  outreachDelayDays: integer('outreach_delay_days').default(0), // Days to wait after lead gen before outreach
+
   // Target Criteria
   industry: varchar('industry', { length: 100 }),
   targetCountries: varchar('target_countries', { length: 100 }).array(),
   targetCities: varchar('target_cities', { length: 100 }).array(),
   companySize: varchar('company_size', { length: 50 }),
-  
+
   // Configuration
   leadsPerDay: integer('leads_per_day').default(50),
   emailTemplateId: uuid('email_template_id'),
@@ -183,28 +202,46 @@ export const campaigns = pgTable('campaigns', {
   followUpEnabled: boolean('follow_up_enabled').default(true),
   followUp1DelayDays: integer('follow_up_1_delay_days').default(3),
   followUp2DelayDays: integer('follow_up_2_delay_days').default(5),
-  
-  // Scheduling
-  status: campaignStatusEnum('status').default('draft'),
+
+  // NEW: Enhanced Status Management (PROMPT 1)
+  // Values: 'draft' | 'scheduled' | 'running' | 'paused' | 'completed' | 'failed'
+  status: varchar('status', { length: 50 }).notNull().default('draft'),
+  startType: varchar('start_type', { length: 20 }).default('manual'), // 'manual' | 'scheduled'
+  scheduledStartAt: timestamp('scheduled_start_at'),
+  actualStartedAt: timestamp('actual_started_at'),
+  pausedAt: timestamp('paused_at'),
+  resumedAt: timestamp('resumed_at'),
+  completedAt: timestamp('completed_at'),
+  failedAt: timestamp('failed_at'),
+  failureReason: text('failure_reason'),
+
+  // OLD: Scheduling (kept for backward compatibility)
   scheduleType: scheduleTypeEnum('schedule_type').default('manual'),
   scheduleTime: varchar('schedule_time', { length: 10 }),
   startDate: timestamp('start_date'),
   endDate: timestamp('end_date'),
-  
+
   // Lead Sources
   usesLinkedin: boolean('uses_linkedin').default(false),
   usesApollo: boolean('uses_apollo').default(false),
   usesPeopleDL: boolean('uses_people_dl').default(false),
   usesGooglePlaces: boolean('uses_google_places').default(false),
   usesWebScraping: boolean('uses_web_scraping').default(false),
-  
-  // Metrics
+
+  // NEW: Enhanced Metrics (PROMPT 1)
+  totalLeadsTargeted: integer('total_leads_targeted').default(0),
+  emailsSentCount: integer('emails_sent_count').default(0),
+  emailsScheduledCount: integer('emails_scheduled_count').default(0),
+  emailsFailedCount: integer('emails_failed_count').default(0),
+  currentWorkflowStep: integer('current_workflow_step').default(1),
+
+  // OLD: Metrics (kept for backward compatibility)
   leadsGenerated: integer('leads_generated').default(0),
   emailsSent: integer('emails_sent').default(0),
   emailsOpened: integer('emails_opened').default(0),
   emailsClicked: integer('emails_clicked').default(0),
   responsesReceived: integer('responses_received').default(0),
-  
+
   // Timestamps
   lastRunAt: timestamp('last_run_at'),
   createdAt: timestamp('created_at').defaultNow(),
@@ -244,6 +281,38 @@ export const emails = pgTable('emails', {
   metadata: jsonb('metadata'),
   
   createdAt: timestamp('created_at').defaultNow(),
+});
+
+// NEW: Scheduled Emails (PROMPT 1 - KEY to fixing campaign completion bug)
+// This table stores all future emails that need to be sent
+// Campaign only completes when all scheduled emails are sent/failed
+export const scheduledEmails = pgTable('scheduled_emails', {
+  id: uuid('id').defaultRandom().primaryKey(),
+
+  // References
+  campaignId: uuid('campaign_id').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
+  leadId: uuid('lead_id').notNull().references(() => leads.id, { onDelete: 'cascade' }),
+  templateId: uuid('template_id').notNull().references(() => emailTemplates.id),
+  workflowId: uuid('workflow_id').references(() => workflows.id),
+  workflowStepNumber: integer('workflow_step_number').default(1),
+
+  // Scheduling
+  scheduledFor: timestamp('scheduled_for').notNull(), // When this email should be sent
+
+  // Execution
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  // Values: 'pending' | 'sent' | 'failed' | 'skipped' | 'cancelled'
+  sentAt: timestamp('sent_at'),
+  failedAt: timestamp('failed_at'),
+  failureReason: text('failure_reason'),
+  retryCount: integer('retry_count').default(0),
+
+  // Result tracking (links to emails table after sent)
+  emailId: uuid('email_id').references(() => emails.id),
+
+  // Metadata
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 // Campaign Leads (Many-to-Many relationship for manual campaigns)
@@ -449,25 +518,39 @@ export const websiteAnalysisCache = pgTable('website_analysis_cache', {
 // Lead Batches (CSV Upload Tracking)
 export const leadBatches = pgTable('lead_batches', {
   id: uuid('id').defaultRandom().primaryKey(),
-  
+
   // Batch Information
   name: varchar('name', { length: 255 }).notNull(),
   sourceFile: varchar('source_file', { length: 255 }),
   uploadedBy: varchar('uploaded_by', { length: 255 }),
-  
+
   // Metrics
   totalLeads: integer('total_leads').default(0),
   successfulImports: integer('successful_imports').default(0),
   failedImports: integer('failed_imports').default(0),
   duplicatesSkipped: integer('duplicates_skipped').default(0),
-  
+
+  // NEW: Campaign Usage Tracking (PROMPT 1)
+  activeCampaignId: uuid('active_campaign_id').references(() => campaigns.id),
+  // If not null, this batch is currently being used by this campaign
+  // Prevents multiple campaigns from using same batch simultaneously
+
+  campaignHistory: jsonb('campaign_history').$type<Array<{
+    campaignId: string;
+    campaignName: string;
+    startedAt: string;
+    completedAt: string;
+  }>>(),
+  // Track all campaigns that have used this batch
+
   // Metadata
   importSettings: jsonb('import_settings'), // Stores enrichment flags, mapping config
   notes: text('notes'),
-  
+
   // Timestamps
   createdAt: timestamp('created_at').defaultNow(),
   completedAt: timestamp('completed_at'),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // Workflows - Multi-step email sequences
@@ -496,22 +579,29 @@ export const workflows = pgTable('workflows', {
 // Workflow Steps - Individual emails in a workflow sequence
 export const workflowSteps = pgTable('workflow_steps', {
   id: uuid('id').defaultRandom().primaryKey(),
-  
+
   // Relationships
   workflowId: uuid('workflow_id')
     .references(() => workflows.id, { onDelete: 'cascade' })
     .notNull(),
-  
+
+  // NEW: Email Template Reference (PROMPT 1)
+  emailTemplateId: uuid('email_template_id')
+    .notNull()
+    .references(() => emailTemplates.id),
+
   // Step Configuration
   stepNumber: integer('step_number').notNull(), // 1, 2, 3, etc.
   daysAfterPrevious: integer('days_after_previous').default(0), // 0 for first email, N days for subsequent
-  
-  // Email Content
-  subject: varchar('subject', { length: 500 }).notNull(),
-  body: text('body').notNull(),
-  
+
+  // DEPRECATED: Inline Email Content (kept for backward compatibility)
+  // Use emailTemplateId instead
+  subject: varchar('subject', { length: 500 }),
+  body: text('body'),
+
   // Metadata
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // Custom Variables - User-defined email variables
@@ -624,6 +714,7 @@ export const leadBatchesRelations = relations(leadBatches, ({ many }) => ({
 export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   emails: many(emails),
   campaignLeads: many(campaignLeads),
+  scheduledEmails: many(scheduledEmails),
   workflow: one(workflows, {
     fields: [campaigns.workflowId],
     references: [workflows.id],
@@ -652,6 +743,29 @@ export const emailsRelations = relations(emails, ({ one }) => ({
   }),
 }));
 
+export const scheduledEmailsRelations = relations(scheduledEmails, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [scheduledEmails.campaignId],
+    references: [campaigns.id],
+  }),
+  lead: one(leads, {
+    fields: [scheduledEmails.leadId],
+    references: [leads.id],
+  }),
+  template: one(emailTemplates, {
+    fields: [scheduledEmails.templateId],
+    references: [emailTemplates.id],
+  }),
+  workflow: one(workflows, {
+    fields: [scheduledEmails.workflowId],
+    references: [workflows.id],
+  }),
+  sentEmail: one(emails, {
+    fields: [scheduledEmails.emailId],
+    references: [emails.id],
+  }),
+}));
+
 export const leadSourceRoiRelations = relations(leadSourceRoi, ({ one }) => ({
   lead: one(leads, {
     fields: [leadSourceRoi.leadId],
@@ -668,5 +782,9 @@ export const workflowStepsRelations = relations(workflowSteps, ({ one }) => ({
   workflow: one(workflows, {
     fields: [workflowSteps.workflowId],
     references: [workflows.id],
+  }),
+  emailTemplate: one(emailTemplates, {
+    fields: [workflowSteps.emailTemplateId],
+    references: [emailTemplates.id],
   }),
 }));
