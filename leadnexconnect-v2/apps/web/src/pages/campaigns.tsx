@@ -2,7 +2,7 @@ import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import ProgressDialog from '@/components/ProgressDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
-import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search } from 'lucide-react'
+import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search, Database, Zap } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
@@ -38,6 +38,7 @@ interface Campaign {
   industry?: string
   status: string
   scheduleType?: string
+  campaignType?: string
   leadsGenerated: number
   emailsSent: number
   emailsOpened: number
@@ -67,6 +68,7 @@ export default function Campaigns() {
   const [newCountry, setNewCountry] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [campaignTypeFilter, setCampaignTypeFilter] = useState<'all' | 'lead_generation' | 'outreach' | 'fully_automated'>('all')
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set())
   const [showBulkStartConfirm, setShowBulkStartConfirm] = useState(false)
   const [showBulkPauseConfirm, setShowBulkPauseConfirm] = useState(false)
@@ -458,9 +460,17 @@ export default function Campaigns() {
     return campaignMonth === selectedMonth && campaignYear === selectedYear
   })
 
-  // Then filter by search and status, and sort with active campaigns on top
+  // Then filter by search, status, and campaign type, and sort with active campaigns on top
   const filteredCampaigns = dateFilteredCampaigns
     .filter((campaign) => {
+      // Campaign type filter
+      if (campaignTypeFilter !== 'all') {
+        const campaignType = campaign.campaignType || 'outreach' // default to outreach for backwards compatibility
+        if (campaignType !== campaignTypeFilter) {
+          return false
+        }
+      }
+
       // Status filter
       if (statusFilter !== 'all' && campaign.status !== statusFilter) {
         return false
@@ -559,6 +569,61 @@ export default function Campaigns() {
             </button>
           </div>
         </div>
+
+        {/* Campaign Type Tabs */}
+        {campaigns.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-1">
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => setCampaignTypeFilter('all')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                  campaignTypeFilter === 'all'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span>All Campaigns</span>
+              </button>
+              <button
+                onClick={() => setCampaignTypeFilter('lead_generation')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                  campaignTypeFilter === 'lead_generation'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Database className="w-4 h-4" />
+                <span className="hidden sm:inline">Lead Generation</span>
+                <span className="sm:hidden">Gen</span>
+              </button>
+              <button
+                onClick={() => setCampaignTypeFilter('outreach')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                  campaignTypeFilter === 'outreach'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Mail className="w-4 h-4" />
+                <span className="hidden sm:inline">Outreach</span>
+                <span className="sm:hidden">Out</span>
+              </button>
+              <button
+                onClick={() => setCampaignTypeFilter('fully_automated')}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                  campaignTypeFilter === 'fully_automated'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+                <span className="hidden sm:inline">Fully Automated</span>
+                <span className="sm:hidden">Auto</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Overview Stats */}
         {campaigns.length > 0 && (
@@ -755,13 +820,26 @@ export default function Campaigns() {
                         >
                           {campaign.name}
                         </h3>
-                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                          campaign.status === 'active' ? 'bg-green-100 text-green-800' :
-                          campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {campaign.status}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                            campaign.status === 'active' ? 'bg-green-100 text-green-800' :
+                            campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                            campaign.status === 'running' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {campaign.status}
+                          </span>
+                          {campaign.campaignType && campaign.campaignType !== 'outreach' && (
+                            <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                              campaign.campaignType === 'lead_generation' ? 'bg-purple-100 text-purple-800' :
+                              campaign.campaignType === 'fully_automated' ? 'bg-orange-100 text-orange-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {campaign.campaignType === 'lead_generation' ? 'Lead Gen' :
+                               campaign.campaignType === 'fully_automated' ? 'Auto' : campaign.campaignType}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
