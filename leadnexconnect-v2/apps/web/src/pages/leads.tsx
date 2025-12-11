@@ -193,7 +193,6 @@ export default function Leads() {
     'United Arab Emirates',
     'Saudi Arabia',
     'Qatar',
-    'Israel',
     'Brazil',
     'Mexico',
     'Argentina',
