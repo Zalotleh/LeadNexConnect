@@ -10,11 +10,28 @@
 - ✅ API route filtering by campaignType added (GET /api/campaigns?type=X)
 - ✅ Scheduled campaigns cron job exists
 
-### Phase 2-5: Frontend - 🚧 TODO
-- [ ] Phase 2: Lead Generation Tab + Create Form
-- [ ] Phase 3: Outreach Tab + Create Form + Batch Integration
-- [ ] Phase 4: Fully Automated Tab + Create Form + Automation Runner
-- [ ] Phase 5: Workflow Builder with Template Selection
+### Phase 2: Lead Generation Tab - ✅ COMPLETE
+- ✅ CreateLeadGenerationForm component with 4-step wizard
+- ✅ Support for one-time and recurring campaigns
+- ✅ Integrated into campaigns page
+- ✅ Successfully builds
+
+### Phase 3: Outreach Tab - ✅ COMPLETE
+- ✅ CreateOutreachForm component with 4-step wizard
+- ✅ Batch selection with real-time data
+- ✅ Template vs Workflow choice
+- ✅ Manual vs Scheduled start
+- ✅ Integrated into campaigns page
+- ✅ Successfully builds
+
+### Phase 4: Fully Automated Tab - 🚧 IN PROGRESS
+- [ ] CreateFullyAutomatedForm component
+- [ ] Combine lead gen + outreach settings
+- [ ] Automation scheduler and runner
+
+### Phase 5: Workflow Builder - 🚧 TODO
+- [ ] Fix template selection dropdown in workflow builder
+- [ ] Connect to GET /api/email-templates endpoint
 
 ---
 
