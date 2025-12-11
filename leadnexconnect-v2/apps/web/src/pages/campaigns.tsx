@@ -570,60 +570,58 @@ export default function Campaigns() {
           </div>
         </div>
 
-        {/* Campaign Type Tabs */}
-        {campaigns.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-1">
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={() => setCampaignTypeFilter('all')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                  campaignTypeFilter === 'all'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                <span>All Campaigns</span>
-              </button>
-              <button
-                onClick={() => setCampaignTypeFilter('lead_generation')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                  campaignTypeFilter === 'lead_generation'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                <Database className="w-4 h-4" />
-                <span className="hidden sm:inline">Lead Generation</span>
-                <span className="sm:hidden">Gen</span>
-              </button>
-              <button
-                onClick={() => setCampaignTypeFilter('outreach')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                  campaignTypeFilter === 'outreach'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                <Mail className="w-4 h-4" />
-                <span className="hidden sm:inline">Outreach</span>
-                <span className="sm:hidden">Out</span>
-              </button>
-              <button
-                onClick={() => setCampaignTypeFilter('fully_automated')}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                  campaignTypeFilter === 'fully_automated'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}
-              >
-                <Zap className="w-4 h-4" />
-                <span className="hidden sm:inline">Fully Automated</span>
-                <span className="sm:hidden">Auto</span>
-              </button>
-            </div>
+        {/* Campaign Type Tabs - Always show tabs */}
+        <div className="bg-white rounded-lg shadow p-1">
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setCampaignTypeFilter('all')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                campaignTypeFilter === 'all'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span>All Campaigns</span>
+            </button>
+            <button
+              onClick={() => setCampaignTypeFilter('lead_generation')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                campaignTypeFilter === 'lead_generation'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span className="hidden sm:inline">Lead Generation</span>
+              <span className="sm:hidden">Gen</span>
+            </button>
+            <button
+              onClick={() => setCampaignTypeFilter('outreach')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                campaignTypeFilter === 'outreach'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              <span className="hidden sm:inline">Outreach</span>
+              <span className="sm:hidden">Out</span>
+            </button>
+            <button
+              onClick={() => setCampaignTypeFilter('fully_automated')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
+                campaignTypeFilter === 'fully_automated'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              <span className="hidden sm:inline">Fully Automated</span>
+              <span className="sm:hidden">Auto</span>
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Overview Stats */}
         {campaigns.length > 0 && (
@@ -776,7 +774,7 @@ export default function Campaigns() {
               <Mail className="w-16 h-16 text-gray-300 mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No campaigns yet</h3>
               <p className="text-gray-600 mb-6">Create your first email campaign to start reaching out to leads</p>
-              <button 
+              <button
                 onClick={handleCreateCampaign}
                 className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
               >
@@ -788,8 +786,87 @@ export default function Campaigns() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCampaigns.length === 0 ? (
-              <div className="col-span-full bg-white rounded-lg shadow p-8 text-center">
-                <p className="text-gray-600">No campaigns match your search criteria</p>
+              <div className="col-span-full">
+                {/* Tab-Specific Empty States */}
+                {campaignTypeFilter === 'lead_generation' ? (
+                  <div className="bg-gradient-to-br from-purple-50 to-white rounded-lg shadow-lg p-12 text-center border-2 border-purple-100">
+                    <Database className="w-20 h-20 text-purple-500 mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Lead Generation Campaigns</h3>
+                    <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+                      Lead generation campaigns automatically discover and collect leads from sources like Apollo.io and Google Places.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                      <button
+                        onClick={() => window.location.href = '/leads'}
+                        className="px-6 py-3 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 flex items-center gap-2"
+                      >
+                        <Database className="w-5 h-5" />
+                        Generate Lead Batch
+                      </button>
+                      <button
+                        onClick={handleCreateCampaign}
+                        className="px-6 py-3 text-sm font-medium text-purple-600 bg-white border-2 border-purple-600 rounded-lg hover:bg-purple-50 flex items-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Create Lead Gen Campaign
+                      </button>
+                    </div>
+                  </div>
+                ) : campaignTypeFilter === 'outreach' ? (
+                  <div className="bg-gradient-to-br from-blue-50 to-white rounded-lg shadow-lg p-12 text-center border-2 border-blue-100">
+                    <Mail className="w-20 h-20 text-blue-500 mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Outreach Campaigns</h3>
+                    <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+                      Outreach campaigns send personalized email sequences to your existing leads or batches. Perfect for manual lead lists or targeted outreach.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                      <button
+                        onClick={() => window.location.href = '/leads'}
+                        className="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        <Users className="w-5 h-5" />
+                        Select Leads or Batch
+                      </button>
+                      <button
+                        onClick={handleCreateCampaign}
+                        className="px-6 py-3 text-sm font-medium text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 flex items-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        Create Outreach Campaign
+                      </button>
+                    </div>
+                  </div>
+                ) : campaignTypeFilter === 'fully_automated' ? (
+                  <div className="bg-gradient-to-br from-orange-50 to-white rounded-lg shadow-lg p-12 text-center border-2 border-orange-100">
+                    <Zap className="w-20 h-20 text-orange-500 mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Fully Automated Campaigns</h3>
+                    <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
+                      Fully automated campaigns combine lead generation and outreach into one hands-free workflow. Set it up once and let it run continuously.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                      <button
+                        onClick={handleCreateCampaign}
+                        className="px-6 py-3 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 flex items-center gap-2"
+                      >
+                        <Zap className="w-5 h-5" />
+                        Create Automated Campaign
+                      </button>
+                      <a
+                        href="https://docs.example.com/automated-campaigns"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-6 py-3 text-sm font-medium text-orange-600 bg-white border-2 border-orange-600 rounded-lg hover:bg-orange-50 flex items-center gap-2"
+                      >
+                        <Eye className="w-5 h-5" />
+                        Learn More
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg shadow p-8 text-center">
+                    <p className="text-gray-600">No campaigns match your search criteria</p>
+                  </div>
+                )}
               </div>
             ) : (
               filteredCampaigns.map((campaign) => (
