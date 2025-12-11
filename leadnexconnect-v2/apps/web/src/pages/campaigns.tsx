@@ -1142,7 +1142,7 @@ export default function Campaigns() {
                   </div>
                 </div>
               </div>
-              ))
+              ))}
               </>
             )}
           </div>
