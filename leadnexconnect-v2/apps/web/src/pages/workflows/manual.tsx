@@ -342,15 +342,22 @@ export default function ManualWorkflowBuilder() {
                       {/* Template Preview */}
                       {step.emailTemplateId && getTemplatePreview(step.emailTemplateId) && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                          <div className="flex items-start gap-2 mb-2">
-                            <Mail className="w-4 h-4 text-blue-600 mt-0.5" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-blue-900 mb-1">
-                                Subject: {getTemplatePreview(step.emailTemplateId)!.subject || 'No subject'}
+                          <div className="flex items-start gap-2 mb-3">
+                            <Mail className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-blue-900 mb-2">
+                                <span className="font-semibold">Subject:</span> {getTemplatePreview(step.emailTemplateId)!.subject || 'No subject'}
                               </p>
-                              <p className="text-xs text-blue-700 line-clamp-2">
-                                {(getTemplatePreview(step.emailTemplateId)!.bodyText || 'No content').substring(0, 150)}...
-                              </p>
+                              <div className="text-sm text-blue-800 bg-white rounded p-3 border border-blue-100">
+                                <p className="font-semibold mb-2 text-blue-900">Body:</p>
+                                <div 
+                                  className="whitespace-pre-wrap break-words"
+                                  dangerouslySetInnerHTML={{ 
+                                    __html: getTemplatePreview(step.emailTemplateId)!.bodyHtml || 
+                                            (getTemplatePreview(step.emailTemplateId)!.bodyText || 'No content').replace(/\n/g, '<br>')
+                                  }}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
