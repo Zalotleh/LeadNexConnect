@@ -27,13 +27,12 @@ export class CampaignsController {
       logger.info('[CampaignsController] Getting campaigns', { type });
 
       // Build query with optional type filter
-      let query = db.select().from(campaigns);
-      
-      if (type && typeof type === 'string') {
-        query = query.where(eq(campaigns.campaignType, type as any));
-      }
-      
-      const allCampaigns = await query.orderBy(desc(campaigns.createdAt));
+      const allCampaigns = type && typeof type === 'string'
+        ? await db.select().from(campaigns)
+            .where(eq(campaigns.campaignType, type as any))
+            .orderBy(desc(campaigns.createdAt))
+        : await db.select().from(campaigns)
+            .orderBy(desc(campaigns.createdAt));
 
       res.json({
         success: true,
@@ -888,8 +887,8 @@ export class CampaignsController {
           }
 
           // Replace template variables
-          const subject = this.replaceTemplateVariables(step.subject, lead);
-          const bodyText = this.replaceTemplateVariables(step.body, lead);
+          const subject = this.replaceTemplateVariables(step.subject || '', lead);
+          const bodyText = this.replaceTemplateVariables(step.body || '', lead);
 
           // Calculate cumulative delay from campaign start
           // First step sends immediately (cumulativeDelayMinutes = 0)
