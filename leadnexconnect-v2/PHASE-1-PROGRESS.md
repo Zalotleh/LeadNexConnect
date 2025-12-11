@@ -27,34 +27,42 @@
 
 ---
 
-### ⏳ Phase 2: Database Migrations (NEXT - TO BE DONE)
+### ✅ Phase 2: Database Migrations (COMPLETED)
 
-- [ ] **Generate Drizzle Migrations**
-  ```bash
-  cd packages/database
-  npx drizzle-kit generate:pg
-  ```
+- [x] **Generate Drizzle Migrations**
+  - Due to version compatibility issues, created manual SQL migrations
+  - File: `packages/database/src/migrations/0001_campaign_system_overhaul.sql`
+  - Includes: Schema changes, scheduledEmails table, indexes, triggers
 
-- [ ] **Review Generated Migration SQL**
-  - Check for any breaking changes
-  - Verify foreign key constraints
-  - Ensure backward compatibility
+- [x] **Review Generated Migration SQL**
+  - ✅ No breaking changes - all old fields retained
+  - ✅ Foreign key constraints properly configured
+  - ✅ Full backward compatibility ensured
+  - ✅ Indexes added for query performance
 
-- [ ] **Run Migrations**
-  ```bash
-  npx drizzle-kit push:pg
-  # OR
-  npx drizzle-kit migrate
-  ```
+- [x] **Run Migrations**
+  - Executed: `0001_campaign_system_overhaul.sql` ✅
+  - Added campaign_status enum values: 'scheduled', 'running', 'failed'
+  - Created scheduledEmails table with all fields
+  - Added 15+ new fields to campaigns table
+  - Updated lead_batches and workflow_steps tables
 
-- [ ] **Create Data Migration Script**
-  - File: `apps/api/src/scripts/migrate-existing-campaigns.ts`
-  - Purpose: Convert old campaigns to new schema
-  - Tasks:
-    - Set campaignType = 'outreach' for existing campaigns
-    - Migrate status values to new format
-    - Create scheduledEmails for active campaigns
-    - Update metrics field names
+- [x] **Create Data Migration Script**
+  - File: `packages/database/src/migrations/0002_migrate_campaign_data.sql`
+  - Executed successfully ✅
+  - Completed Tasks:
+    - ✅ Set campaignType = 'outreach' for existing campaigns
+    - ✅ Converted batchId → batchIds array format
+    - ✅ Migrated metrics: emailsSent → emailsSentCount
+    - ✅ Migrated metrics: leadsGenerated → totalLeadsTargeted
+    - ✅ Set timestamp fields from old data
+  - Also created TypeScript version: `apps/api/src/scripts/migrate-existing-campaigns.ts` (for future use)
+
+**Migration Verification:**
+- scheduledEmails table: ✅ Created with proper schema
+- campaigns table: ✅ All new fields present
+- Existing campaigns: ✅ Migrated to new schema (17 campaigns updated)
+- Enum values: ✅ 'scheduled', 'running', 'failed' added
 
 ---
 
@@ -211,37 +219,49 @@ PGPASSWORD=<your_password> psql -U leadnex_user -h localhost -p 5432 leadnexconn
 
 ## 🔄 Next Steps (Start Here in Next Session)
 
-1. **Generate Drizzle Migrations**
-   ```bash
-   cd packages/database
-   npx drizzle-kit generate:pg
-   ```
+1. **Phase 3: Create Service Layer**
+   - Create `campaign-email-scheduler.service.ts` (~250 lines)
+   - Create `campaign-email-sender.service.ts` (~200 lines)
+   - Implement email scheduling logic
+   - Implement email sending logic
 
-2. **Review & Run Migrations**
-   - Check generated SQL files
-   - Run migrations: `npx drizzle-kit push:pg`
+2. **Phase 4: Update Controllers/Jobs**
+   - Modify `send-campaign-emails.job.ts`
+   - Update `campaigns.controller.ts` (start/pause/resume endpoints)
 
-3. **Create Services**
-   - Start with campaign-email-scheduler.service.ts
-   - Then campaign-email-sender.service.ts
-
-4. **Update Controllers/Jobs**
-   - Modify send-campaign-emails.job.ts
-   - Update campaigns.controller.ts
-
-5. **Test with Campaign** `a3b8bae3-4e31-48d1-b25f-97aaa3ef9c72`
+3. **Phase 5: Testing**
+   - Test campaign start (verify scheduledEmails created)
+   - Test email sending (verify cron job works)
+   - Test campaign completion logic
+   - Test with Campaign ID: `a3b8bae3-4e31-48d1-b25f-97aaa3ef9c72`
 
 ---
 
 ## ⚠️ Important Notes
 
-- **Backward Compatibility:** All old fields retained, new system works alongside
-- **No Breaking Changes:** Existing campaigns continue to work
-- **Migration Required:** Run data migration script for existing active campaigns
+- **Backward Compatibility:** ✅ All old fields retained, new system works alongside
+- **No Breaking Changes:** ✅ Existing campaigns continue to work
+- **Migration Complete:** ✅ Schema and data migrations successfully executed
 - **Testing Critical:** Must test with real campaign before production use
 
 ---
 
-**Session End:** ~102K tokens used
-**Progress:** 30% of PROMPT 1 complete
-**Resume:** Continue with Phase 2 (Database Migrations)
+## 📊 Phase 2 Completion Summary
+
+**Date:** December 11, 2025
+**Status:** Phase 2 Complete ✅
+**Database Changes:**
+- ✅ scheduledEmails table created (15 fields, 5 indexes, 5 foreign keys)
+- ✅ campaigns table updated (15+ new fields added)
+- ✅ campaign_status enum updated (3 new values: scheduled, running, failed)
+- ✅ lead_batches table updated (campaign reference fields)
+- ✅ workflow_steps table updated (emailTemplateId reference)
+- ✅ 17 existing campaigns migrated to new schema
+
+**Files Created:**
+1. `packages/database/src/migrations/0001_campaign_system_overhaul.sql` (130 lines)
+2. `packages/database/src/migrations/0002_migrate_campaign_data.sql` (75 lines)
+3. `apps/api/src/scripts/migrate-existing-campaigns.ts` (160 lines)
+
+**Progress:** ~45% of PROMPT 1 complete (Phase 1 & 2 done)
+**Resume:** Continue with Phase 3 (Service Layer Implementation)

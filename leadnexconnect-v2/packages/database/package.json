@@ -16,8 +16,8 @@
     "postgres": "^3.4.3"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.20.10",
-    "tsx": "^4.7.0",
-    "@types/pg": "^8.10.9"
+    "@types/pg": "^8.10.9",
+    "drizzle-kit": "^0.20.14",
+    "tsx": "^4.7.0"
   }
 }
