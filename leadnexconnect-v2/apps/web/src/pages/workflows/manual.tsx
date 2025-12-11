@@ -21,7 +21,8 @@ interface EmailTemplate {
   id: string
   name: string
   subject: string | null
-  body: string | null
+  bodyText: string | null
+  bodyHtml?: string | null
   category?: string
 }
 
@@ -348,7 +349,7 @@ export default function ManualWorkflowBuilder() {
                                 Subject: {getTemplatePreview(step.emailTemplateId)!.subject || 'No subject'}
                               </p>
                               <p className="text-xs text-blue-700 line-clamp-2">
-                                {(getTemplatePreview(step.emailTemplateId)!.body || 'No content').substring(0, 150)}...
+                                {(getTemplatePreview(step.emailTemplateId)!.bodyText || 'No content').substring(0, 150)}...
                               </p>
                             </div>
                           </div>
