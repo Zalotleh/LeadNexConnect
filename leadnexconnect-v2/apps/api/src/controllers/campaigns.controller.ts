@@ -8,6 +8,8 @@ import { googlePlacesService } from '../services/lead-generation/google-places.s
 import { enrichmentPipelineService } from '../services/crm/enrichment-pipeline.service';
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
 import { emailQueueService } from '../services/outreach/email-queue.service';
+import { campaignEmailSchedulerService } from '../services/campaign/campaign-email-scheduler.service';
+import { campaignEmailSenderService } from '../services/campaign/campaign-email-sender.service';
 
 export class CampaignsController {
   // In-memory lock to prevent duplicate campaign executions
@@ -610,82 +612,71 @@ export class CampaignsController {
       const campaign = campaignResult[0];
 
       // Prevent starting if already active or running
-      if (campaign.status === 'active') {
-        logger.warn('[CampaignsController] Campaign already active, skipping duplicate start', { id });
+      if (campaign.status === 'active' || campaign.status === 'running') {
+        logger.warn('[CampaignsController] Campaign already active/running, skipping duplicate start', { id });
         return res.status(400).json({
           success: false,
-          error: { message: 'Campaign is already active' },
+          error: { message: 'Campaign is already active or running' },
         });
       }
 
-      // Determine if campaign is scheduled for future
-      const scheduledStartDate = campaign.startDate ? new Date(campaign.startDate) : new Date();
-      const now = new Date();
-      const isFutureScheduled = scheduledStartDate > now;
-
-      // Only set startDate if not already scheduled
-      const updateData: any = { 
-        status: 'active',
+      // Update campaign status to running
+      const updateData: any = {
+        status: 'running',
+        actualStartedAt: new Date(),
+        updatedAt: new Date(),
       };
-      
-      if (!campaign.startDate) {
-        updateData.startDate = new Date();
-      }
-      
-      // Only set lastRunAt if executing immediately (not scheduled for future)
-      if (!isFutureScheduled) {
-        updateData.lastRunAt = new Date();
-      }
 
-      // Update campaign status to active
       await db
         .update(campaigns)
         .set(updateData)
         .where(eq(campaigns.id, id));
 
-      logger.info('[CampaignsController] Campaign started', { 
-        id, 
+      logger.info('[CampaignsController] Campaign starting', {
+        id,
         name: campaign.name,
-        startDate: campaign.startDate || updateData.startDate,
-        scheduledStart: campaign.startDate ? new Date(campaign.startDate) : null,
-        isFutureScheduled,
       });
 
-      // Check if campaign is scheduled for future execution
-      if (isFutureScheduled) {
-        logger.info('[CampaignsController] Campaign scheduled for future execution', {
+      // Schedule all emails for this campaign using the NEW service
+      const scheduleResult = await campaignEmailSchedulerService.scheduleEmailsForCampaign(id);
+
+      if (!scheduleResult.success) {
+        logger.error('[CampaignsController] Failed to schedule emails', {
           campaignId: id,
-          scheduledFor: scheduledStartDate,
-          delayMinutes: Math.round((scheduledStartDate.getTime() - now.getTime()) / 60000)
+          error: scheduleResult.error,
         });
-        
-        return res.json({
-          success: true,
-          data: {
-            ...campaign,
-            status: 'active',
-            startDate: scheduledStartDate,
-          },
-          message: `Campaign scheduled to start at ${scheduledStartDate.toLocaleString()}`,
+
+        // Revert campaign status to draft
+        await db
+          .update(campaigns)
+          .set({
+            status: 'draft',
+            failedAt: new Date(),
+            failureReason: scheduleResult.error || 'Failed to schedule emails',
+            updatedAt: new Date(),
+          })
+          .where(eq(campaigns.id, id));
+
+        return res.status(500).json({
+          success: false,
+          error: { message: `Failed to schedule emails: ${scheduleResult.error}` },
         });
       }
 
-      // Start lead generation and outreach immediately
-      this.executeCampaign(id, campaign).catch(error => {
-        logger.error('[CampaignsController] Error executing campaign', {
-          campaignId: id,
-          error: error.message,
-        });
+      logger.info('[CampaignsController] Campaign started successfully', {
+        campaignId: id,
+        scheduledEmailsCount: scheduleResult.scheduledCount,
       });
 
       res.json({
         success: true,
         data: {
           ...campaign,
-          status: 'active',
-          startDate: new Date(),
+          status: 'running',
+          actualStartedAt: new Date(),
+          emailsScheduledCount: scheduleResult.scheduledCount,
         },
-        message: 'Campaign started successfully. Lead generation and outreach running in background.',
+        message: `Campaign started successfully. ${scheduleResult.scheduledCount} emails scheduled.`,
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error starting campaign', {
@@ -1491,9 +1482,14 @@ export class CampaignsController {
     try {
       const { id } = req.params;
 
+      // Update campaign status to paused
       const updated = await db
         .update(campaigns)
-        .set({ status: 'paused' })
+        .set({
+          status: 'paused',
+          pausedAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(eq(campaigns.id, id))
         .returning();
 
@@ -1504,26 +1500,100 @@ export class CampaignsController {
         });
       }
 
-      // Cancel all queued jobs for this campaign
-      try {
-        const cancelledCount = await emailQueueService.cancelCampaignJobs(id);
-        logger.info('[CampaignsController] Cancelled queued jobs for campaign', {
+      // Cancel all scheduled emails using the NEW service
+      const cancelResult = await campaignEmailSchedulerService.cancelScheduledEmails(id);
+
+      if (cancelResult.success) {
+        logger.info('[CampaignsController] Campaign paused and emails cancelled', {
           campaignId: id,
-          cancelledCount,
+          cancelledCount: cancelResult.cancelledCount,
         });
-      } catch (error: any) {
-        logger.error('[CampaignsController] Error cancelling jobs', {
+      } else {
+        logger.error('[CampaignsController] Error cancelling scheduled emails', {
           campaignId: id,
-          error: error.message,
+          error: cancelResult.error,
         });
       }
 
       res.json({
         success: true,
         data: updated[0],
+        message: `Campaign paused. ${cancelResult.cancelledCount} scheduled emails cancelled.`,
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error pausing campaign', {
+        error: error.message,
+      });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * POST /api/campaigns/:id/resume - Resume paused campaign
+   */
+  async resumeCampaign(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      // Get campaign details
+      const campaignResult = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .limit(1);
+
+      if (!campaignResult[0]) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Campaign not found' },
+        });
+      }
+
+      const campaign = campaignResult[0];
+
+      if (campaign.status !== 'paused') {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Campaign is not paused' },
+        });
+      }
+
+      // Update campaign status to running
+      const updated = await db
+        .update(campaigns)
+        .set({
+          status: 'running',
+          resumedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(campaigns.id, id))
+        .returning();
+
+      // Resume scheduled emails using the NEW service
+      const resumeResult = await campaignEmailSchedulerService.resumeScheduledEmails(id);
+
+      if (resumeResult.success) {
+        logger.info('[CampaignsController] Campaign resumed and emails re-scheduled', {
+          campaignId: id,
+          resumedCount: resumeResult.resumedCount,
+        });
+      } else {
+        logger.error('[CampaignsController] Error resuming scheduled emails', {
+          campaignId: id,
+          error: resumeResult.error,
+        });
+      }
+
+      res.json({
+        success: true,
+        data: updated[0],
+        message: `Campaign resumed. ${resumeResult.resumedCount} emails re-scheduled.`,
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error resuming campaign', {
         error: error.message,
       });
       res.status(500).json({

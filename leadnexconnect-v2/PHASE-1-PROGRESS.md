@@ -66,67 +66,89 @@
 
 ---
 
-### ⏳ Phase 3: Service Layer (TO BE DONE)
+### ✅ Phase 3: Service Layer (COMPLETED)
 
 #### 3.1 Campaign Email Scheduler Service
-- [ ] **Create `apps/api/src/services/campaign/campaign-email-scheduler.service.ts`**
-  - Purpose: Schedule emails when campaign starts
-  - Key Methods:
-    - `scheduleEmailsForCampaign(campaignId: string)`
-    - `scheduleEmailForLead(campaignId, leadId, template, delay)`
-    - `cancelScheduledEmails(campaignId: string)`
-  - Logic:
-    - If single template: Schedule 1 email per lead
-    - If workflow: Schedule N emails per lead (one per step with delays)
-    - Write to scheduledEmails table
-    - Update campaign.emailsScheduledCount
+- [x] **Created `apps/api/src/services/campaign/campaign-email-scheduler.service.ts`** (~420 lines)
+  - ✅ Purpose: Schedule emails when campaign starts
+  - ✅ Key Methods Implemented:
+    - `scheduleEmailsForCampaign(campaignId: string)` - Main entry point
+    - `scheduleSingleTemplateEmails()` - For single-template campaigns
+    - `scheduleWorkflowEmails()` - For multi-step workflow campaigns
+    - `getCampaignLeads()` - Get leads from various sources
+    - `cancelScheduledEmails(campaignId: string)` - For pause functionality
+    - `resumeScheduledEmails(campaignId: string)` - For resume functionality
+    - `getPendingEmailsCount()` - Get count of pending emails
+  - ✅ Logic Implemented:
+    - Gets leads from batchIds, batchId, or campaignLeads table (backward compatible)
+    - If single template: Schedules 1 email per lead
+    - If workflow: Schedules N emails per lead with cumulative delays
+    - Writes all emails to scheduledEmails table with proper scheduling
+    - Updates campaign.emailsScheduledCount & totalLeadsTargeted
 
 #### 3.2 Campaign Email Sender Service
-- [ ] **Create `apps/api/src/services/campaign/campaign-email-sender.service.ts`**
-  - Purpose: Send scheduled emails
-  - Key Methods:
-    - `sendDueEmails()` - Called by cron every minute
-    - `sendScheduledEmail(scheduledEmailId: string)`
-    - `markCampaignComplete(campaignId: string)`
-  - Logic:
-    - Query scheduledEmails WHERE status='pending' AND scheduledFor <= NOW()
-    - Send each email
-    - Update scheduledEmail.status to 'sent' or 'failed'
-    - Link scheduledEmail.emailId to emails table
-    - Check if all emails sent → mark campaign 'completed'
+- [x] **Created `apps/api/src/services/campaign/campaign-email-sender.service.ts`** (~450 lines)
+  - ✅ Purpose: Send scheduled emails at their scheduled time
+  - ✅ Key Methods Implemented:
+    - `sendDueEmails()` - Called by cron every minute (processes max 100)
+    - `sendScheduledEmail(scheduledEmailId: string)` - Sends single email
+    - `checkCampaignCompletion(campaignId: string)` - **THE KEY BUG FIX!**
+    - `getCampaignEmailStats()` - Get detailed email statistics
+    - `retryFailedEmails()` - Retry failed emails functionality
+    - `incrementCampaignSentCount()` & `incrementCampaignFailedCount()`
+  - ✅ Logic Implemented:
+    - Queries scheduledEmails WHERE status='pending' AND scheduledFor <= NOW()
+    - Generates personalized email content using emailGeneratorService
+    - Sends each email using existing emailSenderService
+    - Updates scheduledEmail.status to 'sent' or 'failed'
+    - Links scheduledEmail.emailId to emails table
+    - Checks if all emails sent/failed → marks campaign 'completed' ✨
+    - Skips emails if campaign status is not 'running'
 
 ---
 
-### ⏳ Phase 4: Controllers & Jobs (TO BE DONE)
+### ✅ Phase 4: Controllers & Jobs (COMPLETED)
 
-#### 4.1 Update Send Campaign Emails Job
-- [ ] **Modify `apps/api/src/jobs/send-campaign-emails.job.ts`**
-  - Change from manual email sending to calling `campaignEmailSenderService.sendDueEmails()`
-  - Remove old logic
-  - Add error handling
+#### 4.1 Create Send Campaign Emails Job
+- [x] **Created `apps/api/src/jobs/send-campaign-emails.job.ts`** (~95 lines)
+  - ✅ Cron schedule: Every 1 minute (`* * * * *`)
+  - ✅ Calls `campaignEmailSenderService.sendDueEmails()`
+  - ✅ Prevents concurrent executions with isRunning flag
+  - ✅ Comprehensive error handling and logging
+  - ✅ Registered in server startup (apps/api/src/index.ts)
+  - ✅ Registered in graceful shutdown
 
 #### 4.2 Update Campaigns Controller
-- [ ] **Modify `apps/api/src/controllers/campaigns.controller.ts`**
+- [x] **Modified `apps/api/src/controllers/campaigns.controller.ts`**
 
-  **Start Campaign:**
-  - Set status = 'running'
-  - Set actualStartedAt = NOW()
-  - Call `campaignEmailScheduler.scheduleEmailsForCampaign()`
-  - Return success
+  **Start Campaign:** (Lines 594-690)
+  - ✅ Validates campaign exists and not already running
+  - ✅ Sets status = 'running' (not 'active')
+  - ✅ Sets actualStartedAt = NOW()
+  - ✅ Calls `campaignEmailScheduler.scheduleEmailsForCampaign()`
+  - ✅ Returns scheduled email count
+  - ✅ Reverts to draft status on scheduling failure
 
-  **Pause Campaign:**
-  - Set status = 'paused'
-  - Set pausedAt = NOW()
-  - Cancel pending scheduled emails (set status='cancelled')
+  **Pause Campaign:** (Lines 1481-1532)
+  - ✅ Sets status = 'paused'
+  - ✅ Sets pausedAt = NOW()
+  - ✅ Calls `campaignEmailScheduler.cancelScheduledEmails()`
+  - ✅ Cancels pending scheduled emails (sets status='cancelled')
+  - ✅ Returns cancelled email count
 
-  **Resume Campaign:**
-  - Set status = 'running'
-  - Set resumedAt = NOW()
-  - Re-schedule cancelled emails
+  **Resume Campaign:** (Lines 1537-1604) - **NEW METHOD**
+  - ✅ Validates campaign is paused
+  - ✅ Sets status = 'running'
+  - ✅ Sets resumedAt = NOW()
+  - ✅ Calls `campaignEmailScheduler.resumeScheduledEmails()`
+  - ✅ Re-schedules cancelled emails back to pending
+  - ✅ Returns resumed email count
+  - ✅ Route added: POST /api/campaigns/:id/resume
 
-  **Complete Campaign Check:**
-  - Query scheduledEmails for campaign
-  - If all emails sent/failed → set status='completed', completedAt=NOW()
+  **Complete Campaign Check:** (Automatic in CampaignEmailSenderService)
+  - ✅ Queries scheduledEmails for campaign after each email sent
+  - ✅ If all emails sent/failed → sets status='completed', completedAt=NOW()
+  - ✅ Only marks complete if status is 'running' (prevents double-completion)
 
 ---
 
@@ -219,21 +241,25 @@ PGPASSWORD=<your_password> psql -U leadnex_user -h localhost -p 5432 leadnexconn
 
 ## 🔄 Next Steps (Start Here in Next Session)
 
-1. **Phase 3: Create Service Layer**
-   - Create `campaign-email-scheduler.service.ts` (~250 lines)
-   - Create `campaign-email-sender.service.ts` (~200 lines)
-   - Implement email scheduling logic
-   - Implement email sending logic
-
-2. **Phase 4: Update Controllers/Jobs**
-   - Modify `send-campaign-emails.job.ts`
-   - Update `campaigns.controller.ts` (start/pause/resume endpoints)
-
-3. **Phase 5: Testing**
+1. **Phase 5: Testing & Verification**
    - Test campaign start (verify scheduledEmails created)
-   - Test email sending (verify cron job works)
+   - Test email sending (verify cron job works every minute)
    - Test campaign completion logic
+   - Test pause/resume functionality
    - Test with Campaign ID: `a3b8bae3-4e31-48d1-b25f-97aaa3ef9c72`
+   - Monitor logs for any errors
+
+2. **Bug Verification**
+   - Create a test campaign with a few leads
+   - Start the campaign
+   - Verify campaign stays in 'running' status (not immediately completing)
+   - Wait for scheduled emails to be sent
+   - Verify campaign only completes after all emails sent
+
+3. **Production Deployment**
+   - Run a final test with real data
+   - Deploy to production
+   - Monitor first few campaigns closely
 
 ---
 
@@ -241,27 +267,41 @@ PGPASSWORD=<your_password> psql -U leadnex_user -h localhost -p 5432 leadnexconn
 
 - **Backward Compatibility:** ✅ All old fields retained, new system works alongside
 - **No Breaking Changes:** ✅ Existing campaigns continue to work
-- **Migration Complete:** ✅ Schema and data migrations successfully executed
-- **Testing Critical:** Must test with real campaign before production use
+- **Implementation Complete:** ✅ Phases 1-4 fully implemented
+- **Testing Required:** Must test with real campaign before production use
+- **Cron Job Active:** Server must be running for email sending to work
 
 ---
 
-## 📊 Phase 2 Completion Summary
+## 📊 Phase 3 & 4 Completion Summary
 
 **Date:** December 11, 2025
-**Status:** Phase 2 Complete ✅
-**Database Changes:**
-- ✅ scheduledEmails table created (15 fields, 5 indexes, 5 foreign keys)
-- ✅ campaigns table updated (15+ new fields added)
-- ✅ campaign_status enum updated (3 new values: scheduled, running, failed)
-- ✅ lead_batches table updated (campaign reference fields)
-- ✅ workflow_steps table updated (emailTemplateId reference)
-- ✅ 17 existing campaigns migrated to new schema
+**Status:** Phases 3 & 4 Complete ✅
 
-**Files Created:**
-1. `packages/database/src/migrations/0001_campaign_system_overhaul.sql` (130 lines)
-2. `packages/database/src/migrations/0002_migrate_campaign_data.sql` (75 lines)
-3. `apps/api/src/scripts/migrate-existing-campaigns.ts` (160 lines)
+**Service Layer Files Created:**
+1. `apps/api/src/services/campaign/campaign-email-scheduler.service.ts` (~420 lines)
+2. `apps/api/src/services/campaign/campaign-email-sender.service.ts` (~450 lines)
+3. `apps/api/src/jobs/send-campaign-emails.job.ts` (~95 lines)
 
-**Progress:** ~45% of PROMPT 1 complete (Phase 1 & 2 done)
-**Resume:** Continue with Phase 3 (Service Layer Implementation)
+**Controller & Route Updates:**
+- Modified `apps/api/src/controllers/campaigns.controller.ts`:
+  - Updated `startCampaign()` method (lines 594-690)
+  - Updated `pauseCampaign()` method (lines 1481-1532)
+  - Added `resumeCampaign()` method (lines 1537-1604)
+- Updated `apps/api/src/routes/campaigns.routes.ts`:
+  - Added POST /api/campaigns/:id/resume route
+- Updated `apps/api/src/index.ts`:
+  - Registered sendCampaignEmailsJob in startup
+  - Registered sendCampaignEmailsJob in shutdown
+
+**Key Features Implemented:**
+✅ Email scheduling on campaign start
+✅ Automatic email sending via cron (every minute)
+✅ Campaign completion detection (THE BUG FIX!)
+✅ Pause/resume functionality
+✅ Failed email retry capability
+✅ Comprehensive logging and error handling
+✅ Backward compatibility with old campaigns
+
+**Progress:** ~85% of PROMPT 1 complete (Phases 1-4 done, Phase 5 testing remains)
+**Resume:** Continue with Phase 5 (Testing & Verification)
