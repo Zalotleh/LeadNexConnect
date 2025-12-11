@@ -232,6 +232,7 @@ leadnexconnect-v2/
 - `09-KNOWN-ISSUES.md` - Bugs, limitations, and roadmap
 
 ---
+create an overview comprehensive project structure and data flow, features to share with claude/ai
 
 ## 🔐 Security Updates
 

@@ -90,6 +90,11 @@ leadnexconnect-v2/
 ├── apps/
 │   ├── api/              # Express.js backend
 │   │   ├── src/
+│   ├── 04-FEATURE-DOCUMENTATION.md
+│   ├── 06-DATA-FLOW.md
+│   └── 09-KNOWN-ISSUES.md
+├── package.json          # Root workspace config
+├── ecosystem.config.js   # PM2 deployment
 │   │   │   ├── controllers/     # 13 controllers
 │   │   │   ├── services/        # 20+ services
 │   │   │   ├── routes/          # 13 route files
@@ -106,6 +111,11 @@ leadnexconnect-v2/
 │       │   └── styles/          # Tailwind CSS
 │       └── package.json
 ├── packages/
+│   ├── 04-FEATURE-DOCUMENTATION.md
+│   ├── 06-DATA-FLOW.md
+│   └── 09-KNOWN-ISSUES.md
+├── package.json          # Root workspace config
+├── ecosystem.config.js   # PM2 deployment
 │   ├── database/         # Drizzle ORM
 │   │   ├── src/
 │   │   │   ├── schema/          # Database schema

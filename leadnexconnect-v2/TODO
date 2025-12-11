@@ -1,18 +1,31 @@
-✅ COMPLETED: Create comprehensive documentation (docs/ folder with 6 files)
-   - 01-PROJECT-OVERVIEW.md - Project status, features, metrics
-   - 02-DATABASE-SCHEMA.md - Complete database documentation
-   - 03-API-ENDPOINTS.md - All 82+ API endpoints
-   - 04-FEATURE-DOCUMENTATION.md - Detailed feature workflows
-   - 06-DATA-FLOW.md - Architecture and data flow diagrams
-   - 09-KNOWN-ISSUES.md - Bugs, limitations, roadmap
-   - README.md - Documentation index
+## 🎯 CAMPAIGN SYSTEM OVERHAUL - IN PROGRESS
 
-✅ COMPLETED: Comment out seed data insertion in seed.ts file
+### Phase 1: Backend (Database & Services) - ✅ COMPLETE
+- ✅ campaigns table updated with campaignType field
+- ✅ scheduledEmails table created
+- ✅ automated_campaign_runs table created
+- ✅ leadBatches table has activeCampaignId field
+- ✅ Campaign email scheduler service exists
+- ✅ Campaign email sender service exists
+- ✅ API route filtering by campaignType added (GET /api/campaigns?type=X)
+- ✅ Scheduled campaigns cron job exists
 
-"Qualified/Unqualified" tracking - These aren't real statuses. Use quality score tiers (Hot/Warm/Cold) instead
-Auto-detecting "Responded" - Requires email service webhook integration (planned)
-Auto-detecting "Interested" - Requires AI analysis of email replies or manual update
-Email webhook integration to auto-update responded status
-AI sentiment analysis for auto-detecting interest level
-Custom status fields for your specific workflow
-Bulk status updates from campaign analytics
+### Phase 2-5: Frontend - 🚧 TODO
+- [ ] Phase 2: Lead Generation Tab + Create Form
+- [ ] Phase 3: Outreach Tab + Create Form + Batch Integration
+- [ ] Phase 4: Fully Automated Tab + Create Form + Automation Runner
+- [ ] Phase 5: Workflow Builder with Template Selection
+
+---
+
+## 📋 Other Tasks
+
+add filter in leads page, to get leads without contacts
+in generate leads batch button, the for Generate Leads, add more countries to chose from or add country manually
+campaign 3b44f777-76b3-4112-bbb6-f9e19d9dd978 worked once and stopped
+sort the campaigns, active ones on top
+smpt usage in settings page not working
+api performance. the cost per lead still showing even though price is set at zero in the stting s page
+emails opened and clicked still do not reflect the real value
+
+when creating camapigns, add the option to create and start now, or create and save draft

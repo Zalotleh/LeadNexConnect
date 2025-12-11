@@ -315,6 +315,38 @@ export const scheduledEmails = pgTable('scheduled_emails', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// NEW: Automated Campaign Runs (PROMPT 1 - CLEAR-CAMPAIGN-SPECIFICATION.md)
+// Tracks each individual run of a fully_automated campaign
+export const automatedCampaignRuns = pgTable('automated_campaign_runs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+
+  // References
+  campaignId: uuid('campaign_id')
+    .notNull()
+    .references(() => campaigns.id, { onDelete: 'cascade' }),
+  
+  // Run Information
+  runNumber: integer('run_number').notNull(), // 1, 2, 3, etc.
+  
+  // Lead Generation Results
+  batchId: uuid('batch_id').references(() => leadBatches.id),
+  leadsGenerated: integer('leads_generated').default(0),
+  
+  // Outreach Campaign Created
+  outreachCampaignId: uuid('outreach_campaign_id').references(() => campaigns.id),
+  
+  // Status
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  // Values: 'pending' | 'generating_leads' | 'outreach_started' | 'completed' | 'failed'
+  
+  // Timestamps
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  errorMessage: text('error_message'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Campaign Leads (Many-to-Many relationship for manual campaigns)
 export const campaignLeads = pgTable('campaign_leads', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -715,6 +747,7 @@ export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
   emails: many(emails),
   campaignLeads: many(campaignLeads),
   scheduledEmails: many(scheduledEmails),
+  automatedRuns: many(automatedCampaignRuns),
   workflow: one(workflows, {
     fields: [campaigns.workflowId],
     references: [workflows.id],
@@ -786,5 +819,20 @@ export const workflowStepsRelations = relations(workflowSteps, ({ one }) => ({
   emailTemplate: one(emailTemplates, {
     fields: [workflowSteps.emailTemplateId],
     references: [emailTemplates.id],
+  }),
+}));
+
+export const automatedCampaignRunsRelations = relations(automatedCampaignRuns, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [automatedCampaignRuns.campaignId],
+    references: [campaigns.id],
+  }),
+  batch: one(leadBatches, {
+    fields: [automatedCampaignRuns.batchId],
+    references: [leadBatches.id],
+  }),
+  outreachCampaign: one(campaigns, {
+    fields: [automatedCampaignRuns.outreachCampaignId],
+    references: [campaigns.id],
   }),
 }));

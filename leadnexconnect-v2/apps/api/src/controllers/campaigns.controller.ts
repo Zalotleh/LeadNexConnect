@@ -17,15 +17,23 @@ export class CampaignsController {
   
   /**
    * GET /api/campaigns - Get all campaigns
+   * Query params:
+   * - type: 'lead_generation' | 'outreach' | 'fully_automated' (optional - filter by campaign type)
    */
   async getCampaigns(req: Request, res: Response) {
     try {
-      logger.info('[CampaignsController] Getting campaigns');
+      const { type } = req.query;
+      
+      logger.info('[CampaignsController] Getting campaigns', { type });
 
-      const allCampaigns = await db
-        .select()
-        .from(campaigns)
-        .orderBy(desc(campaigns.createdAt));
+      // Build query with optional type filter
+      let query = db.select().from(campaigns);
+      
+      if (type && typeof type === 'string') {
+        query = query.where(eq(campaigns.campaignType, type as any));
+      }
+      
+      const allCampaigns = await query.orderBy(desc(campaigns.createdAt));
 
       res.json({
         success: true,
