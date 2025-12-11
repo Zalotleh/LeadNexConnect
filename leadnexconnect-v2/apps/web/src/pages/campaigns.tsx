@@ -797,18 +797,18 @@ export default function Campaigns() {
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                       <button
-                        onClick={() => window.location.href = '/leads'}
-                        className="px-6 py-3 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 flex items-center gap-2"
-                      >
-                        <Database className="w-5 h-5" />
-                        Generate Lead Batch
-                      </button>
-                      <button
                         onClick={handleCreateCampaign}
-                        className="px-6 py-3 text-sm font-medium text-purple-600 bg-white border-2 border-purple-600 rounded-lg hover:bg-purple-50 flex items-center gap-2"
+                        className="px-6 py-3 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 flex items-center gap-2"
                       >
                         <Plus className="w-5 h-5" />
                         Create Lead Gen Campaign
+                      </button>
+                      <button
+                        onClick={() => window.location.href = '/leads'}
+                        className="px-6 py-3 text-sm font-medium text-purple-600 bg-white border-2 border-purple-600 rounded-lg hover:bg-purple-50 flex items-center gap-2"
+                      >
+                        <Database className="w-5 h-5" />
+                        Go to Leads Page
                       </button>
                     </div>
                   </div>
@@ -821,18 +821,18 @@ export default function Campaigns() {
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                       <button
-                        onClick={() => window.location.href = '/leads'}
-                        className="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                      >
-                        <Users className="w-5 h-5" />
-                        Select Leads or Batch
-                      </button>
-                      <button
                         onClick={handleCreateCampaign}
-                        className="px-6 py-3 text-sm font-medium text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 flex items-center gap-2"
+                        className="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
                       >
                         <Plus className="w-5 h-5" />
                         Create Outreach Campaign
+                      </button>
+                      <button
+                        onClick={() => window.location.href = '/leads'}
+                        className="px-6 py-3 text-sm font-medium text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 flex items-center gap-2"
+                      >
+                        <Users className="w-5 h-5" />
+                        Go to Leads Page
                       </button>
                     </div>
                   </div>
@@ -880,16 +880,16 @@ export default function Campaigns() {
                           <Database className="w-6 h-6" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-lg mb-1">Generate More Leads</h3>
-                          <p className="text-purple-100 text-sm">Create a new batch of leads from Apollo.io or Google Places</p>
+                          <h3 className="font-bold text-lg mb-1">Create New Lead Generation Campaign</h3>
+                          <p className="text-purple-100 text-sm">Set up automated lead discovery from Apollo.io or Google Places</p>
                         </div>
                       </div>
                       <button
-                        onClick={() => window.location.href = '/leads'}
+                        onClick={handleCreateCampaign}
                         className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
                       >
                         <Plus className="w-4 h-4" />
-                        Generate Leads
+                        New Campaign
                       </button>
                     </div>
                   </div>
@@ -905,26 +905,17 @@ export default function Campaigns() {
                           <Mail className="w-6 h-6" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-lg mb-1">Start New Outreach</h3>
-                          <p className="text-blue-100 text-sm">Select leads or batches and create a personalized email campaign</p>
+                          <h3 className="font-bold text-lg mb-1">Create New Outreach Campaign</h3>
+                          <p className="text-blue-100 text-sm">Send personalized email sequences to your leads or batches</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => window.location.href = '/leads'}
-                          className="px-4 py-2 bg-white/10 text-white border border-white/30 rounded-lg hover:bg-white/20 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
-                        >
-                          <Users className="w-4 h-4" />
-                          Select Leads
-                        </button>
-                        <button
-                          onClick={handleCreateCampaign}
-                          className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
-                        >
-                          <Plus className="w-4 h-4" />
-                          New Campaign
-                        </button>
-                      </div>
+                      <button
+                        onClick={handleCreateCampaign}
+                        className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+                      >
+                        <Plus className="w-4 h-4" />
+                        New Campaign
+                      </button>
                     </div>
                   </div>
                 </div>
