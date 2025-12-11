@@ -352,6 +352,98 @@ Format your response as a JSON array with this structure:
   }
 
   /**
+   * Create manual workflow with email template references
+   */
+  async createManualWorkflow(req: Request, res: Response) {
+    try {
+      const {
+        name,
+        description,
+        industry,
+        stepsCount,
+        steps,
+      } = req.body;
+
+      logger.info('[WorkflowsController] Creating manual workflow', {
+        name,
+        stepsCount,
+      });
+
+      // Validate
+      if (!name || !steps || !Array.isArray(steps) || steps.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Name and steps are required' },
+        });
+      }
+
+      // Validate each step
+      for (const step of steps) {
+        if (!step.emailTemplateId || typeof step.stepNumber !== 'number') {
+          return res.status(400).json({
+            success: false,
+            error: { message: 'Each step must have emailTemplateId and stepNumber' },
+          });
+        }
+      }
+
+      // Create workflow
+      const [newWorkflow] = await db
+        .insert(workflows)
+        .values({
+          name,
+          description: description || null,
+          stepsCount: steps.length,
+          industry: industry || null,
+          country: null,
+          aiInstructions: null,
+          isActive: true,
+          usageCount: 0,
+        })
+        .returning();
+
+      logger.info(`[WorkflowsController] Created manual workflow ${newWorkflow.id}`);
+
+      // Create workflow steps with template references
+      const stepValues = steps.map((step: any) => ({
+        workflowId: newWorkflow.id,
+        stepNumber: step.stepNumber,
+        daysAfterPrevious: step.daysAfterPrevious || 0,
+        emailTemplateId: step.emailTemplateId,
+        // Leave subject and body null for template-based workflows
+        subject: null,
+        body: null,
+      }));
+
+      const createdSteps = await db
+        .insert(workflowSteps)
+        .values(stepValues)
+        .returning();
+
+      logger.info(
+        `[WorkflowsController] Created ${createdSteps.length} steps for manual workflow ${newWorkflow.id}`
+      );
+
+      res.status(201).json({
+        success: true,
+        data: {
+          ...newWorkflow,
+          steps: createdSteps,
+        },
+      });
+    } catch (error: any) {
+      logger.error('[WorkflowsController] Error creating manual workflow:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to create manual workflow',
+          details: error.message,
+        },
+      });
+    }
+  }
+
+  /**
    * Delete workflow
    */
   async deleteWorkflow(req: Request, res: Response) {

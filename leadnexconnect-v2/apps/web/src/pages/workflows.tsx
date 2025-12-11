@@ -152,13 +152,22 @@ export default function Workflows() {
               Create AI-powered email sequences for your campaigns
             </p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Create Workflow
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.location.href = '/workflows/manual'}
+              className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            >
+              <Edit className="w-5 h-5" />
+              Manual Workflow
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
+            >
+              <Sparkles className="w-5 h-5" />
+              AI Workflow
+            </button>
+          </div>
         </div>
 
         {/* Search Bar */}
