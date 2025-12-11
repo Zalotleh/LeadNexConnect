@@ -4,6 +4,7 @@ import ProgressDialog from '@/components/ProgressDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
 import CreateLeadGenerationForm from '@/components/campaigns/CreateLeadGenerationForm'
 import CreateOutreachForm from '@/components/campaigns/CreateOutreachForm'
+import CreateFullyAutomatedForm from '@/components/campaigns/CreateFullyAutomatedForm'
 import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search, Database, Zap, MousePointerClick, Reply, RefreshCw, Calendar, BarChart3, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
@@ -2065,20 +2066,15 @@ export default function Campaigns() {
           />
         )}
 
-        {/* Fully Automated Campaign Form - TODO: Create component */}
+        {/* Fully Automated Campaign Form */}
         {showAutomatedForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">Fully Automated Campaign (Coming Soon)</h2>
-              <p className="text-gray-600 mb-4">This feature is under development.</p>
-              <button
-                onClick={() => setShowAutomatedForm(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+          <CreateFullyAutomatedForm
+            onClose={() => setShowAutomatedForm(false)}
+            onSuccess={() => {
+              fetchCampaigns()
+              setShowAutomatedForm(false)
+            }}
+          />
         )}
       </div>
     </Layout>
