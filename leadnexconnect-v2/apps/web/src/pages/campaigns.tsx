@@ -2,6 +2,7 @@ import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import ProgressDialog from '@/components/ProgressDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
+import CreateLeadGenerationForm from '@/components/campaigns/CreateLeadGenerationForm'
 import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search, Database, Zap, MousePointerClick, Reply, RefreshCw, Calendar, BarChart3, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
@@ -79,6 +80,9 @@ export default function Campaigns() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [showModal, setShowModal] = useState(false)
+  const [showLeadGenForm, setShowLeadGenForm] = useState(false)
+  const [showOutreachForm, setShowOutreachForm] = useState(false)
+  const [showAutomatedForm, setShowAutomatedForm] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(false)
@@ -147,8 +151,18 @@ export default function Campaigns() {
   }
 
   const handleCreateCampaign = () => {
-    setShowModal(true)
-    setCurrentStep(1)
+    // Show different form based on current campaign type filter
+    if (campaignTypeFilter === 'lead_generation') {
+      setShowLeadGenForm(true)
+    } else if (campaignTypeFilter === 'outreach') {
+      setShowOutreachForm(true)
+    } else if (campaignTypeFilter === 'fully_automated') {
+      setShowAutomatedForm(true)
+    } else {
+      // If "All" tab is selected, show old modal (or we can default to one type)
+      setShowModal(true)
+      setCurrentStep(1)
+    }
   }
 
   const handleCloseModal = () => {
@@ -2027,6 +2041,49 @@ export default function Campaigns() {
           message={progressMessage}
           indeterminate={true}
         />
+
+        {/* Lead Generation Campaign Form */}
+        {showLeadGenForm && (
+          <CreateLeadGenerationForm
+            onClose={() => setShowLeadGenForm(false)}
+            onSuccess={() => {
+              fetchCampaigns()
+              setShowLeadGenForm(false)
+            }}
+          />
+        )}
+
+        {/* Outreach Campaign Form - TODO: Create component */}
+        {showOutreachForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">Outreach Campaign (Coming Soon)</h2>
+              <p className="text-gray-600 mb-4">This feature is under development.</p>
+              <button
+                onClick={() => setShowOutreachForm(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Fully Automated Campaign Form - TODO: Create component */}
+        {showAutomatedForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6">
+              <h2 className="text-xl font-semibold mb-4">Fully Automated Campaign (Coming Soon)</h2>
+              <p className="text-gray-600 mb-4">This feature is under development.</p>
+              <button
+                onClick={() => setShowAutomatedForm(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   )
