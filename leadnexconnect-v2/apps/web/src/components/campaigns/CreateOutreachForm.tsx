@@ -75,7 +75,7 @@ export default function CreateOutreachForm({ onClose, onSuccess, preSelectedBatc
   const fetchBatches = async () => {
     try {
       setLoadingBatches(true)
-      const response = await api.get('/lead-batches')
+      const response = await api.get('/leads/batches')
       setBatches(response.data.data || [])
     } catch (error: any) {
       toast.error('Failed to load batches')
@@ -88,7 +88,7 @@ export default function CreateOutreachForm({ onClose, onSuccess, preSelectedBatc
   const fetchTemplates = async () => {
     try {
       setLoadingTemplates(true)
-      const response = await api.get('/email-templates')
+      const response = await api.get('/templates')
       setTemplates(response.data.data || [])
     } catch (error: any) {
       toast.error('Failed to load email templates')

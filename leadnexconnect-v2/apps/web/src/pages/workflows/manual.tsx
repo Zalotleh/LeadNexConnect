@@ -52,7 +52,7 @@ export default function ManualWorkflowBuilder() {
   const { data: templatesData } = useQuery({
     queryKey: ['email-templates'],
     queryFn: async () => {
-      const response = await api.get('/email-templates')
+      const response = await api.get('/templates')
       return response.data.data
     },
   })

@@ -106,7 +106,7 @@ export default function CreateFullyAutomatedForm({ onClose, onSuccess }: CreateF
   const fetchTemplates = async () => {
     try {
       setLoadingTemplates(true)
-      const response = await api.get('/email-templates')
+      const response = await api.get('/templates')
       setTemplates(response.data.data || [])
     } catch (error: any) {
       toast.error('Failed to load email templates')
