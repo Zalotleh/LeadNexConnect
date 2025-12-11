@@ -20,8 +20,8 @@ import {
 interface EmailTemplate {
   id: string
   name: string
-  subject: string
-  body: string
+  subject: string | null
+  body: string | null
   category?: string
 }
 
@@ -345,10 +345,10 @@ export default function ManualWorkflowBuilder() {
                             <Mail className="w-4 h-4 text-blue-600 mt-0.5" />
                             <div className="flex-1">
                               <p className="text-sm font-medium text-blue-900 mb-1">
-                                Subject: {getTemplatePreview(step.emailTemplateId)!.subject}
+                                Subject: {getTemplatePreview(step.emailTemplateId)!.subject || 'No subject'}
                               </p>
                               <p className="text-xs text-blue-700 line-clamp-2">
-                                {getTemplatePreview(step.emailTemplateId)!.body.substring(0, 150)}...
+                                {(getTemplatePreview(step.emailTemplateId)!.body || 'No content').substring(0, 150)}...
                               </p>
                             </div>
                           </div>
