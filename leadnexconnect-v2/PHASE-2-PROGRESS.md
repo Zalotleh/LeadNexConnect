@@ -22,12 +22,16 @@
 
 **Note:** Using simplified inline tabs approach instead of separate components for better performance and simpler codebase. All campaign types displayed in same grid with filtering.
 
-### ⏳ Phase 2: Manual Workflow Builder
-- [ ] Create WorkflowBuilder component
-- [ ] Add step management (add/remove/reorder)
-- [ ] Integrate email template selector
-- [ ] Add delay configuration between steps
-- [ ] Save workflow functionality
+### ✅ Phase 2: Manual Workflow Builder
+- [x] Create Manual Workflow Builder page (/workflows/manual)
+- [x] Add step management (add/remove/reorder with up/down buttons)
+- [x] Integrate email template selector with preview
+- [x] Add delay configuration between steps (0-30 days)
+- [x] Save workflow functionality with template references
+- [x] Add "Manual Workflow" button to workflows page
+- [x] Backend endpoint POST /workflows/manual
+
+**Note:** Uses emailTemplateId references instead of inline content. Maintains backward compatibility with existing AI-generated workflows that use inline subject/body.
 
 ### ⏳ Phase 3: Enhanced Campaign Creation
 - [ ] Update create campaign flow for each type
@@ -44,14 +48,18 @@
 
 ## 🔄 Current Session
 
-**Completed Phase:** 1 - Campaign Page Tabs ✅
-**Token Usage:** ~74K/200K used
+**Completed Phases:**
+- Phase 1: Campaign Page Tabs ✅ (Commit: ab4ce70, db90337)
+- Phase 2: Manual Workflow Builder ✅ (Commit: ec96d0b)
+
+**Token Usage:** ~115K/200K used (85K remaining)
+
 **Next Steps:**
-1. ~~Update campaigns page with tabs~~ ✅ Completed
-2. ~~Add campaign type filtering~~ ✅ Completed
-3. ~~Commit Phase 1~~ ✅ Committed (ab4ce70)
-4. Start Phase 2: Manual Workflow Builder
-5. Continue with remaining phases
+1. ~~Phase 1: Campaign tabs~~ ✅ Completed
+2. ~~Phase 2: Manual workflow builder~~ ✅ Completed
+3. Phase 3: Enhanced campaign creation (optional - see TODO file)
+4. Phase 4: Batch integration (optional)
+5. Commit progress and prepare summary
 
 ---
 
