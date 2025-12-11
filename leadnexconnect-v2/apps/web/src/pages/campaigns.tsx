@@ -2,7 +2,7 @@ import Layout from '@/components/Layout'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import ProgressDialog from '@/components/ProgressDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
-import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search, Database, Zap } from 'lucide-react'
+import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search, Database, Zap, MousePointerClick, Reply, RefreshCw, Calendar, BarChart3, Settings } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
@@ -45,6 +45,33 @@ interface Campaign {
   emailsClicked: number
   responsesReceived: number
   createdAt: string
+  // Lead Generation specific
+  isRecurring?: boolean
+  recurringInterval?: string
+  leadSources?: string[]
+  maxResultsPerRun?: number
+  totalLeadsGenerated?: number
+  batchesCreated?: number
+  nextRunAt?: string
+  lastRunAt?: string
+  city?: string
+  country?: string
+  // Outreach specific
+  useWorkflow?: boolean
+  workflowName?: string
+  templateName?: string
+  totalLeadsTargeted?: number
+  emailsScheduledCount?: number
+  emailsReplied?: number
+  batchNames?: string[]
+  scheduledStartAt?: string
+  actualStartedAt?: string
+  completedAt?: string
+  currentWorkflowStep?: number
+  // Fully Automated specific
+  outreachDelayDays?: number
+  totalRunsCompleted?: number
+  endDate?: string
 }
 
 export default function Campaigns() {
@@ -946,194 +973,568 @@ export default function Campaigns() {
                 </div>
               )}
 
-              {filteredCampaigns.map((campaign) => (
-              <div
-                key={campaign.id}
-                className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
-                  selectedCampaigns.has(campaign.id) ? 'ring-2 ring-primary-500' : ''
-                }`}
-              >
-                <div className="p-4 lg:p-6 flex-1">
-                  {/* Header with Checkbox */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={selectedCampaigns.has(campaign.id)}
-                        onChange={(e) => {
-                          e.stopPropagation()
-                          handleSelectCampaign(campaign.id)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h3 
+              {filteredCampaigns.map((campaign) => {
+                const campaignType = campaign.campaignType || 'outreach';
+
+                // Lead Generation Campaign Card
+                if (campaignType === 'lead_generation') {
+                  return (
+                    <div
+                      key={campaign.id}
+                      className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
+                        selectedCampaigns.has(campaign.id) ? 'ring-2 ring-purple-500' : ''
+                      }`}
+                    >
+                      <div className="p-4 lg:p-6 flex-1">
+                        {/* Header with Checkbox */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={selectedCampaigns.has(campaign.id)}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleSelectCampaign(campaign.id)
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h3
+                                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                                className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-purple-600"
+                              >
+                                {campaign.name}
+                              </h3>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                                  campaign.status === 'running' ? 'bg-green-100 text-green-800' :
+                                  campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                                  campaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                                  campaign.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                                  campaign.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {campaign.status}
+                                </span>
+                                {campaign.isRecurring && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">
+                                    <RefreshCw className="w-3 h-3" />
+                                    {campaign.recurringInterval === 'daily' ? 'Daily' :
+                                     campaign.recurringInterval === 'every_2_days' ? 'Every 2 Days' :
+                                     campaign.recurringInterval === 'every_3_days' ? 'Every 3 Days' :
+                                     campaign.recurringInterval === 'weekly' ? 'Weekly' :
+                                     campaign.recurringInterval === 'monthly' ? 'Monthly' : 'Recurring'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Campaign Details */}
+                        <div
                           onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                          className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-primary-600"
+                          className="space-y-2 text-sm mb-4"
                         >
-                          {campaign.name}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                            campaign.status === 'active' ? 'bg-green-100 text-green-800' :
-                            campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                            campaign.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {campaign.status}
-                          </span>
-                          {campaign.campaignType && campaign.campaignType !== 'outreach' && (
-                            <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                              campaign.campaignType === 'lead_generation' ? 'bg-purple-100 text-purple-800' :
-                              campaign.campaignType === 'fully_automated' ? 'bg-orange-100 text-orange-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {campaign.campaignType === 'lead_generation' ? 'Lead Gen' :
-                               campaign.campaignType === 'fully_automated' ? 'Auto' : campaign.campaignType}
-                            </span>
+                          {campaign.industry && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Industry:</span>
+                              <span className="font-medium text-gray-900">{campaign.industry}</span>
+                            </div>
                           )}
+                          {campaign.city && campaign.country && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Location:</span>
+                              <span className="font-medium text-gray-900">{campaign.city}, {campaign.country}</span>
+                            </div>
+                          )}
+                          {campaign.leadSources && campaign.leadSources.length > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Sources:</span>
+                              <span className="font-medium text-gray-900">{campaign.leadSources.length} source{campaign.leadSources.length !== 1 ? 's' : ''}</span>
+                            </div>
+                          )}
+                          {campaign.maxResultsPerRun && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Max per run:</span>
+                              <span className="font-medium text-gray-900">{campaign.maxResultsPerRun} leads</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Stats */}
+                        <div
+                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                          className="pt-3 border-t grid grid-cols-2 gap-3 mb-4"
+                        >
+                          <div className="text-center bg-purple-50 rounded-lg p-3">
+                            <div className="text-2xl font-bold text-purple-700">{campaign.totalLeadsGenerated || 0}</div>
+                            <div className="text-xs text-gray-600">Leads Generated</div>
+                          </div>
+                          <div className="text-center bg-purple-50 rounded-lg p-3">
+                            <div className="text-2xl font-bold text-purple-700">{campaign.batchesCreated || 0}</div>
+                            <div className="text-xs text-gray-600">Batches Created</div>
+                          </div>
+                        </div>
+
+                        {/* Next/Last Run */}
+                        {campaign.isRecurring && campaign.nextRunAt && campaign.status === 'running' && (
+                          <div
+                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                            className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 p-3 rounded-lg mb-2"
+                          >
+                            <Calendar className="w-4 h-4 text-blue-600" />
+                            <span>Next run: {new Date(campaign.nextRunAt).toLocaleString()}</span>
+                          </div>
+                        )}
+
+                        {campaign.lastRunAt && (
+                          <div
+                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                            className="text-xs text-gray-600 mb-2"
+                          >
+                            Last run: {new Date(campaign.lastRunAt).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Footer with Actions */}
+                      <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between gap-2">
+                        <div className="text-xs text-gray-500">
+                          Created {new Date(campaign.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="flex gap-2">
+                          {campaign.status === 'running' ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePauseCampaign(campaign.id);
+                              }}
+                              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                            >
+                              <Pause className="w-3 h-3" />
+                              Pause
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartCampaign(campaign.id);
+                              }}
+                              className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-700 flex items-center gap-1"
+                            >
+                              <Play className="w-3 h-3" />
+                              Start
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/campaigns/${campaign.id}`;
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                          >
+                            <Settings className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCampaign(campaign.id);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       </div>
                     </div>
-                  </div>
+                  );
+                }
 
-                  {/* Description */}
-                  {campaign.description && (
-                    <p 
-                      onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                      className="text-gray-600 text-sm mb-3 line-clamp-2"
+                // Fully Automated Campaign Card
+                if (campaignType === 'fully_automated') {
+                  return (
+                    <div
+                      key={campaign.id}
+                      className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
+                        selectedCampaigns.has(campaign.id) ? 'ring-2 ring-orange-500' : ''
+                      }`}
                     >
-                      {campaign.description}
-                    </p>
-                  )}
+                      <div className="p-4 lg:p-6 flex-1">
+                        {/* Header with Checkbox */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={selectedCampaigns.has(campaign.id)}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleSelectCampaign(campaign.id)
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500 cursor-pointer"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h3
+                                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                                className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-orange-600"
+                              >
+                                {campaign.name}
+                              </h3>
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                                  campaign.status === 'running' ? 'bg-green-100 text-green-800' :
+                                  campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {campaign.status}
+                                </span>
+                              </div>
+                              {campaign.industry && (
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {campaign.industry} • {
+                                    campaign.recurringInterval === 'daily' ? 'Daily' :
+                                    campaign.recurringInterval === 'every_2_days' ? 'Every 2 Days' :
+                                    campaign.recurringInterval === 'every_3_days' ? 'Every 3 Days' :
+                                    campaign.recurringInterval === 'weekly' ? 'Weekly' :
+                                    campaign.recurringInterval === 'monthly' ? 'Monthly' : 'Recurring'
+                                  }
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
 
-                  {/* Tags */}
-                  <div 
-                    onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                    className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-4"
+                        {/* Configuration Summary */}
+                        <div
+                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4"
+                        >
+                          <div className="flex items-start gap-2 bg-orange-50 p-3 rounded-lg">
+                            <Database className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="font-medium text-gray-900">Lead Generation</div>
+                              <div className="text-xs text-gray-600">
+                                {campaign.maxResultsPerRun || 0} leads from {(campaign.leadSources || []).length} source{(campaign.leadSources || []).length !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2 bg-orange-50 p-3 rounded-lg">
+                            <Mail className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="font-medium text-gray-900">Outreach</div>
+                              <div className="text-xs text-gray-600">
+                                {campaign.outreachDelayDays === 0 ? 'Immediate' : `${campaign.outreachDelayDays || 0} days delay`}
+                                <br />
+                                {campaign.useWorkflow ? `Workflow: ${campaign.workflowName || 'Unknown'}` : `Template: ${campaign.templateName || 'Unknown'}`}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div
+                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                          className="grid grid-cols-3 gap-2 pt-3 border-t mb-4"
+                        >
+                          <div className="text-center bg-orange-50 rounded-lg p-3">
+                            <div className="text-xl font-bold text-orange-700">{campaign.totalRunsCompleted || 0}</div>
+                            <div className="text-xs text-gray-600">Runs</div>
+                          </div>
+                          <div className="text-center bg-orange-50 rounded-lg p-3">
+                            <div className="text-xl font-bold text-orange-700">{campaign.totalLeadsGenerated || 0}</div>
+                            <div className="text-xs text-gray-600">Leads</div>
+                          </div>
+                          <div className="text-center bg-orange-50 rounded-lg p-3">
+                            <div className="text-xl font-bold text-orange-700">{campaign.emailsSent || 0}</div>
+                            <div className="text-xs text-gray-600">Emails</div>
+                          </div>
+                        </div>
+
+                        {/* Next Run */}
+                        {campaign.status === 'running' && campaign.nextRunAt && (
+                          <div
+                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                            className="flex items-center gap-2 bg-blue-50 p-3 rounded-lg text-sm mb-2"
+                          >
+                            <Calendar className="w-4 h-4 text-blue-600" />
+                            <span className="text-gray-700">Next run: {new Date(campaign.nextRunAt).toLocaleString()}</span>
+                          </div>
+                        )}
+
+                        {/* End Date */}
+                        {campaign.endDate && (
+                          <div
+                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                            className="text-xs text-gray-600"
+                          >
+                            Ends: {new Date(campaign.endDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card Footer with Actions */}
+                      <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between gap-2">
+                        <div className="text-xs text-gray-500">
+                          Created {new Date(campaign.createdAt).toLocaleDateString()}
+                        </div>
+                        <div className="flex gap-2">
+                          {campaign.status === 'running' ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePauseCampaign(campaign.id);
+                              }}
+                              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                            >
+                              <Pause className="w-3 h-3" />
+                              Pause
+                            </button>
+                          ) : campaign.status === 'paused' ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartCampaign(campaign.id);
+                              }}
+                              className="px-3 py-1.5 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 flex items-center gap-1"
+                            >
+                              <Play className="w-3 h-3" />
+                              Resume
+                            </button>
+                          ) : null}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.location.href = `/campaigns/${campaign.id}`;
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                          >
+                            <BarChart3 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCampaign(campaign.id);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Outreach Campaign Card (default/fallback)
+                return (
+                  <div
+                    key={campaign.id}
+                    className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
+                      selectedCampaigns.has(campaign.id) ? 'ring-2 ring-blue-500' : ''
+                    }`}
                   >
-                    {campaign.industry && (
-                      <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                        <TrendingUp className="w-3 h-3" />
-                        {campaign.industry}
-                      </span>
-                    )}
-                    {campaign.scheduleType && (
-                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                        {campaign.scheduleType === 'daily' ? '🕒 Daily' : '👆 Manual'}
-                      </span>
-                    )}
-                  </div>
+                    <div className="p-4 lg:p-6 flex-1">
+                      {/* Header with Checkbox */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedCampaigns.has(campaign.id)}
+                            onChange={(e) => {
+                              e.stopPropagation()
+                              handleSelectCampaign(campaign.id)
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h3
+                              onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                              className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-blue-600"
+                            >
+                              {campaign.name}
+                            </h3>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                                campaign.status === 'running' ? 'bg-green-100 text-green-800' :
+                                campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
+                                campaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                                campaign.status === 'draft' ? 'bg-gray-100 text-gray-800' :
+                                campaign.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {campaign.status}
+                              </span>
+                            </div>
+                            <div
+                              onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                              className="flex items-center gap-3 text-sm text-gray-600 flex-wrap"
+                            >
+                              <span className="flex items-center gap-1">
+                                {campaign.useWorkflow ? (
+                                  <>
+                                    <RefreshCw className="w-4 h-4" />
+                                    Workflow: {campaign.workflowName || 'Unknown'}
+                                    {campaign.currentWorkflowStep && (
+                                      <span className="ml-1">(Step {campaign.currentWorkflowStep})</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Mail className="w-4 h-4" />
+                                    Template: {campaign.templateName || 'Unknown'}
+                                  </>
+                                )}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Users className="w-4 h-4" />
+                                {campaign.totalLeadsTargeted || campaign.leadsGenerated || 0} leads
+                              </span>
+                            </div>
+                            {campaign.batchNames && campaign.batchNames.length > 0 && (
+                              <div
+                                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                                className="text-xs text-gray-600 mt-1"
+                              >
+                                Batches: {campaign.batchNames.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Metrics Grid */}
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Users className="w-4 h-4 text-gray-500" />
-                        <p className="text-xs text-gray-600">Leads</p>
-                      </div>
-                      <p className="text-lg font-bold text-gray-900">{campaign.leadsGenerated}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Send className="w-4 h-4 text-gray-500" />
-                        <p className="text-xs text-gray-600">Sent</p>
-                      </div>
-                      <p className="text-lg font-bold text-gray-900">{campaign.emailsSent}</p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Eye className="w-4 h-4 text-green-600" />
-                        <p className="text-xs text-green-600">Opens</p>
-                      </div>
-                      <p className="text-lg font-bold text-green-700">{campaign.emailsOpened}</p>
-                      <p className="text-xs text-green-600 font-medium">{calculateOpenRate(campaign)}%</p>
-                    </div>
-                    <div className="bg-purple-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Mail className="w-4 h-4 text-purple-600" />
-                        <p className="text-xs text-purple-600">Replies</p>
-                      </div>
-                      <p className="text-lg font-bold text-purple-700">{campaign.responsesReceived}</p>
-                      <p className="text-xs text-purple-600 font-medium">{calculateResponseRate(campaign)}%</p>
-                    </div>
-                  </div>
-
-                  {/* Performance Bars */}
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>Open Rate</span>
-                        <span className="font-medium">{calculateOpenRate(campaign)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      {/* Progress Bar */}
+                      {campaign.status === 'running' && campaign.emailsScheduledCount && (
                         <div
-                          className="bg-green-500 h-1.5 rounded-full transition-all"
-                          style={{ width: `${Math.min(calculateOpenRate(campaign), 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span>Click Rate</span>
-                        <span className="font-medium">{calculateClickRate(campaign)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div
-                          className="bg-blue-500 h-1.5 rounded-full transition-all"
-                          style={{ width: `${Math.min(calculateClickRate(campaign), 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                          className="space-y-1 mb-4"
+                        >
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Progress</span>
+                            <span className="font-medium text-gray-900">
+                              {campaign.emailsSent || 0} / {campaign.emailsScheduledCount || 0} emails sent
+                              ({campaign.emailsScheduledCount ? Math.round(((campaign.emailsSent || 0) / campaign.emailsScheduledCount) * 100) : 0}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full transition-all"
+                              style={{ width: `${campaign.emailsScheduledCount ? Math.min(((campaign.emailsSent || 0) / campaign.emailsScheduledCount) * 100, 100) : 0}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
 
-                {/* Card Footer with Actions */}
-                <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between gap-2">
-                  <div className="text-xs text-gray-500">
-                    Created {new Date(campaign.createdAt).toLocaleDateString()}
-                  </div>
-                  <div className="flex gap-2">
-                    {campaign.status === 'active' ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePauseCampaign(campaign.id);
-                        }}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
-                        title="Pause Campaign"
+                      {/* Email Stats */}
+                      <div
+                        onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                        className="grid grid-cols-4 gap-2 mb-4"
                       >
-                        <Pause className="w-3 h-3" />
-                        Pause
-                      </button>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartCampaign(campaign.id);
-                        }}
-                        className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 flex items-center gap-1"
-                        title="Start Campaign"
+                        <div className="text-center bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
+                            <Mail className="w-3 h-3" />
+                          </div>
+                          <div className="text-lg font-bold text-gray-900">{campaign.emailsSent || 0}</div>
+                          <div className="text-xs text-gray-600">Sent</div>
+                        </div>
+                        <div className="text-center bg-green-50 rounded-lg p-3">
+                          <div className="flex items-center justify-center gap-1 text-green-600 mb-1">
+                            <Eye className="w-3 h-3" />
+                          </div>
+                          <div className="text-lg font-bold text-green-700">{campaign.emailsOpened || 0}</div>
+                          <div className="text-xs text-green-600">
+                            {campaign.emailsSent ? Math.round(((campaign.emailsOpened || 0) / campaign.emailsSent) * 100) : 0}%
+                          </div>
+                        </div>
+                        <div className="text-center bg-blue-50 rounded-lg p-3">
+                          <div className="flex items-center justify-center gap-1 text-blue-600 mb-1">
+                            <MousePointerClick className="w-3 h-3" />
+                          </div>
+                          <div className="text-lg font-bold text-blue-700">{campaign.emailsClicked || 0}</div>
+                          <div className="text-xs text-blue-600">Clicks</div>
+                        </div>
+                        <div className="text-center bg-purple-50 rounded-lg p-3">
+                          <div className="flex items-center justify-center gap-1 text-purple-600 mb-1">
+                            <Reply className="w-3 h-3" />
+                          </div>
+                          <div className="text-lg font-bold text-purple-700">{campaign.emailsReplied || campaign.responsesReceived || 0}</div>
+                          <div className="text-xs text-purple-600">Replies</div>
+                        </div>
+                      </div>
+
+                      {/* Timing Info */}
+                      <div
+                        onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                        className="text-xs text-gray-600 space-y-1"
                       >
-                        <Play className="w-3 h-3" />
-                        Start
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteCampaign(campaign.id);
-                      }}
-                      className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
-                      title="Delete Campaign"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                        {campaign.status === 'scheduled' && campaign.scheduledStartAt && (
+                          <div className="bg-blue-50 p-2 rounded">
+                            Scheduled for: {new Date(campaign.scheduledStartAt).toLocaleString()}
+                          </div>
+                        )}
+                        {campaign.actualStartedAt && (
+                          <div>Started: {new Date(campaign.actualStartedAt).toLocaleString()}</div>
+                        )}
+                        {campaign.completedAt && (
+                          <div>Completed: {new Date(campaign.completedAt).toLocaleString()}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card Footer with Actions */}
+                    <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between gap-2">
+                      <div className="text-xs text-gray-500">
+                        Created {new Date(campaign.createdAt).toLocaleDateString()}
+                      </div>
+                      <div className="flex gap-2">
+                        {campaign.status === 'running' ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePauseCampaign(campaign.id);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                          >
+                            <Pause className="w-3 h-3" />
+                            Pause
+                          </button>
+                        ) : (campaign.status === 'paused' || campaign.status === 'draft' || campaign.status === 'scheduled') ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartCampaign(campaign.id);
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 flex items-center gap-1"
+                          >
+                            <Play className="w-3 h-3" />
+                            {campaign.status === 'paused' ? 'Resume' : 'Start'}
+                          </button>
+                        ) : null}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `/campaigns/${campaign.id}`;
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                        >
+                          <BarChart3 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCampaign(campaign.id);
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              ))}
+                );
+              })}
               </>
             )}
           </div>
