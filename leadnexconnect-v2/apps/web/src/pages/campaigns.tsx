@@ -208,8 +208,9 @@ export default function Campaigns() {
       setCampaignToStart(null)
     } catch (error: any) {
       setShowProgressDialog(false)
-      toast.error('Failed to start campaign')
-      console.error(error)
+      const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to start campaign'
+      toast.error(errorMessage)
+      console.error('Failed to start campaign:', error)
     } finally {
       setIsStarting(false)
     }
