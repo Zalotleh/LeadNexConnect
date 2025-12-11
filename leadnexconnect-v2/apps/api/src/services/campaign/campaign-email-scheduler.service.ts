@@ -277,7 +277,7 @@ export class CampaignEmailSchedulerService {
 
         for (const step of steps) {
           // Calculate when this email should be sent
-          cumulativeDelayDays += step.delayDays || 0;
+          cumulativeDelayDays += step.daysAfterPrevious || 0;
           const scheduledFor = new Date();
           scheduledFor.setDate(scheduledFor.getDate() + cumulativeDelayDays);
 
