@@ -869,9 +869,95 @@ export default function Campaigns() {
                 )}
               </div>
             ) : (
-              filteredCampaigns.map((campaign) => (
-              <div 
-                key={campaign.id} 
+              <>
+              {/* Quick Action Card - Show when viewing specific campaign type tabs */}
+              {campaignTypeFilter === 'lead_generation' && (
+                <div className="col-span-full">
+                  <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                          <Database className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-lg mb-1">Generate More Leads</h3>
+                          <p className="text-purple-100 text-sm">Create a new batch of leads from Apollo.io or Google Places</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => window.location.href = '/leads'}
+                        className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Generate Leads
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {campaignTypeFilter === 'outreach' && (
+                <div className="col-span-full">
+                  <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                          <Mail className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-lg mb-1">Start New Outreach</h3>
+                          <p className="text-blue-100 text-sm">Select leads or batches and create a personalized email campaign</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => window.location.href = '/leads'}
+                          className="px-4 py-2 bg-white/10 text-white border border-white/30 rounded-lg hover:bg-white/20 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <Users className="w-4 h-4" />
+                          Select Leads
+                        </button>
+                        <button
+                          onClick={handleCreateCampaign}
+                          className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <Plus className="w-4 h-4" />
+                          New Campaign
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {campaignTypeFilter === 'fully_automated' && (
+                <div className="col-span-full">
+                  <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                          <Zap className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-lg mb-1">Create Automated Campaign</h3>
+                          <p className="text-orange-100 text-sm">Set up continuous lead generation + outreach on autopilot</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleCreateCampaign}
+                        className="px-4 py-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
+                      >
+                        <Plus className="w-4 h-4" />
+                        New Automated Campaign
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {filteredCampaigns.map((campaign) => (
+              <div
+                key={campaign.id}
                 className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
                   selectedCampaigns.has(campaign.id) ? 'ring-2 ring-primary-500' : ''
                 }`}
@@ -1057,6 +1143,7 @@ export default function Campaigns() {
                 </div>
               </div>
               ))
+              </>
             )}
           </div>
         )}
