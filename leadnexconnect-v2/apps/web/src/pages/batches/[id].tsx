@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import CreateOutreachForm from '@/components/campaigns/CreateOutreachForm'
 import { leadsAPI, campaignsAPI } from '@/services/api'
 import {
   ArrowLeft,
@@ -41,6 +42,7 @@ export default function BatchDetailPage() {
   const [showAddLeadModal, setShowAddLeadModal] = useState(false)
   const [showEditLeadModal, setShowEditLeadModal] = useState(false)
   const [selectedLead, setSelectedLead] = useState<any>(null)
+  const [showOutreachForm, setShowOutreachForm] = useState(false)
 
   // Fetch batch details
   const { data: batchData, isLoading: batchLoading, refetch: refetchBatch } = useQuery({
@@ -236,6 +238,13 @@ export default function BatchDetailPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowOutreachForm(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Mail className="w-4 h-4" />
+                Create Outreach
+              </button>
               <button
                 onClick={() => setShowAddLeadModal(true)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -592,6 +601,20 @@ export default function BatchDetailPage() {
               refetchLeads()
               refetchBatch()
               refetchAnalytics()
+            }}
+          />
+        )}
+
+        {/* Outreach Campaign Form */}
+        {showOutreachForm && (
+          <CreateOutreachForm
+            preSelectedBatchId={batch.id}
+            onClose={() => setShowOutreachForm(false)}
+            onSuccess={() => {
+              setShowOutreachForm(false)
+              refetchBatch()
+              refetchAnalytics()
+              toast.success('Outreach campaign created! Check the Campaigns page.')
             }}
           />
         )}
