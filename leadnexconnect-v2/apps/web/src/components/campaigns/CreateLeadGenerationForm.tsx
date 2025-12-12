@@ -108,10 +108,22 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
         status: formData.startImmediately ? 'active' : 'draft',
       }
 
-      await api.post('/campaigns', payload)
-      toast.success(formData.startImmediately 
-        ? 'Campaign created and started successfully!' 
-        : 'Campaign created as draft. You can start it later.')
+      const response = await api.post('/campaigns', payload)
+      const campaignId = response.data.data.id
+
+      // If user wants to start immediately, trigger campaign execution
+      if (formData.startImmediately) {
+        try {
+          await api.post(`/campaigns/${campaignId}/start`)
+          toast.success('Campaign created and started successfully!')
+        } catch (startError: any) {
+          console.error('Failed to start campaign:', startError)
+          toast.success('Campaign created but failed to start. You can start it manually.')
+        }
+      } else {
+        toast.success('Campaign created as draft. You can start it later.')
+      }
+
       onSuccess()
       onClose()
     } catch (error: any) {
