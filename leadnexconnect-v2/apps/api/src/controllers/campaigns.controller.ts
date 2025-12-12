@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
 import { campaigns, leads, emails, emailTemplates, campaignLeads, leadBatches } from '@leadnex/database';
-import { eq, desc, and, gte } from 'drizzle-orm';
+import { eq, desc, and, gte, count, sql } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
@@ -34,9 +34,57 @@ export class CampaignsController {
         : await db.select().from(campaigns)
             .orderBy(desc(campaigns.createdAt));
 
+      // Enrich each campaign with actual counts
+      const enrichedCampaigns = await Promise.all(
+        allCampaigns.map(async (campaign) => {
+          // Get actual lead count
+          let leadsCount = 0;
+          if (campaign.campaignType === 'lead_generation') {
+            // For lead_generation, count leads in batches created by this campaign
+            const batchIds = await db
+              .select({ id: leadBatches.id })
+              .from(leadBatches)
+              .where(eq(leadBatches.activeCampaignId, campaign.id));
+            
+            if (batchIds.length > 0) {
+              const leadsResult = await db
+                .select({ count: count() })
+                .from(leads)
+                .where(
+                  sql`${leads.batchId} IN (${sql.join(batchIds.map(b => sql`${b.id}`), sql`, `)})`
+                );
+              leadsCount = Number(leadsResult[0]?.count || 0);
+            }
+          } else {
+            // For other campaign types, use campaignLeads junction table
+            const result = await db
+              .select({ count: count() })
+              .from(campaignLeads)
+              .where(eq(campaignLeads.campaignId, campaign.id));
+            leadsCount = Number(result[0]?.count || 0);
+          }
+
+          // Get actual batch count (for lead_generation campaigns)
+          let batchCount = 0;
+          if (campaign.campaignType === 'lead_generation') {
+            const batchesResult = await db
+              .select({ count: count() })
+              .from(leadBatches)
+              .where(eq(leadBatches.activeCampaignId, campaign.id));
+            batchCount = Number(batchesResult[0]?.count || 0);
+          }
+
+          return {
+            ...campaign,
+            leadsGenerated: leadsCount,
+            batchesCreated: batchCount,
+          };
+        })
+      );
+
       res.json({
         success: true,
-        data: allCampaigns,
+        data: enrichedCampaigns,
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error getting campaigns', { error: error.message });
