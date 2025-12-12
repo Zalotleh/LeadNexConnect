@@ -225,8 +225,14 @@ export default function Campaigns() {
     }
   }
 
-  const handleStartCampaign = async (campaignId: string) => {
+  const handleStartCampaign = async (campaignId: string, campaignType?: string) => {
     setCampaignToStart(campaignId)
+    // Store the campaign type in state for use in confirmStartCampaign
+    const campaign = campaigns.find(c => c.id === campaignId)
+    if (campaign) {
+      // Store campaign data temporarily
+      (window as any).__startCampaignType = campaign.campaignType
+    }
     setShowStartConfirm(true)
   }
 
@@ -242,7 +248,13 @@ export default function Campaigns() {
       setProgressMessage('Initializing campaign execution...')
       setShowProgressDialog(true)
       
-      await api.post(`/campaigns/${campaignToStart}/start`)
+      // Use the correct endpoint based on campaign type
+      const campaignType = (window as any).__startCampaignType
+      const endpoint = campaignType === 'lead_generation' 
+        ? `/campaigns/${campaignToStart}/execute`
+        : `/campaigns/${campaignToStart}/start`
+      
+      await api.post(endpoint)
       
       setProgressMessage('Campaign started successfully!')
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -251,11 +263,15 @@ export default function Campaigns() {
       toast.success('Campaign started successfully!')
       fetchCampaigns()
       setCampaignToStart(null)
+      // Clean up temporary data
+      delete (window as any).__startCampaignType
     } catch (error: any) {
       setShowProgressDialog(false)
       const errorMessage = error.response?.data?.error?.message || error.message || 'Failed to start campaign'
       toast.error(errorMessage)
       console.error('Failed to start campaign:', error)
+      // Clean up temporary data
+      delete (window as any).__startCampaignType
     } finally {
       setIsStarting(false)
     }
@@ -1121,7 +1137,8 @@ export default function Campaigns() {
                           Created {new Date(campaign.createdAt).toLocaleDateString()}
                         </div>
                         <div className="flex gap-2">
-                          {campaign.status === 'running' ? (
+                          {/* Show appropriate button based on campaign status */}
+                          {(campaign.status === 'running' || campaign.status === 'active') ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1136,12 +1153,12 @@ export default function Campaigns() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleStartCampaign(campaign.id);
+                                handleStartCampaign(campaign.id, campaign.campaignType);
                               }}
                               className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-700 flex items-center gap-1"
                             >
                               <Play className="w-3 h-3" />
-                              Start
+                              {campaign.status === 'paused' ? 'Resume' : 'Start'}
                             </button>
                           )}
                           <button
@@ -1296,7 +1313,7 @@ export default function Campaigns() {
                           Created {new Date(campaign.createdAt).toLocaleDateString()}
                         </div>
                         <div className="flex gap-2">
-                          {campaign.status === 'running' ? (
+                          {(campaign.status === 'running' || campaign.status === 'active') ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1307,16 +1324,16 @@ export default function Campaigns() {
                               <Pause className="w-3 h-3" />
                               Pause
                             </button>
-                          ) : campaign.status === 'paused' ? (
+                          ) : (campaign.status === 'paused' || campaign.status === 'draft') ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleStartCampaign(campaign.id);
+                                handleStartCampaign(campaign.id, campaign.campaignType);
                               }}
                               className="px-3 py-1.5 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 flex items-center gap-1"
                             >
                               <Play className="w-3 h-3" />
-                              Resume
+                              {campaign.status === 'paused' ? 'Resume' : 'Start'}
                             </button>
                           ) : null}
                           <button
@@ -1505,7 +1522,7 @@ export default function Campaigns() {
                         Created {new Date(campaign.createdAt).toLocaleDateString()}
                       </div>
                       <div className="flex gap-2">
-                        {campaign.status === 'running' ? (
+                        {(campaign.status === 'running' || campaign.status === 'active') ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1520,7 +1537,7 @@ export default function Campaigns() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleStartCampaign(campaign.id);
+                              handleStartCampaign(campaign.id, campaign.campaignType);
                             }}
                             className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 flex items-center gap-1"
                           >

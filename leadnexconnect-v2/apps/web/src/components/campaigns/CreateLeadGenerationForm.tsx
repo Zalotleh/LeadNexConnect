@@ -111,22 +111,28 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
       const response = await api.post('/campaigns', payload)
       const campaignId = response.data.data.id
 
-      // If user wants to start immediately, trigger campaign execution
+      // Show success message and close modal immediately for better UX
+      if (formData.startImmediately) {
+        toast.success('Campaign created! Starting lead generation...')
+      } else {
+        toast.success('Campaign created as draft. You can start it later.')
+      }
+      
+      onSuccess()
+      onClose()
+
+      // If user wants to start immediately, trigger campaign execution in background
+      // This happens after modal closes so user doesn't wait
       if (formData.startImmediately) {
         try {
           // For lead generation campaigns, use /execute endpoint which generates leads
           await api.post(`/campaigns/${campaignId}/execute`)
-          toast.success('Campaign created and started successfully!')
+          toast.success('Lead generation started successfully!')
         } catch (startError: any) {
           console.error('Failed to start campaign:', startError)
-          toast.success('Campaign created but failed to start. You can start it manually.')
+          toast.error('Campaign created but failed to start. Please start it manually from the campaigns page.')
         }
-      } else {
-        toast.success('Campaign created as draft. You can start it later.')
       }
-
-      onSuccess()
-      onClose()
     } catch (error: any) {
       toast.error(error.response?.data?.error?.message || 'Failed to create campaign')
       console.error(error)
