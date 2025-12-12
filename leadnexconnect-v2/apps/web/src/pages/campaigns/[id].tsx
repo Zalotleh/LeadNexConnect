@@ -805,24 +805,8 @@ export default function CampaignDetail() {
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Campaign Settings</h2>
             
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                {isEditing ? (
-                  <textarea
-                    value={editForm.description}
-                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="Campaign description..."
-                  />
-                ) : (
-                  <p className="text-gray-600">{campaign.description || 'No description'}</p>
-                )}
-              </div>
-
+            {/* Horizontal Grid Layout for Settings */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {/* Industry Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1037,7 +1021,17 @@ export default function CampaignDetail() {
                   </div>
                 </>
               )}
+
             </div>
+
+            {/* Description - Full Width Below */}
+            {campaign.description && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <p className="text-gray-600">{campaign.description}</p>
+              </div>
+            )}
+
           </div>
 
         {/* Workflow Steps Section (Only for email campaigns) */}
