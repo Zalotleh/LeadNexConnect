@@ -74,6 +74,7 @@ interface Campaign {
   status: string
   industry: string | null
   targetCountries: string[] | null
+  targetCities?: string[] | null
   companySize: string | null
   leadsPerDay: number
   emailTemplateId: string | null
@@ -1040,6 +1041,7 @@ export default function CampaignDetail() {
               )}
             </div>
           </div>
+        </div>
 
           {/* Right Column - Workflow Steps (Only for email campaigns) */}
           {campaign.campaignType !== 'lead_generation' && campaign.workflow && campaign.workflow.steps && campaign.workflow.steps.length > 0 && (
