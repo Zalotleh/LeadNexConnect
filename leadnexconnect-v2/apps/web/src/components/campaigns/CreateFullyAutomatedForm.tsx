@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Zap, Database, Mail, Calendar, Clock } from 'lucide-react'
-import { INDUSTRIES, getIndustriesByCategory } from '@leadnex/shared'
+import { INDUSTRIES, getIndustriesByCategory, COUNTRIES } from '@leadnex/shared'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 
@@ -41,14 +41,6 @@ interface Workflow {
   description?: string
   stepsCount?: number
 }
-
-const COUNTRIES = [
-  'United States', 'United Kingdom', 'Canada', 'Australia', 'Germany',
-  'France', 'Spain', 'Italy', 'Netherlands', 'Sweden', 'Norway',
-  'Denmark', 'Switzerland', 'Belgium', 'Austria', 'Ireland',
-  'United Arab Emirates', 'Saudi Arabia', 'Qatar', 'Singapore',
-  'Hong Kong', 'Japan', 'South Korea', 'India', 'Brazil'
-]
 
 const LEAD_SOURCES = [
   { id: 'apollo', name: 'Apollo.io', description: 'B2B contact database' },
