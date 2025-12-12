@@ -1101,7 +1101,7 @@ export default function Campaigns() {
                           className="pt-3 border-t grid grid-cols-2 gap-3 mb-4"
                         >
                           <div className="text-center bg-purple-50 rounded-lg p-3">
-                            <div className="text-2xl font-bold text-purple-700">{campaign.totalLeadsGenerated || 0}</div>
+                            <div className="text-2xl font-bold text-purple-700">{campaign.leadsGenerated || 0}</div>
                             <div className="text-xs text-gray-600">Leads Generated</div>
                           </div>
                           <div className="text-center bg-purple-50 rounded-lg p-3">
