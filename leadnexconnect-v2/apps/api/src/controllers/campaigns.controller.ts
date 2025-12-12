@@ -1496,13 +1496,69 @@ export class CampaignsController {
 
       // 6. Update campaign metrics and link to batch
       // Note: emailsSent counter will be updated by email sender service when emails are actually sent
+      const updateData: any = {
+        leadsGenerated: (campaign.leadsGenerated || 0) + allQualifiedLeads.length,
+        lastRunAt: new Date(),
+        batchId, // Link campaign to the batch used
+      };
+
+      // If this is a recurring campaign, calculate nextRunAt
+      if (campaign.isRecurring && campaign.recurringInterval && campaign.endDate) {
+        const now = new Date();
+        const endDate = new Date(campaign.endDate);
+        
+        // Only set nextRunAt if we haven't reached the end date
+        if (now < endDate) {
+          let nextRun = new Date(now);
+          
+          switch (campaign.recurringInterval) {
+            case 'daily':
+              nextRun.setDate(nextRun.getDate() + 1);
+              break;
+            case 'every_2_days':
+              nextRun.setDate(nextRun.getDate() + 2);
+              break;
+            case 'every_3_days':
+              nextRun.setDate(nextRun.getDate() + 3);
+              break;
+            case 'weekly':
+              nextRun.setDate(nextRun.getDate() + 7);
+              break;
+            default:
+              nextRun.setDate(nextRun.getDate() + 1); // Default to daily
+          }
+          
+          // Only set nextRunAt if it's before the end date
+          if (nextRun <= endDate) {
+            updateData.nextRunAt = nextRun;
+            logger.info('[CampaignsController] Set next run for recurring campaign', {
+              campaignId,
+              nextRunAt: nextRun.toISOString(),
+              interval: campaign.recurringInterval,
+            });
+          } else {
+            // Campaign has completed all runs, set status to completed
+            updateData.status = 'completed';
+            updateData.nextRunAt = null;
+            logger.info('[CampaignsController] Recurring campaign completed (reached end date)', {
+              campaignId,
+              endDate: endDate.toISOString(),
+            });
+          }
+        } else {
+          // Campaign has already passed end date
+          updateData.status = 'completed';
+          updateData.nextRunAt = null;
+          logger.info('[CampaignsController] Recurring campaign completed (past end date)', {
+            campaignId,
+            endDate: endDate.toISOString(),
+          });
+        }
+      }
+
       await db
         .update(campaigns)
-        .set({
-          leadsGenerated: (campaign.leadsGenerated || 0) + allQualifiedLeads.length,
-          lastRunAt: new Date(),
-          batchId, // Link campaign to the batch used
-        })
+        .set(updateData)
         .where(eq(campaigns.id, campaignId));
 
       logger.info('[CampaignsController] Campaign execution completed', {

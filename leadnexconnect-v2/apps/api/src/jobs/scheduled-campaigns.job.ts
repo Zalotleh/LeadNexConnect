@@ -46,7 +46,7 @@ export class ScheduledCampaignsJob {
     try {
       const now = new Date();
 
-      // Get all active campaigns with a startDate in the past or now
+      // 1. Get all active campaigns with a startDate in the past or now
       // Only get campaigns where startDate exists and lastRunAt is null or before startDate
       // This ensures we only execute each campaign once at its scheduled time
       const scheduledCampaigns = await db
@@ -59,13 +59,29 @@ export class ScheduledCampaignsJob {
           )
         );
 
-      if (scheduledCampaigns.length === 0) {
+      // 2. Get all recurring lead_generation campaigns that are due to run
+      // These have isRecurring=true, nextRunAt in the past, and haven't reached endDate
+      const allActiveCampaigns = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.status, 'active'));
+      
+      const recurringCampaigns = allActiveCampaigns.filter(campaign => 
+        campaign.isRecurring &&
+        campaign.nextRunAt &&
+        new Date(campaign.nextRunAt) <= now &&
+        (!campaign.endDate || new Date(campaign.endDate) > now)
+      );
+
+      const totalCampaigns = scheduledCampaigns.length + recurringCampaigns.length;
+
+      if (totalCampaigns === 0) {
         return;
       }
 
-      logger.info(`[ScheduledCampaigns] Found ${scheduledCampaigns.length} active campaigns, checking which need execution`);
+      logger.info(`[ScheduledCampaigns] Found ${totalCampaigns} campaigns to execute (${scheduledCampaigns.length} scheduled, ${recurringCampaigns.length} recurring)`);
 
-      // Process each campaign
+      // Process scheduled one-time campaigns
       for (const campaign of scheduledCampaigns) {
         try {
           // Skip if no startDate (shouldn't happen due to query, but safety check)
@@ -135,6 +151,46 @@ export class ScheduledCampaignsJob {
 
         } catch (error: any) {
           logger.error('[ScheduledCampaigns] Error executing scheduled campaign', {
+            campaignId: campaign.id,
+            campaignName: campaign.name,
+            error: error.message,
+          });
+        }
+
+        // Add small delay between campaigns
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Process recurring lead_generation campaigns
+      for (const campaign of recurringCampaigns) {
+        try {
+          logger.info('[ScheduledCampaigns] Executing recurring campaign', {
+            campaignId: campaign.id,
+            campaignName: campaign.name,
+            recurringInterval: campaign.recurringInterval,
+            nextRunAt: campaign.nextRunAt,
+            endDate: campaign.endDate,
+          });
+
+          // Call the execute endpoint
+          // The execute endpoint will update lastRunAt and calculate nextRunAt
+          await axios.post(
+            `${this.apiBaseUrl}/api/campaigns/${campaign.id}/execute`,
+            {},
+            {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000, // 30 second timeout for lead generation
+            }
+          );
+
+          logger.info('[ScheduledCampaigns] Successfully triggered recurring campaign execution', {
+            campaignId: campaign.id,
+          });
+
+        } catch (error: any) {
+          logger.error('[ScheduledCampaigns] Error executing recurring campaign', {
             campaignId: campaign.id,
             campaignName: campaign.name,
             error: error.message,
