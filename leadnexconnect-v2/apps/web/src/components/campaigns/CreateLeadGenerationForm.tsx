@@ -105,7 +105,7 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
         isRecurring: formData.isRecurring,
         recurringInterval: formData.isRecurring ? formData.recurringInterval : null,
         endDate: formData.isRecurring ? formData.endDate : null,
-        status: formData.startImmediately ? 'active' : 'draft',
+        status: 'draft', // Always create as draft, /execute will set to active
       }
 
       const response = await api.post('/campaigns', payload)
@@ -114,7 +114,8 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
       // If user wants to start immediately, trigger campaign execution
       if (formData.startImmediately) {
         try {
-          await api.post(`/campaigns/${campaignId}/start`)
+          // For lead generation campaigns, use /execute endpoint which generates leads
+          await api.post(`/campaigns/${campaignId}/execute`)
           toast.success('Campaign created and started successfully!')
         } catch (startError: any) {
           console.error('Failed to start campaign:', startError)
