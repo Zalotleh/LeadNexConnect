@@ -732,39 +732,44 @@ export default function CampaignDetail() {
                 </div>
               ) : (
                 <>
-                  {campaign.workflow && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Workflow
-                      </label>
-                      <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <Workflow className="w-5 h-5 text-blue-600" />
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{campaign.workflow.name}</p>
-                          <p className="text-sm text-gray-600">
-                            {campaign.workflow.stepsCount} email steps
-                          </p>
+                  {/* Only show workflow/template for non-lead_generation campaigns */}
+                  {campaign.campaignType !== 'lead_generation' && (
+                    <>
+                      {campaign.workflow && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Workflow
+                          </label>
+                          <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <Workflow className="w-5 h-5 text-blue-600" />
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{campaign.workflow.name}</p>
+                              <p className="text-sm text-gray-600">
+                                {campaign.workflow.stepsCount} email steps
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  )}
+                      )}
 
-                  {!campaign.workflow && campaign.emailTemplate && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Template
-                      </label>
-                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                      {!campaign.workflow && campaign.emailTemplate && (
                         <div>
-                          <p className="text-xs font-medium text-gray-500 mb-1">Subject</p>
-                          <p className="text-sm font-medium text-gray-900">{campaign.emailTemplate.subject}</p>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Email Template
+                          </label>
+                          <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 mb-1">Subject</p>
+                              <p className="text-sm font-medium text-gray-900">{campaign.emailTemplate.subject}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 mb-1">Body</p>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{campaign.emailTemplate.bodyText}</p>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500 mb-1">Body</p>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{campaign.emailTemplate.bodyText}</p>
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                    </>
                   )}
 
                   <div className="grid grid-cols-2 gap-4">
@@ -798,8 +803,8 @@ export default function CampaignDetail() {
             </div>
           </div>
 
-          {/* Right Column - Workflow Steps */}
-          {campaign.workflow && campaign.workflow.steps && campaign.workflow.steps.length > 0 && (
+          {/* Right Column - Workflow Steps (Only for email campaigns) */}
+          {campaign.campaignType !== 'lead_generation' && campaign.workflow && campaign.workflow.steps && campaign.workflow.steps.length > 0 && (
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Email Sequence</h2>
               
@@ -833,8 +838,8 @@ export default function CampaignDetail() {
           )}
         </div>
 
-        {/* Email Schedule & Timeline */}
-        {emailScheduleData && (
+        {/* Email Schedule & Timeline (Only for email campaigns) */}
+        {campaign.campaignType !== 'lead_generation' && emailScheduleData && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               <Calendar className="w-6 h-6 text-primary-600" />
@@ -1126,6 +1131,33 @@ export default function CampaignDetail() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Lead Generation: Batches Section */}
+        {campaign.campaignType === 'lead_generation' && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Users className="w-6 h-6 text-primary-600" />
+                Lead Batches ({campaign.batchesCreated || 0})
+              </h2>
+              <p className="text-sm text-gray-600 mt-2">
+                View all batches of leads generated by this campaign
+              </p>
+            </div>
+            <div className="p-6">
+              <a
+                href="/leads?view=batches"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View All Batches
+              </a>
+              <p className="text-xs text-gray-500 mt-3">
+                Navigate to the Leads page to see detailed batch information and manage your generated leads
+              </p>
+            </div>
           </div>
         )}
 
