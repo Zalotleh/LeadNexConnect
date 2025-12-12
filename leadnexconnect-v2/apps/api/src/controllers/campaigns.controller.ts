@@ -284,10 +284,19 @@ export class CampaignsController {
         followUp1DelayDays,
         followUp2DelayDays,
         leadIds,
+        batchIds,
         scheduleType,
         scheduleTime,
         scheduledAt,
         status,
+        startType,
+        scheduledStartAt,
+        useWorkflow,
+        // Lead generation specific fields
+        isRecurring,
+        recurringInterval,
+        endDate,
+        maxResultsPerRun,
       } = req.body;
 
       // Convert leadSources array to individual boolean flags if provided
@@ -376,10 +385,55 @@ export class CampaignsController {
         .values(campaignData)
         .returning();
 
-      // Note: Lead-campaign association can be tracked via campaignId in emails table
-      // if (leadIds && leadIds.length > 0) {
-      //   // Update leads with campaign reference if needed
-      // }
+      const campaignId = newCampaign[0].id;
+
+      // For outreach campaigns, enroll leads from selected batches or individual leads
+      if (campaignType === 'outreach') {
+        let leadsToEnroll: string[] = [];
+
+        // If batches are selected, get all leads from those batches
+        if (batchIds && batchIds.length > 0) {
+          logger.info('[CampaignsController] Enrolling leads from batches', { 
+            campaignId, 
+            batchCount: batchIds.length 
+          });
+
+          const batchLeads = await db
+            .select({ id: leads.id })
+            .from(leads)
+            .where(sql`${leads.batchId} IN (${sql.join(batchIds.map((bid: string) => sql`${bid}`), sql`, `)})`);
+          
+          leadsToEnroll = batchLeads.map(l => l.id);
+          logger.info('[CampaignsController] Found leads from batches', { 
+            leadCount: leadsToEnroll.length 
+          });
+        }
+        
+        // If individual leads are selected
+        if (leadIds && leadIds.length > 0) {
+          leadsToEnroll = [...leadsToEnroll, ...leadIds];
+        }
+
+        // Enroll leads in campaign_leads table
+        if (leadsToEnroll.length > 0) {
+          const enrollmentData = leadsToEnroll.map(leadId => ({
+            campaignId,
+            leadId,
+            enrolledAt: new Date(),
+          }));
+
+          await db.insert(campaignLeads).values(enrollmentData);
+          
+          logger.info('[CampaignsController] Enrolled leads in campaign', {
+            campaignId,
+            enrolledCount: leadsToEnroll.length,
+          });
+        } else {
+          logger.warn('[CampaignsController] No leads to enroll for outreach campaign', {
+            campaignId,
+          });
+        }
+      }
 
       res.json({
         success: true,
@@ -806,13 +860,19 @@ export class CampaignsController {
         targetCities: campaign.targetCities,
       });
 
-      // Check if this is a manual campaign with pre-selected leads
-      if (campaign.campaignType === 'manual') {
+      // Check if this is an outreach or manual campaign with pre-selected leads
+      if (campaign.campaignType === 'manual' || campaign.campaignType === 'outreach') {
         await this.executeManualCampaign(campaignId, campaign);
         return;
       }
 
-      // Otherwise, execute automated campaign (generate new leads)
+      // Check if this is a lead_generation campaign (only generates leads, no emails)
+      if (campaign.campaignType === 'lead_generation') {
+        await this.executeAutomatedCampaign(campaignId, campaign);
+        return;
+      }
+
+      // Otherwise, execute as fully_automated (generates leads AND sends emails)
       await this.executeAutomatedCampaign(campaignId, campaign);
     } catch (error: any) {
       logger.error('[CampaignsController] Fatal error executing campaign', {
