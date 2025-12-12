@@ -26,6 +26,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  ChevronRight,
 } from 'lucide-react'
 
 interface Lead {
