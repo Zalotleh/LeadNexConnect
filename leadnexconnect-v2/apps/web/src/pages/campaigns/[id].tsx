@@ -84,6 +84,7 @@ interface Campaign {
   startDate: string | null
   endDate: string | null
   leadsGenerated: number
+  batchesCreated?: number
   emailsSent: number
   emailsOpened: number
   emailsClicked: number
@@ -92,6 +93,15 @@ interface Campaign {
   updatedAt: string
   workflow?: Workflow
   emailTemplate?: EmailTemplate
+  // Lead Generation specific
+  isRecurring?: boolean
+  recurringInterval?: string
+  nextRunAt?: string
+  lastRunAt?: string
+  usesApollo?: boolean
+  usesGooglePlaces?: boolean
+  usesLinkedin?: boolean
+  usesPeopleDL?: boolean
 }
 
 export default function CampaignDetail() {
@@ -406,58 +416,150 @@ export default function CampaignDetail() {
 
         {/* Metrics Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Users className="w-5 h-5 text-blue-600" />
+          {campaign.campaignType === 'lead_generation' ? (
+            <>
+              {/* Lead Generation Metrics */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Users className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Total Leads</p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{campaign.leadsGenerated}</p>
               </div>
-              <p className="text-sm text-gray-600">Leads</p>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{campaign.leadsGenerated}</p>
-          </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Send className="w-5 h-5 text-purple-600" />
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Send className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Batches Created</p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{campaign.batchesCreated || 0}</p>
               </div>
-              <p className="text-sm text-gray-600">Emails Sent</p>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{campaign.emailsSent}</p>
-          </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Eye className="w-5 h-5 text-green-600" />
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Lead Sources</p>
+                </div>
+                <div className="text-sm text-gray-900">
+                  {campaign.usesApollo && <div>✓ Apollo.io</div>}
+                  {campaign.usesGooglePlaces && <div>✓ Google Places</div>}
+                  {campaign.usesLinkedin && <div>✓ LinkedIn</div>}
+                  {campaign.usesPeopleDL && <div>✓ PeopleDataLabs</div>}
+                </div>
               </div>
-              <p className="text-sm text-gray-600">Opens</p>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{campaign.emailsOpened}</p>
-            <p className="text-sm text-green-600 font-medium mt-1">{calculateOpenRate()}% rate</p>
-          </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <MousePointer className="w-5 h-5 text-orange-600" />
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <Calendar className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Schedule</p>
+                </div>
+                <div className="space-y-1">
+                  {campaign.isRecurring ? (
+                    <>
+                      <p className="text-sm font-medium text-gray-900">
+                        {campaign.recurringInterval === 'daily' ? 'Daily' :
+                         campaign.recurringInterval === 'every_2_days' ? 'Every 2 days' :
+                         campaign.recurringInterval === 'every_3_days' ? 'Every 3 days' :
+                         campaign.recurringInterval === 'weekly' ? 'Weekly' : 'Recurring'}
+                      </p>
+                      {campaign.endDate && (
+                        <p className="text-xs text-gray-600">
+                          Until: {new Date(campaign.endDate).toLocaleDateString()}
+                        </p>
+                      )}
+                      {campaign.nextRunAt && (
+                        <p className="text-xs text-gray-600">
+                          Next: {new Date(campaign.nextRunAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-900">One-time</p>
+                  )}
+                </div>
               </div>
-              <p className="text-sm text-gray-600">Clicks</p>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{campaign.emailsClicked}</p>
-            <p className="text-sm text-orange-600 font-medium mt-1">{calculateClickRate()}% rate</p>
-          </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-indigo-100 rounded-lg">
-                <Mail className="w-5 h-5 text-indigo-600" />
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Clock className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Last Run</p>
+                </div>
+                {campaign.lastRunAt ? (
+                  <p className="text-sm text-gray-900">
+                    {new Date(campaign.lastRunAt).toLocaleString()}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500">Not yet executed</p>
+                )}
               </div>
-              <p className="text-sm text-gray-600">Responses</p>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{campaign.responsesReceived}</p>
-            <p className="text-sm text-indigo-600 font-medium mt-1">{calculateResponseRate()}% rate</p>
-          </div>
+            </>
+          ) : (
+            <>
+              {/* Email Campaign Metrics */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Users className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Leads</p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{campaign.leadsGenerated}</p>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Send className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Emails Sent</p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{campaign.emailsSent}</p>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Eye className="w-5 h-5 text-green-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Opens</p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{campaign.emailsOpened}</p>
+                <p className="text-sm text-green-600 font-medium mt-1">{calculateOpenRate()}% rate</p>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <MousePointer className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Clicks</p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{campaign.emailsClicked}</p>
+                <p className="text-sm text-orange-600 font-medium mt-1">{calculateClickRate()}% rate</p>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Mail className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Responses</p>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{campaign.responsesReceived}</p>
+                <p className="text-sm text-indigo-600 font-medium mt-1">{calculateResponseRate()}% rate</p>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Campaign Details */}
