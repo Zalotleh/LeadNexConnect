@@ -1,0 +1,5 @@
+                  id                  |            name             |  campaign_type  | status | is_recurring | recurring_interval | end_date | next_run_at |       last_run_at       | leads_generated 
+--------------------------------------+-----------------------------+-----------------+--------+--------------+--------------------+----------+-------------+-------------------------+-----------------
+ 52abcdfe-7095-4966-b45c-16a96c6bcff3 | Tour operators in singapore | lead_generation | active | f            |                    |          |             | 2025-12-12 10:48:23.302 |              20
+(1 row)
+

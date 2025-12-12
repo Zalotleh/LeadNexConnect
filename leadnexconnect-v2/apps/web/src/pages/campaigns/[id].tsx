@@ -123,12 +123,13 @@ export default function CampaignDetail() {
     emailSubject: '',
     emailBody: '',
   })
-  const [enrolledLeads, setEnrolledLeads] = useState<Lead[]>([])
+  const [enrolledLeadsWithActivity, setEnrolledLeadsWithActivity] = useState<any[]>([])
   const [loadingLeads, setLoadingLeads] = useState(false)
   const [campaignBatches, setCampaignBatches] = useState<any[]>([])
   const [loadingBatches, setLoadingBatches] = useState(false)
   const [batchLeads, setBatchLeads] = useState<{ [batchId: string]: Lead[] }>({})
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
+  const [expandedLeads, setExpandedLeads] = useState<Set<string>>(new Set())
   const [newCountry, setNewCountry] = useState('')
 
   // Fetch campaign details
@@ -153,10 +154,10 @@ export default function CampaignDetail() {
 
   const campaign: Campaign | undefined = campaignData
 
-  // Load enrolled leads
+  // Load enrolled leads with activity
   useEffect(() => {
     if (id && campaign) {
-      loadEnrolledLeads()
+      loadEnrolledLeadsWithActivity()
       // Load batches for lead_generation campaigns
       if (campaign.campaignType === 'lead_generation') {
         loadCampaignBatches()
@@ -164,16 +165,26 @@ export default function CampaignDetail() {
     }
   }, [id, campaign])
 
-  const loadEnrolledLeads = async () => {
+  const loadEnrolledLeadsWithActivity = async () => {
     try {
       setLoadingLeads(true)
-      const response = await api.get(`/campaigns/${id}/leads`)
-      setEnrolledLeads(response.data.data || [])
+      const response = await api.get(`/campaigns/${id}/leads-with-activity`)
+      setEnrolledLeadsWithActivity(response.data.data || [])
     } catch (error) {
-      console.error('Failed to load enrolled leads:', error)
+      console.error('Failed to load enrolled leads with activity:', error)
     } finally {
       setLoadingLeads(false)
     }
+  }
+
+  const toggleLeadExpansion = (leadId: string) => {
+    const newExpanded = new Set(expandedLeads)
+    if (newExpanded.has(leadId)) {
+      newExpanded.delete(leadId)
+    } else {
+      newExpanded.add(leadId)
+    }
+    setExpandedLeads(newExpanded)
   }
 
   const loadCampaignBatches = async () => {
@@ -1197,170 +1208,7 @@ export default function CampaignDetail() {
               </div>
             )}
 
-            {/* Actual Emails Sent */}
-            {emailScheduleData.emails && emailScheduleData.emails.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Mail className="w-5 h-5 text-primary-600" />
-                  Email History ({emailScheduleData.emails.length} emails)
-                </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lead</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sent</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Delivered</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Opened</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Clicked</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {emailScheduleData.emails.slice(0, 50).map((email: any) => (
-                        <tr key={email.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {email.status === 'delivered' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                                <CheckCircle className="w-3 h-3" />
-                                Delivered
-                              </span>
-                            )}
-                            {email.status === 'sent' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
-                                <Send className="w-3 h-3" />
-                                Sent
-                              </span>
-                            )}
-                            {email.status === 'queued' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
-                                <Clock className="w-3 h-3" />
-                                Queued
-                              </span>
-                            )}
-                            {(email.status === 'failed' || email.status === 'bounced') && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-                                <XCircle className="w-3 h-3" />
-                                {email.status === 'bounced' ? 'Bounced' : 'Failed'}
-                              </span>
-                            )}
-                            {email.status === 'opened' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-indigo-100 text-indigo-800 rounded-full">
-                                <Eye className="w-3 h-3" />
-                                Opened
-                              </span>
-                            )}
-                            {email.status === 'clicked' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
-                                <MousePointer className="w-3 h-3" />
-                                Clicked
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{email.leadCompanyName || 'Unknown'}</p>
-                              <p className="text-xs text-gray-500">{email.leadEmail}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="text-sm text-gray-900 max-w-xs truncate">{email.subject}</p>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <p className="text-sm text-gray-900">
-                              {new Date(email.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(email.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {email.sentAt ? (
-                              <>
-                                <p className="text-sm text-gray-900">
-                                  {new Date(email.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(email.sentAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              </>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {email.deliveredAt ? (
-                              <>
-                                <p className="text-sm text-gray-900">
-                                  {new Date(email.deliveredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(email.deliveredAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              </>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {email.openedAt ? (
-                              <>
-                                <p className="text-sm text-gray-900">
-                                  {new Date(email.openedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(email.openedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                                {email.openCount > 1 && (
-                                  <p className="text-xs text-indigo-600 font-medium">{email.openCount}x</p>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {email.clickedAt ? (
-                              <>
-                                <p className="text-sm text-gray-900">
-                                  {new Date(email.clickedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {new Date(email.clickedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                                {email.clickCount > 1 && (
-                                  <p className="text-xs text-orange-600 font-medium">{email.clickCount}x</p>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-xs text-gray-400">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {emailScheduleData.emails.length > 50 && (
-                    <div className="p-4 text-center text-sm text-gray-500 bg-gray-50 border-t">
-                      Showing 50 of {emailScheduleData.emails.length} emails
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* No emails sent yet */}
-            {(!emailScheduleData.emails || emailScheduleData.emails.length === 0) && (
-              <div className="text-center py-8 text-gray-500">
-                <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                <p>No emails have been sent yet</p>
-                {campaign?.status === 'draft' && (
-                  <p className="text-sm mt-2">Start the campaign to begin sending emails</p>
-                )}
-              </div>
-            )}
+            {/* Email History now integrated into Campaign Leads & Activity table below */}
           </div>
         )}
 
@@ -1481,88 +1329,329 @@ export default function CampaignDetail() {
           </div>
         )}
 
-        {/* Enrolled Leads */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-bold text-gray-900">
-              Enrolled Leads ({enrolledLeads.length})
-            </h2>
-          </div>
-          
-          {loadingLeads ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader className="w-8 h-8 animate-spin text-primary-600" />
+        {/* Enrolled Leads with Email Activity - Unified View */}
+        {campaign.campaignType !== 'lead_generation' && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Users className="w-6 h-6 text-primary-600" />
+                Campaign Leads & Activity ({enrolledLeadsWithActivity.length})
+              </h2>
+              <p className="text-sm text-gray-600 mt-2">
+                All enrolled leads with their email engagement status
+                {campaign.workflowId && ' (workflow-based campaigns show aggregated email activity per lead)'}
+              </p>
             </div>
-          ) : enrolledLeads.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-              <p>No leads enrolled in this campaign yet</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Company
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Industry
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Location
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Score
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {enrolledLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm font-medium text-gray-900">{lead.companyName}</p>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm text-gray-900">{lead.contactName || '-'}</p>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm text-gray-600">{lead.email}</p>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm text-gray-600">{lead.industry || '-'}</p>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <p className="text-sm text-gray-600">
-                          {lead.city && lead.country ? `${lead.city}, ${lead.country}` : lead.country || lead.city || '-'}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            (lead.qualityScore || 0) >= 80
-                              ? 'bg-green-100 text-green-800'
-                              : (lead.qualityScore || 0) >= 60
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {lead.qualityScore || 0}
-                        </span>
-                      </td>
+            
+            {loadingLeads ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader className="w-8 h-8 animate-spin text-primary-600" />
+              </div>
+            ) : enrolledLeadsWithActivity.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                <p>No leads enrolled in this campaign yet</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Company & Contact
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Emails Sent
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Last Activity
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {enrolledLeadsWithActivity.map((lead) => (
+                      <>
+                        <tr key={lead.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-medium text-gray-900">{lead.companyName}</p>
+                            {lead.contactName && (
+                              <p className="text-xs text-gray-500">{lead.contactName}</p>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm text-gray-600">{lead.email}</p>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <p className="text-sm text-gray-600">
+                              {lead.city && lead.country ? `${lead.city}, ${lead.country}` : lead.country || lead.city || '-'}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {lead.emailActivity.overallStatus === 'clicked' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded-full">
+                                <MousePointer className="w-3 h-3" />
+                                Clicked
+                              </span>
+                            )}
+                            {lead.emailActivity.overallStatus === 'opened' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-indigo-100 text-indigo-800 rounded-full">
+                                <Eye className="w-3 h-3" />
+                                Opened
+                              </span>
+                            )}
+                            {lead.emailActivity.overallStatus === 'delivered' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                <CheckCircle className="w-3 h-3" />
+                                Delivered
+                              </span>
+                            )}
+                            {lead.emailActivity.overallStatus === 'sent' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                <Send className="w-3 h-3" />
+                                Sent
+                              </span>
+                            )}
+                            {lead.emailActivity.overallStatus === 'queued' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                <Clock className="w-3 h-3" />
+                                Queued
+                              </span>
+                            )}
+                            {lead.emailActivity.overallStatus === 'failed' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                                <XCircle className="w-3 h-3" />
+                                Failed
+                              </span>
+                            )}
+                            {lead.emailActivity.overallStatus === 'not_sent' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
+                                <AlertCircle className="w-3 h-3" />
+                                Not Sent
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                {lead.emailActivity.emailsSent}/{lead.emailActivity.totalEmails}
+                              </span>
+                              {lead.emailActivity.emailsOpened > 0 && (
+                                <span className="text-xs text-indigo-600">
+                                  {lead.emailActivity.emailsOpened} opened
+                                </span>
+                              )}
+                              {lead.emailActivity.emailsClicked > 0 && (
+                                <span className="text-xs text-purple-600">
+                                  {lead.emailActivity.emailsClicked} clicked
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {lead.emailActivity.lastEmailDate ? (
+                              <p className="text-sm text-gray-900">
+                                {new Date(lead.emailActivity.lastEmailDate).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {lead.emailActivity.totalEmails > 0 && (
+                              <button
+                                onClick={() => toggleLeadExpansion(lead.id)}
+                                className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                              >
+                                {expandedLeads.has(lead.id) ? 'Hide' : 'Show'} Details
+                                <ChevronRight className={`w-4 h-4 transition-transform ${expandedLeads.has(lead.id) ? 'rotate-90' : ''}`} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        
+                        {/* Expanded Email Details */}
+                        {expandedLeads.has(lead.id) && lead.emailActivity.emails.length > 0 && (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-4 bg-gray-50">
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">
+                                  Email History for {lead.companyName}
+                                </h4>
+                                <div className="space-y-2">
+                                  {lead.emailActivity.emails.map((email: any, idx: number) => (
+                                    <div key={email.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-xs font-medium text-gray-500">
+                                              #{idx + 1} - Step {email.followUpStage === 'initial' ? '1' : email.followUpStage}
+                                            </span>
+                                            {email.status === 'delivered' && (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-green-100 text-green-800 rounded">
+                                                <CheckCircle className="w-3 h-3" />
+                                                Delivered
+                                              </span>
+                                            )}
+                                            {email.status === 'sent' && (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
+                                                <Send className="w-3 h-3" />
+                                                Sent
+                                              </span>
+                                            )}
+                                            {email.status === 'queued' && (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded">
+                                                <Clock className="w-3 h-3" />
+                                                Queued
+                                              </span>
+                                            )}
+                                            {(email.status === 'failed' || email.status === 'bounced') && (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-red-100 text-red-800 rounded">
+                                                <XCircle className="w-3 h-3" />
+                                                {email.status === 'bounced' ? 'Bounced' : 'Failed'}
+                                              </span>
+                                            )}
+                                            {email.openedAt && (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-800 rounded">
+                                                <Eye className="w-3 h-3" />
+                                                Opened {email.openCount > 1 ? `(${email.openCount}x)` : ''}
+                                              </span>
+                                            )}
+                                            {email.clickedAt && (
+                                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                                                <MousePointer className="w-3 h-3" />
+                                                Clicked {email.clickCount > 1 ? `(${email.clickCount}x)` : ''}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-sm font-medium text-gray-900 mb-1">{email.subject}</p>
+                                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                                            <span>Created: {new Date(email.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            {email.sentAt && (
+                                              <span>Sent: {new Date(email.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            )}
+                                            {email.deliveredAt && (
+                                              <span>Delivered: {new Date(email.deliveredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Enrolled Leads - Original simple view for Lead Generation campaigns */}
+        {campaign.campaignType === 'lead_generation' && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b">
+              <h2 className="text-xl font-bold text-gray-900">
+                Enrolled Leads ({enrolledLeadsWithActivity.length})
+              </h2>
             </div>
-          )}
-        </div>
+            
+            {loadingLeads ? (
+              <div className="flex justify-center items-center py-12">
+                <Loader className="w-8 h-8 animate-spin text-primary-600" />
+              </div>
+            ) : enrolledLeadsWithActivity.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                <p>No leads enrolled in this campaign yet</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Company
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contact
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Industry
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Score
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {enrolledLeadsWithActivity.map((lead) => (
+                      <tr key={lead.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm font-medium text-gray-900">{lead.companyName}</p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm text-gray-900">{lead.contactName || '-'}</p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm text-gray-600">{lead.email}</p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm text-gray-600">{lead.industry || '-'}</p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <p className="text-sm text-gray-600">
+                            {lead.city && lead.country ? `${lead.city}, ${lead.country}` : lead.country || lead.city || '-'}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              (lead.qualityScore || 0) >= 80
+                                ? 'bg-green-100 text-green-800'
+                                : (lead.qualityScore || 0) >= 60
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {lead.qualityScore || 0}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       </div>
     </Layout>

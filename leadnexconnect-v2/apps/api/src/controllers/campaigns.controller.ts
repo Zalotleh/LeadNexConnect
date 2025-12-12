@@ -173,12 +173,41 @@ export class CampaignsController {
         batchCount = Number(batchesResult[0]?.count || 0);
       }
 
-      // Get campaign leads via emails table
-      const campaignEmails = await db
-        .select()
-        .from(leads)
-        .innerJoin(emails, eq(emails.leadId, leads.id))
+      // Get actual lead count
+      let leadsCount = 0;
+      if (campaignData.campaignType === 'lead_generation') {
+        // For lead_generation, count leads in batches created by this campaign
+        const batchIds = await db
+          .select({ id: leadBatches.id })
+          .from(leadBatches)
+          .where(
+            sql`${leadBatches.activeCampaignId} = ${campaignData.id} OR ${leadBatches.importSettings}->>'campaignId' = ${campaignData.id}`
+          );
+        
+        if (batchIds.length > 0) {
+          const leadsResult = await db
+            .select({ count: count() })
+            .from(leads)
+            .where(
+              sql`${leads.batchId} IN (${sql.join(batchIds.map(b => sql`${b.id}`), sql`, `)})`
+            );
+          leadsCount = Number(leadsResult[0]?.count || 0);
+        }
+      } else {
+        // For other campaign types, use campaignLeads junction table
+        const result = await db
+          .select({ count: count() })
+          .from(campaignLeads)
+          .where(eq(campaignLeads.campaignId, campaignData.id));
+        leadsCount = Number(result[0]?.count || 0);
+      }
+
+      // Get actual emails sent count - count unique leads that received at least one email
+      const uniqueLeadsWithEmails = await db
+        .selectDistinct({ leadId: emails.leadId })
+        .from(emails)
         .where(eq(emails.campaignId, id));
+      const emailsSentCount = uniqueLeadsWithEmails.length;
 
       res.json({
         success: true,
@@ -186,8 +215,9 @@ export class CampaignsController {
           ...campaignData,
           workflow: workflowData,
           emailTemplate: emailTemplateData,
-          leads: campaignEmails.map(e => e.leads),
           batchesCreated: batchCount,
+          leadsGenerated: leadsCount,
+          emailsSent: emailsSentCount,
         },
       });
     } catch (error: any) {
@@ -247,6 +277,166 @@ export class CampaignsController {
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error getting campaign leads', { error: error.message });
+      res.status(500).json({
+        success: false,
+        error: { message: error.message },
+      });
+    }
+  }
+
+  /**
+   * GET /api/campaigns/:id/leads-with-activity - Get enrolled leads with email activity aggregated
+   */
+  async getCampaignLeadsWithActivity(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      logger.info('[CampaignsController] Getting campaign leads with activity', { campaignId: id });
+
+      // Get campaign to check if it uses workflow
+      const campaignResult = await db
+        .select()
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .limit(1);
+
+      if (!campaignResult[0]) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Campaign not found' },
+        });
+      }
+
+      const campaign = campaignResult[0];
+
+      // Get leads enrolled in this campaign
+      const campaignLeadRecords = await db
+        .select({
+          leadId: campaignLeads.leadId,
+          addedAt: campaignLeads.addedAt,
+          processed: campaignLeads.processed,
+        })
+        .from(campaignLeads)
+        .where(eq(campaignLeads.campaignId, id));
+
+      if (campaignLeadRecords.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+        });
+      }
+
+      const leadIds = campaignLeadRecords.map(cl => cl.leadId);
+
+      // Fetch lead details - using sql IN operator for efficiency
+      const leadsData = await db
+        .select()
+        .from(leads)
+        .where(sql`${leads.id} IN (${sql.join(leadIds.map(lid => sql`${lid}`), sql`, `)})`);
+
+      // Get all emails for these leads in this campaign
+      const emailsData = await db
+        .select({
+          id: emails.id,
+          leadId: emails.leadId,
+          subject: emails.subject,
+          status: emails.status,
+          followUpStage: emails.followUpStage,
+          sentAt: emails.sentAt,
+          deliveredAt: emails.deliveredAt,
+          openedAt: emails.openedAt,
+          clickedAt: emails.clickedAt,
+          openCount: emails.openCount,
+          clickCount: emails.clickCount,
+          createdAt: emails.createdAt,
+        })
+        .from(emails)
+        .where(
+          sql`${emails.campaignId} = ${id} AND ${emails.leadId} IN (${sql.join(leadIds.map(lid => sql`${lid}`), sql`, `)})`
+        )
+        .orderBy(emails.createdAt);
+
+      // Group emails by leadId
+      const emailsByLead: { [key: string]: any[] } = {};
+      emailsData.forEach(email => {
+        if (!emailsByLead[email.leadId]) {
+          emailsByLead[email.leadId] = [];
+        }
+        emailsByLead[email.leadId].push(email);
+      });
+
+      // Build enriched lead data with email statistics
+      const enrichedLeads = leadsData.map(lead => {
+        const leadEmails = emailsByLead[lead.id] || [];
+        const campaignLeadRecord = campaignLeadRecords.find(cl => cl.leadId === lead.id);
+
+        // Calculate email statistics for this lead
+        const totalEmails = leadEmails.length;
+        const emailsSent = leadEmails.filter(e => e.sentAt !== null).length;
+        const emailsDelivered = leadEmails.filter(e => e.deliveredAt !== null).length;
+        const emailsOpened = leadEmails.filter(e => e.openedAt !== null).length;
+        const emailsClicked = leadEmails.filter(e => e.clickedAt !== null).length;
+        const emailsFailed = leadEmails.filter(e => e.status === 'failed' || e.status === 'bounced').length;
+        const emailsQueued = leadEmails.filter(e => e.status === 'queued').length;
+
+        // Get latest email status
+        const latestEmail = leadEmails.length > 0 ? leadEmails[leadEmails.length - 1] : null;
+        let overallStatus = 'not_sent';
+        if (emailsClicked > 0) overallStatus = 'clicked';
+        else if (emailsOpened > 0) overallStatus = 'opened';
+        else if (emailsDelivered > 0) overallStatus = 'delivered';
+        else if (emailsSent > 0) overallStatus = 'sent';
+        else if (emailsQueued > 0) overallStatus = 'queued';
+        else if (emailsFailed > 0) overallStatus = 'failed';
+
+        // Get first and last email dates
+        const firstEmailDate = leadEmails.length > 0 ? leadEmails[0].createdAt : null;
+        const lastEmailDate = latestEmail ? latestEmail.sentAt || latestEmail.createdAt : null;
+
+        return {
+          ...lead,
+          enrolledAt: campaignLeadRecord?.addedAt,
+          processed: campaignLeadRecord?.processed,
+          emailActivity: {
+            totalEmails,
+            emailsSent,
+            emailsDelivered,
+            emailsOpened,
+            emailsClicked,
+            emailsFailed,
+            emailsQueued,
+            overallStatus,
+            firstEmailDate,
+            lastEmailDate,
+            latestEmailStatus: latestEmail?.status || null,
+            latestEmailSubject: latestEmail?.subject || null,
+            // Include detailed email list for expansion if needed
+            emails: leadEmails.map(e => ({
+              id: e.id,
+              subject: e.subject,
+              status: e.status,
+              followUpStage: e.followUpStage || 'initial',
+              sentAt: e.sentAt,
+              deliveredAt: e.deliveredAt,
+              openedAt: e.openedAt,
+              clickedAt: e.clickedAt,
+              openCount: e.openCount || 0,
+              clickCount: e.clickCount || 0,
+              createdAt: e.createdAt,
+            })),
+          },
+        };
+      });
+
+      res.json({
+        success: true,
+        data: enrichedLeads,
+      });
+    } catch (error: any) {
+      logger.error('[CampaignsController] Error getting campaign leads with activity', { 
+        error: error.message,
+        stack: error.stack,
+      });
       res.status(500).json({
         success: false,
         error: { message: error.message },

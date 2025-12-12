@@ -6,6 +6,7 @@ const router = Router();
 router.get('/', (req, res) => campaignsController.getCampaigns(req, res));
 router.get('/:id', (req, res) => campaignsController.getCampaign(req, res));
 router.get('/:id/leads', (req, res) => campaignsController.getCampaignLeads(req, res));
+router.get('/:id/leads-with-activity', (req, res) => campaignsController.getCampaignLeadsWithActivity(req, res));
 router.get('/:id/email-schedule', (req, res) => campaignsController.getEmailSchedule(req, res));
 router.post('/', (req, res) => campaignsController.createCampaign(req, res));
 router.post('/from-batch', (req, res) => campaignsController.createCampaignFromBatch(req, res));
