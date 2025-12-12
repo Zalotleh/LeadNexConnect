@@ -2097,8 +2097,14 @@ export class CampaignsController {
             .where(eq(workflowSteps.workflowId, campaign.workflowId))
             .orderBy(workflowSteps.stepNumber);
 
-          // Calculate planned schedule
-          let baseDate = campaign.startDate ? new Date(campaign.startDate) : new Date();
+          // Calculate planned schedule using stable base date
+          let baseDate = campaign.startDate 
+            ? new Date(campaign.startDate) 
+            : campaign.actualStartedAt 
+              ? new Date(campaign.actualStartedAt) 
+              : campaign.createdAt
+                ? new Date(campaign.createdAt)
+                : new Date();
           let cumulativeDelayDays = 0;
 
           for (const step of steps) {

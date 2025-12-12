@@ -62,7 +62,8 @@ export class CampaignEmailSchedulerService {
       let scheduledCount = 0;
 
       // Check if campaign uses workflow or single template
-      if (campaignData.useWorkflow && campaignData.workflowId) {
+      // Check workflowId first (backwards compatibility - some campaigns may not have useWorkflow flag set)
+      if (campaignData.workflowId) {
         // Schedule workflow emails (multiple emails per lead)
         scheduledCount = await this.scheduleWorkflowEmails(
           campaignId,
@@ -343,14 +344,16 @@ export class CampaignEmailSchedulerService {
           )
         );
 
+      const cancelledCount = Array.isArray(result) ? result.length : 0;
+
       logger.info('[CampaignEmailScheduler] Scheduled emails cancelled', {
         campaignId,
-        cancelledCount: result.rowCount || 0,
+        cancelledCount,
       });
 
       return {
         success: true,
-        cancelledCount: result.rowCount || 0,
+        cancelledCount,
       };
 
     } catch (error: any) {
