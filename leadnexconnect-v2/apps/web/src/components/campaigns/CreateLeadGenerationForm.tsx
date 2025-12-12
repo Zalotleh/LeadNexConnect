@@ -19,6 +19,7 @@ interface LeadGenFormData {
   isRecurring: boolean
   recurringInterval: 'daily' | 'every_2_days' | 'every_3_days' | 'weekly' | ''
   endDate: string
+  startImmediately: boolean
 }
 
 const COUNTRIES = [
@@ -56,6 +57,7 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
     isRecurring: false,
     recurringInterval: '',
     endDate: '',
+    startImmediately: false,
   })
 
   const handleNext = () => {
@@ -103,11 +105,13 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
         isRecurring: formData.isRecurring,
         recurringInterval: formData.isRecurring ? formData.recurringInterval : null,
         endDate: formData.isRecurring ? formData.endDate : null,
-        status: 'draft', // Created as draft, user can start later
+        status: formData.startImmediately ? 'active' : 'draft',
       }
 
       await api.post('/campaigns', payload)
-      toast.success('Lead Generation Campaign created successfully!')
+      toast.success(formData.startImmediately 
+        ? 'Campaign created and started successfully!' 
+        : 'Campaign created as draft. You can start it later.')
       onSuccess()
       onClose()
     } catch (error: any) {
@@ -435,6 +439,29 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
                   </div>
                 </dl>
               </div>
+
+              {/* Start Option */}
+              <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="startImmediately"
+                    checked={formData.startImmediately}
+                    onChange={(e) => setFormData(prev => ({ ...prev, startImmediately: e.target.checked }))}
+                    className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="startImmediately" className="flex-1 cursor-pointer">
+                    <div className="text-sm font-medium text-gray-900">
+                      Start campaign immediately
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {formData.startImmediately 
+                        ? 'Campaign will begin generating leads right after creation'
+                        : 'Campaign will be saved as draft. You can start it manually later'}
+                    </div>
+                  </label>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -471,7 +498,11 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
                 disabled={submitting}
                 className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {submitting ? 'Creating...' : 'Create Campaign'}
+                {submitting 
+                  ? 'Creating...' 
+                  : formData.startImmediately 
+                    ? 'Create & Start Campaign' 
+                    : 'Create Campaign (Draft)'}
               </button>
             )}
           </div>

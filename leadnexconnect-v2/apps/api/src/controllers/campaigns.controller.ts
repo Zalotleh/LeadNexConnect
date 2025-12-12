@@ -204,6 +204,7 @@ export class CampaignsController {
         targetCities,
         companySize,
         leadsPerDay,
+        leadSources, // Array of source IDs
         usesLinkedin,
         usesApollo,
         usesPeopleDL,
@@ -223,11 +224,27 @@ export class CampaignsController {
         status,
       } = req.body;
 
+      // Convert leadSources array to individual boolean flags if provided
+      let finalUsesApollo = usesApollo || false;
+      let finalUsesGooglePlaces = usesGooglePlaces || false;
+      let finalUsesLinkedin = usesLinkedin || false;
+      let finalUsesPeopleDL = usesPeopleDL || false;
+      let finalUsesWebScraping = usesWebScraping || false;
+
+      if (leadSources && Array.isArray(leadSources)) {
+        finalUsesApollo = leadSources.includes('apollo');
+        finalUsesGooglePlaces = leadSources.includes('google_places');
+        finalUsesLinkedin = leadSources.includes('linkedin');
+        finalUsesPeopleDL = leadSources.includes('peopledatalabs');
+        finalUsesWebScraping = leadSources.includes('web_scraping');
+      }
+
       logger.info('[CampaignsController] Creating campaign', { 
         name,
         campaignType: campaignType || 'automated',
-        usesApollo, 
-        usesGooglePlaces,
+        leadSources,
+        usesApollo: finalUsesApollo, 
+        usesGooglePlaces: finalUsesGooglePlaces,
         industry,
         targetCountries: targetCountries || [targetCountry],
       });
@@ -262,11 +279,11 @@ export class CampaignsController {
         targetCities: targetCities || (targetCity ? [targetCity] : []),
         companySize,
         leadsPerDay: leadsPerDay || 50,
-        usesLinkedin: usesLinkedin || false,
-        usesApollo: usesApollo || false,
-        usesPeopleDL: usesPeopleDL || false,
-        usesGooglePlaces: usesGooglePlaces || false,
-        usesWebScraping: usesWebScraping || false,
+        usesLinkedin: finalUsesLinkedin,
+        usesApollo: finalUsesApollo,
+        usesPeopleDL: finalUsesPeopleDL,
+        usesGooglePlaces: finalUsesGooglePlaces,
+        usesWebScraping: finalUsesWebScraping,
         workflowId: workflowId || null,
         followUpEnabled: followUpEnabled !== undefined ? followUpEnabled : true,
         followUp1DelayDays: followUp1DelayDays || 3,

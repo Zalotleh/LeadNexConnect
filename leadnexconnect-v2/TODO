@@ -62,12 +62,5 @@ All 5 phases successfully implemented:
 
 ## 📋 Other Tasks
 
-add filter in leads page, to get leads without contacts
-in generate leads batch button, the for Generate Leads, add more countries to chose from or add country manually
-campaign 3b44f777-76b3-4112-bbb6-f9e19d9dd978 worked once and stopped
-sort the campaigns, active ones on top
-smpt usage in settings page not working
-api performance. the cost per lead still showing even though price is set at zero in the stting s page
-emails opened and clicked still do not reflect the real value
 
-when creating camapigns, add the option to create and start now, or create and save draft
+
