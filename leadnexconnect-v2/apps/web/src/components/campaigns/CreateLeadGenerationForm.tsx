@@ -128,6 +128,11 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
           // For lead generation campaigns, use /execute endpoint which generates leads
           await api.post(`/campaigns/${campaignId}/execute`)
           toast.success('Lead generation started successfully!')
+          
+          // Refresh campaign list after a short delay to show updated status
+          setTimeout(() => {
+            onSuccess() // This triggers fetchCampaigns() in parent
+          }, 1500)
         } catch (startError: any) {
           console.error('Failed to start campaign:', startError)
           toast.error('Campaign created but failed to start. Please start it manually from the campaigns page.')
