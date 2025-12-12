@@ -292,7 +292,7 @@ export const scheduledEmails = pgTable('scheduled_emails', {
   // References
   campaignId: uuid('campaign_id').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
   leadId: uuid('lead_id').notNull().references(() => leads.id, { onDelete: 'cascade' }),
-  templateId: uuid('template_id').notNull().references(() => emailTemplates.id),
+  templateId: uuid('template_id').references(() => emailTemplates.id), // Nullable - workflow emails use workflowId instead
   workflowId: uuid('workflow_id').references(() => workflows.id),
   workflowStepNumber: integer('workflow_step_number').default(1),
 
