@@ -41,10 +41,13 @@ export class CampaignsController {
           let leadsCount = 0;
           if (campaign.campaignType === 'lead_generation') {
             // For lead_generation, count leads in batches created by this campaign
+            // Check both active_campaign_id and import_settings->campaignId
             const batchIds = await db
               .select({ id: leadBatches.id })
               .from(leadBatches)
-              .where(eq(leadBatches.activeCampaignId, campaign.id));
+              .where(
+                sql`${leadBatches.activeCampaignId} = ${campaign.id} OR ${leadBatches.importSettings}->>'campaignId' = ${campaign.id}`
+              );
             
             if (batchIds.length > 0) {
               const leadsResult = await db
@@ -70,7 +73,9 @@ export class CampaignsController {
             const batchesResult = await db
               .select({ count: count() })
               .from(leadBatches)
-              .where(eq(leadBatches.activeCampaignId, campaign.id));
+              .where(
+                sql`${leadBatches.activeCampaignId} = ${campaign.id} OR ${leadBatches.importSettings}->>'campaignId' = ${campaign.id}`
+              );
             batchCount = Number(batchesResult[0]?.count || 0);
           }
 
@@ -156,6 +161,18 @@ export class CampaignsController {
         }
       }
 
+      // Get actual batch count (for lead_generation campaigns)
+      let batchCount = 0;
+      if (campaignData.campaignType === 'lead_generation') {
+        const batchesResult = await db
+          .select({ count: count() })
+          .from(leadBatches)
+          .where(
+            sql`${leadBatches.activeCampaignId} = ${campaignData.id} OR ${leadBatches.importSettings}->>'campaignId' = ${campaignData.id}`
+          );
+        batchCount = Number(batchesResult[0]?.count || 0);
+      }
+
       // Get campaign leads via emails table
       const campaignEmails = await db
         .select()
@@ -170,6 +187,7 @@ export class CampaignsController {
           workflow: workflowData,
           emailTemplate: emailTemplateData,
           leads: campaignEmails.map(e => e.leads),
+          batchesCreated: batchCount,
         },
       });
     } catch (error: any) {
