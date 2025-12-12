@@ -419,7 +419,6 @@ export class CampaignsController {
           const enrollmentData = leadsToEnroll.map(leadId => ({
             campaignId,
             leadId,
-            enrolledAt: new Date(),
           }));
 
           await db.insert(campaignLeads).values(enrollmentData);
