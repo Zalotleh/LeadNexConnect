@@ -801,11 +801,9 @@ export default function CampaignDetail() {
             )}
           </div>
 
-          {/* Detailed Campaign Settings (Editable Section) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column - Editable Details */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Campaign Settings</h2>
+          {/* Campaign Settings (Editable Section) - Full Width */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Campaign Settings</h2>
             
             <div className="space-y-4">
               <div>
@@ -1041,10 +1039,9 @@ export default function CampaignDetail() {
               )}
             </div>
           </div>
-        </div>
 
-          {/* Right Column - Workflow Steps (Only for email campaigns) */}
-          {campaign.campaignType !== 'lead_generation' && campaign.workflow && campaign.workflow.steps && campaign.workflow.steps.length > 0 && (
+        {/* Workflow Steps Section (Only for email campaigns) */}
+        {campaign.campaignType !== 'lead_generation' && campaign.workflow && campaign.workflow.steps && campaign.workflow.steps.length > 0 && (
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Email Sequence</h2>
               
@@ -1076,7 +1073,6 @@ export default function CampaignDetail() {
               </div>
             </div>
           )}
-        </div>
 
         {/* Email Schedule & Timeline (Only for email campaigns) */}
         {campaign.campaignType !== 'lead_generation' && emailScheduleData && (
@@ -1573,6 +1569,7 @@ export default function CampaignDetail() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </Layout>
   )
