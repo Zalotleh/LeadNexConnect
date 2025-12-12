@@ -47,6 +47,7 @@ const RECURRING_INTERVALS = [
 export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateLeadGenerationFormProps) {
   const [currentStep, setCurrentStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  const [useManualCountry, setUseManualCountry] = useState(false)
   const [formData, setFormData] = useState<LeadGenFormData>({
     name: '',
     industry: '',
@@ -269,22 +270,52 @@ export default function CreateLeadGenerationForm({ onClose, onSuccess }: CreateL
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <MapPin className="w-4 h-4 inline mr-1" />
-                  Country *
-                </label>
-                <select
-                  value={formData.country}
-                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Country</option>
-                  {COUNTRIES.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    Country *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseManualCountry(!useManualCountry)
+                      setFormData({ ...formData, country: '' })
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                  >
+                    {useManualCountry ? 'Use dropdown' : 'Enter manually'}
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                </div>
+                
+                {useManualCountry ? (
+                  <input
+                    type="text"
+                    value={formData.country}
+                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    placeholder="e.g., United States, India, Brazil"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                ) : (
+                  <select
+                    value={formData.country}
+                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select Country</option>
+                    {COUNTRIES.map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                
+                <p className="text-xs text-gray-500 mt-1">
+                  {useManualCountry 
+                    ? 'Type any country name. Make sure it matches Apollo.io and Google Places naming conventions.'
+                    : 'Or click "Enter manually" above to type a custom country name'}
+                </p>
               </div>
 
               <div>
