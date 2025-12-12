@@ -58,8 +58,38 @@ export class CampaignsController {
                 );
               leadsCount = Number(leadsResult[0]?.count || 0);
             }
+          } else if (campaign.campaignType === 'fully_automated') {
+            // For fully_automated, count leads from BOTH batches AND enrolled leads
+            // Count from batches (generated leads)
+            const batchIds = await db
+              .select({ id: leadBatches.id })
+              .from(leadBatches)
+              .where(
+                sql`${leadBatches.activeCampaignId} = ${campaign.id} OR ${leadBatches.importSettings}->>'campaignId' = ${campaign.id}`
+              );
+            
+            let batchLeadsCount = 0;
+            if (batchIds.length > 0) {
+              const leadsResult = await db
+                .select({ count: count() })
+                .from(leads)
+                .where(
+                  sql`${leads.batchId} IN (${sql.join(batchIds.map(b => sql`${b.id}`), sql`, `)})`
+                );
+              batchLeadsCount = Number(leadsResult[0]?.count || 0);
+            }
+
+            // Count from campaign_leads (enrolled leads)
+            const enrolledResult = await db
+              .select({ count: count() })
+              .from(campaignLeads)
+              .where(eq(campaignLeads.campaignId, campaign.id));
+            const enrolledCount = Number(enrolledResult[0]?.count || 0);
+
+            // Use the maximum of both counts (in case leads are in both)
+            leadsCount = Math.max(batchLeadsCount, enrolledCount);
           } else {
-            // For other campaign types, use campaignLeads junction table
+            // For outreach and manual campaign types, use campaignLeads junction table
             const result = await db
               .select({ count: count() })
               .from(campaignLeads)
@@ -67,9 +97,9 @@ export class CampaignsController {
             leadsCount = Number(result[0]?.count || 0);
           }
 
-          // Get actual batch count (for lead_generation campaigns)
+          // Get actual batch count (for lead_generation and fully_automated campaigns)
           let batchCount = 0;
-          if (campaign.campaignType === 'lead_generation') {
+          if (campaign.campaignType === 'lead_generation' || campaign.campaignType === 'fully_automated') {
             const batchesResult = await db
               .select({ count: count() })
               .from(leadBatches)
@@ -161,9 +191,9 @@ export class CampaignsController {
         }
       }
 
-      // Get actual batch count (for lead_generation campaigns)
+      // Get actual batch count (for lead_generation and fully_automated campaigns)
       let batchCount = 0;
-      if (campaignData.campaignType === 'lead_generation') {
+      if (campaignData.campaignType === 'lead_generation' || campaignData.campaignType === 'fully_automated') {
         const batchesResult = await db
           .select({ count: count() })
           .from(leadBatches)
@@ -193,8 +223,38 @@ export class CampaignsController {
             );
           leadsCount = Number(leadsResult[0]?.count || 0);
         }
+      } else if (campaignData.campaignType === 'fully_automated') {
+        // For fully_automated, count leads from BOTH batches AND enrolled leads
+        // Count from batches (generated leads)
+        const batchIds = await db
+          .select({ id: leadBatches.id })
+          .from(leadBatches)
+          .where(
+            sql`${leadBatches.activeCampaignId} = ${campaignData.id} OR ${leadBatches.importSettings}->>'campaignId' = ${campaignData.id}`
+          );
+        
+        let batchLeadsCount = 0;
+        if (batchIds.length > 0) {
+          const leadsResult = await db
+            .select({ count: count() })
+            .from(leads)
+            .where(
+              sql`${leads.batchId} IN (${sql.join(batchIds.map(b => sql`${b.id}`), sql`, `)})`
+            );
+          batchLeadsCount = Number(leadsResult[0]?.count || 0);
+        }
+
+        // Count from campaign_leads (enrolled leads)
+        const enrolledResult = await db
+          .select({ count: count() })
+          .from(campaignLeads)
+          .where(eq(campaignLeads.campaignId, campaignData.id));
+        const enrolledCount = Number(enrolledResult[0]?.count || 0);
+
+        // Use the maximum of both counts (in case leads are in both)
+        leadsCount = Math.max(batchLeadsCount, enrolledCount);
       } else {
-        // For other campaign types, use campaignLeads junction table
+        // For outreach and manual campaign types, use campaignLeads junction table
         const result = await db
           .select({ count: count() })
           .from(campaignLeads)
@@ -1699,13 +1759,45 @@ export class CampaignsController {
         return;
       }
 
-      // NOTE: For lead_generation campaigns, we ONLY generate and store leads
-      // We do NOT automatically send emails or queue them
-      // Users must manually create an outreach campaign to send emails to these leads
-      logger.info('[CampaignsController] Lead generation completed - leads stored for manual outreach', {
-        campaignId,
-        qualifiedLeads: allQualifiedLeads.length,
-      });
+      // For fully_automated campaigns: enroll leads AND send emails immediately
+      if (campaign.campaignType === 'fully_automated') {
+        logger.info('[CampaignsController] Fully automated campaign - enrolling leads and queueing emails', {
+          campaignId,
+          qualifiedLeads: allQualifiedLeads.length,
+        });
+
+        // Enroll all qualified leads in campaign_leads table
+        const leadsToEnroll = allQualifiedLeads.map(lead => ({
+          campaignId: campaignId,
+          leadId: lead.id,
+        }));
+
+        await db.insert(campaignLeads).values(leadsToEnroll);
+        
+        logger.info('[CampaignsController] Enrolled leads in fully_automated campaign', {
+          campaignId,
+          enrolledCount: leadsToEnroll.length,
+        });
+
+        // Now execute the email sending logic (workflow or template)
+        if (campaign.workflowId) {
+          await this.executeWorkflowSequence(campaignId, campaign, allQualifiedLeads);
+        } else if (campaign.emailTemplateId) {
+          await this.executeSingleTemplate(campaignId, campaign, allQualifiedLeads);
+        } else {
+          logger.warn('[CampaignsController] Fully automated campaign has no workflow or template configured', {
+            campaignId,
+          });
+        }
+      } else {
+        // For lead_generation campaigns, we ONLY generate and store leads
+        // We do NOT automatically send emails or enroll them
+        // Users must manually create an outreach campaign to send emails to these leads
+        logger.info('[CampaignsController] Lead generation completed - leads stored for manual outreach', {
+          campaignId,
+          qualifiedLeads: allQualifiedLeads.length,
+        });
+      }
 
       // Update batch metrics
       const duplicateCount = enrichmentResults.filter(r => r.isDuplicate).length;

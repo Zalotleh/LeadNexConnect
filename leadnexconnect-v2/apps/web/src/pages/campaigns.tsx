@@ -910,7 +910,7 @@ export default function Campaigns() {
                         <Zap className="w-5 h-5" />
                         Create Automated Campaign
                       </button>
-                      <a
+                      {/* <a
                         href="https://docs.example.com/automated-campaigns"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -918,7 +918,7 @@ export default function Campaigns() {
                       >
                         <Eye className="w-5 h-5" />
                         Learn More
-                      </a>
+                      </a> */}
                     </div>
                   </div>
                 ) : (
