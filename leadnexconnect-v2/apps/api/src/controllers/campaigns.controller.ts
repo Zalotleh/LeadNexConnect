@@ -1432,55 +1432,15 @@ export class CampaignsController {
         return;
       }
 
-      // 4. Generate and queue emails for qualified leads
-      let emailsQueued = 0;
-      
-      for (const lead of allQualifiedLeads) {
-        try {
-          // Skip if no email
-          if (!lead.email) {
-            logger.warn('[CampaignsController] Lead has no email', { leadId: lead.id });
-            continue;
-          }
+      // NOTE: For lead_generation campaigns, we ONLY generate and store leads
+      // We do NOT automatically send emails or queue them
+      // Users must manually create an outreach campaign to send emails to these leads
+      logger.info('[CampaignsController] Lead generation completed - leads stored for manual outreach', {
+        campaignId,
+        qualifiedLeads: allQualifiedLeads.length,
+      });
 
-          // Generate personalized email
-          const emailContent = await emailGeneratorService.generateEmail({
-            industry: lead.industry,
-            companyName: lead.companyName,
-            contactName: lead.contactName || undefined,
-            city: lead.city || undefined,
-            country: lead.country || undefined,
-            followUpStage: 'initial',
-          });
-
-          // Queue email for sending
-          await emailQueueService.addEmail({
-            leadId: lead.id,
-            campaignId: campaignId,
-            to: lead.email,
-            subject: emailContent.subject,
-            bodyText: emailContent.bodyText,
-            bodyHtml: emailContent.bodyHtml,
-            followUpStage: 'initial',
-            metadata: {
-              companyName: lead.companyName,
-              industry: lead.industry,
-            },
-          });
-
-          emailsQueued++;
-
-          // Small delay to avoid overwhelming the queue
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (error: any) {
-          logger.error('[CampaignsController] Error queuing email for lead', {
-            leadId: lead.id,
-            error: error.message,
-          });
-        }
-      }
-
-      // 5. Update batch metrics
+      // Update batch metrics
       const duplicateCount = enrichmentResults.filter(r => r.isDuplicate).length;
       const failedCount = enrichmentResults.filter(r => !r.success && !r.isDuplicate).length;
 
@@ -1494,8 +1454,7 @@ export class CampaignsController {
         })
         .where(eq(leadBatches.id, batchId));
 
-      // 6. Update campaign metrics and link to batch
-      // Note: emailsSent counter will be updated by email sender service when emails are actually sent
+      // Update campaign metrics and link to batch
       const updateData: any = {
         leadsGenerated: (campaign.leadsGenerated || 0) + allQualifiedLeads.length,
         lastRunAt: new Date(),
@@ -1561,14 +1520,14 @@ export class CampaignsController {
         .set(updateData)
         .where(eq(campaigns.id, campaignId));
 
-      logger.info('[CampaignsController] Campaign execution completed', {
+      logger.info('[CampaignsController] Lead generation campaign execution completed', {
         campaignId,
         batchId,
         batchName,
         leadsGenerated: allQualifiedLeads.length,
-        emailsScheduled: emailsQueued,
         duplicates: duplicateCount,
         failed: failedCount,
+        note: 'Leads stored for manual outreach - no emails automatically sent',
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error executing automated campaign', {
