@@ -27,6 +27,7 @@ import {
   XCircle,
   AlertCircle,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react'
 
 interface Lead {
@@ -379,14 +380,22 @@ export default function CampaignDetail() {
                       ? 'bg-green-100 text-green-800'
                       : campaign.status === 'paused'
                       ? 'bg-yellow-100 text-yellow-800'
+                      : campaign.status === 'running'
+                      ? 'bg-blue-100 text-blue-800'
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
                   {campaign.status}
                 </span>
-                <span className="text-sm text-gray-600">
-                  {campaign.campaignType === 'manual' ? 'Manual Campaign' : 'Automated Campaign'}
+                <span className="text-sm text-gray-600 capitalize">
+                  {campaign.campaignType.replace('_', ' ')}
                 </span>
+                {campaign.isRecurring && (
+                  <span className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full bg-purple-100 text-purple-800">
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    Recurring
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -617,10 +626,185 @@ export default function CampaignDetail() {
         </div>
 
         {/* Campaign Details */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Campaign Info */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* Campaign Info - Full Width Horizontal Layout */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Campaign Details</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Campaign Information</h2>
+            
+            {/* Horizontal Grid Layout */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {/* Campaign Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Campaign Type
+                </label>
+                <p className="text-gray-900 capitalize">{campaign.campaignType.replace('_', ' ')}</p>
+              </div>
+
+              {/* Recurring Status */}
+              {campaign.isRecurring && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Recurring Interval
+                    </label>
+                    <p className="text-gray-900 capitalize flex items-center gap-1">
+                      <RefreshCw className="w-4 h-4 text-purple-600" />
+                      {campaign.recurringInterval?.replace('_', ' ')}
+                    </p>
+                  </div>
+
+                  {campaign.nextRunAt && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Next Run
+                      </label>
+                      <p className="text-gray-900">
+                        {new Date(campaign.nextRunAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  )}
+
+                  {campaign.endDate && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        End Date
+                      </label>
+                      <p className="text-gray-900">
+                        {new Date(campaign.endDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Industry */}
+              {campaign.industry && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Industry
+                  </label>
+                  <p className="text-gray-900">{campaign.industry}</p>
+                </div>
+              )}
+
+              {/* Target Countries */}
+              {campaign.targetCountries && campaign.targetCountries.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Target Countries
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {campaign.targetCountries.map((country, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs"
+                      >
+                        {country}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Target Cities */}
+              {campaign.targetCities && campaign.targetCities.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Target Cities
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {campaign.targetCities.map((city, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs"
+                      >
+                        {city}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Created Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Created
+                </label>
+                <p className="text-gray-900">
+                  {new Date(campaign.createdAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </p>
+              </div>
+
+              {/* Last Run */}
+              {campaign.lastRunAt && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Run
+                  </label>
+                  <p className="text-gray-900">
+                    {new Date(campaign.lastRunAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {/* Company Size */}
+              {campaign.companySize && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Size
+                  </label>
+                  <p className="text-gray-900">{campaign.companySize}</p>
+                </div>
+              )}
+
+              {/* Leads Per Day */}
+              {campaign.leadsPerDay && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Max Leads Per Run
+                  </label>
+                  <p className="text-gray-900">{campaign.leadsPerDay}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Description - Full Width Below */}
+            {campaign.description && (
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <p className="text-gray-600">{campaign.description}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Detailed Campaign Settings (Editable Section) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column - Editable Details */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Campaign Settings</h2>
             
             <div className="space-y-4">
               <div>
