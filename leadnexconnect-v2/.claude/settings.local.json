@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /home/mr-abu-lukas/Desktop/Leads Automation tool/leadnexconnect-v2-complete/leadnexconnect-v2 && npm run build:*)",
+      "Bash(cd:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
