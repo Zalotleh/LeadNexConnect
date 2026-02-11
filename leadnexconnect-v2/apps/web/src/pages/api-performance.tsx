@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import { apiPerformanceAPI } from '@/services/api'
 import { Activity, TrendingUp, DollarSign, Award, Zap, Users, Database, AlertCircle, BarChart3 } from 'lucide-react'
 
@@ -722,3 +723,13 @@ export default function APIPerformance() {
     </Layout>
   )
 }
+
+function APIPerformanceWithProtection() {
+  return (
+    <ProtectedRoute>
+      <APIPerformance />
+    </ProtectedRoute>
+  )
+}
+
+export default APIPerformanceWithProtection

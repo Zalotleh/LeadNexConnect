@@ -1,4 +1,5 @@
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import ProgressDialog from '@/components/ProgressDialog'
 import WorkflowSelector from '@/components/WorkflowSelector'
@@ -2097,3 +2098,13 @@ export default function Campaigns() {
     </Layout>
   )
 }
+
+function CampaignsWithProtection() {
+  return (
+    <ProtectedRoute>
+      <Campaigns />
+    </ProtectedRoute>
+  )
+}
+
+export default CampaignsWithProtection

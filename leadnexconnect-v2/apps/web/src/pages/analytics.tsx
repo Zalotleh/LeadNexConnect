@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import { TrendingUp, Users, Mail, Target, Activity, Zap, Award, MousePointerClick } from 'lucide-react'
 import { dashboardAPI } from '@/services/api'
 
@@ -369,3 +370,13 @@ export default function Analytics() {
     </Layout>
   )
 }
+
+function AnalyticsWithProtection() {
+  return (
+    <ProtectedRoute>
+      <Analytics />
+    </ProtectedRoute>
+  )
+}
+
+export default AnalyticsWithProtection

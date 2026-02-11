@@ -1,4 +1,5 @@
 import SettingsLayout from '@/components/SettingsLayout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import { Save, Eye, EyeOff, Settings as SettingsIcon, Server, Mail } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
@@ -366,3 +367,13 @@ function AIConfigTab({
     </div>
   )
 }
+
+function SettingsWithProtection() {
+  return (
+    <ProtectedRoute>
+      <Settings />
+    </ProtectedRoute>
+  )
+}
+
+export default SettingsWithProtection

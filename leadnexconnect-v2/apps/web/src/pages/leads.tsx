@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import ProgressDialog from '@/components/ProgressDialog'
 import ResultDialog from '@/components/ResultDialog'
@@ -1667,3 +1668,13 @@ export default function Leads() {
     </Layout>
   )
 }
+
+function LeadsWithProtection() {
+  return (
+    <ProtectedRoute>
+      <Leads />
+    </ProtectedRoute>
+  )
+}
+
+export default LeadsWithProtection

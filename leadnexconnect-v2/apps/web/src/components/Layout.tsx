@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Home, Users, Mail, TrendingUp, Settings, Workflow, FileText, Variable, ChevronDown, ChevronRight, Activity, Menu, X } from 'lucide-react'
+import { Home, Users, Mail, TrendingUp, Settings, Workflow, FileText, Variable, ChevronDown, ChevronRight, Activity, Menu, X, LogOut, User, Shield } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -9,9 +10,11 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter()
+  const { user, logout, isAdmin } = useAuth()
   const [isContentOpen, setIsContentOpen] = useState(true)
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -204,6 +207,40 @@ export default function Layout({ children }: LayoutProps) {
               <Settings className="w-5 h-5 mr-3" />
               Settings
             </Link>
+
+            {/* Admin Section - Only visible to admins */}
+            {isAdmin && (
+              <>
+                <div className="border-t border-gray-200 my-4"></div>
+                <div className="px-4 mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Admin
+                  </p>
+                </div>
+                <Link
+                  href="/admin/users"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/admin/users')
+                      ? 'bg-purple-50 text-purple-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Shield className="w-5 h-5 mr-3" />
+                  User Management
+                </Link>
+                <Link
+                  href="/admin/analytics"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/admin/analytics')
+                      ? 'bg-purple-50 text-purple-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Activity className="w-5 h-5 mr-3" />
+                  System Analytics
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </div>
@@ -221,6 +258,60 @@ export default function Layout({ children }: LayoutProps) {
             </button>
             <div className="flex-1">
               {/* Search removed - use page-specific search instead */}
+            </div>
+
+            {/* User menu */}
+            <div className="relative">
+              <button
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center space-x-2">
+                  {isAdmin ? (
+                    <Shield className="w-5 h-5 text-indigo-600" />
+                  ) : (
+                    <User className="w-5 h-5 text-gray-600" />
+                  )}
+                  <div className="text-left hidden md:block">
+                    <p className="text-sm font-medium text-gray-700">
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                  </div>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown menu */}
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <p className="text-sm font-medium text-gray-900">
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">{user?.email}</p>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                        isAdmin ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {isAdmin && <Shield className="w-3 h-3 mr-1" />}
+                        {user?.role}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false)
+                      logout()
+                    }}
+                    className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4 mr-3" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
