@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db, leads, leadBatches, campaigns, workflows, workflowSteps, emails } from '@leadnex/database';
 import { eq } from 'drizzle-orm';
 import { logger } from '../utils/logger';
@@ -14,8 +15,9 @@ class TestingController {
    * POST /api/testing/generate-test-leads
    * Generate fake test leads for testing workflows
    */
-  async generateTestLeads(req: Request, res: Response) {
+  async generateTestLeads(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { count = 5, industry = 'Technology' } = req.body;
 
       logger.info('[Testing] Generating test leads', { count, industry });
@@ -104,7 +106,7 @@ class TestingController {
    * POST /api/testing/preview-email
    * Preview email that would be sent to a lead without actually sending
    */
-  async previewEmail(req: Request, res: Response) {
+  async previewEmail(req: AuthRequest, res: Response) {
     try {
       const { leadId, campaignId, workflowStepId } = req.body;
 
@@ -225,7 +227,7 @@ class TestingController {
    * POST /api/testing/dry-run-workflow
    * Simulate running a workflow for a lead without sending emails
    */
-  async dryRunWorkflow(req: Request, res: Response) {
+  async dryRunWorkflow(req: AuthRequest, res: Response) {
     try {
       const { leadId, workflowId } = req.body;
 
@@ -338,7 +340,7 @@ class TestingController {
    * POST /api/testing/send-test-email
    * Send a test email to a specific address (bypassing lead email)
    */
-  async sendTestEmail(req: Request, res: Response) {
+  async sendTestEmail(req: AuthRequest, res: Response) {
     try {
       const { testEmail, leadId, workflowId, stepNumber = 1 } = req.body;
 
@@ -420,7 +422,7 @@ class TestingController {
    * GET /api/testing/email-schedule/:campaignId
    * Get the complete email schedule for a campaign (when each email will be sent)
    */
-  async getEmailSchedule(req: Request, res: Response) {
+  async getEmailSchedule(req: AuthRequest, res: Response) {
     try {
       const { campaignId } = req.params;
 
@@ -525,7 +527,7 @@ class TestingController {
    * DELETE /api/testing/cleanup-test-data
    * Delete all test batches and leads
    */
-  async cleanupTestData(req: Request, res: Response) {
+  async cleanupTestData(req: AuthRequest, res: Response) {
     try {
       logger.info('[Testing] Cleaning up test data');
 

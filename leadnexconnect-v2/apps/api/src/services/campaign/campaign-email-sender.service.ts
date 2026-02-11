@@ -16,7 +16,7 @@
  * - checkCampaignCompletion(campaignId) - Check if campaign is done
  */
 
-import { db, campaigns, leads, scheduledEmails, emails, emailTemplates } from '@leadnex/database';
+import { db, campaigns, leads, scheduledEmails, emails, emailTemplates, users } from '@leadnex/database';
 import { eq, and, lte, or } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 import { emailSenderService } from '../outreach/email-sender.service';
@@ -27,6 +27,7 @@ export class CampaignEmailSenderService {
   /**
    * Send all emails that are due now
    * This method is called by the cron job every minute
+   * Processes each user's scheduled emails separately for data isolation
    */
   async sendDueEmails(): Promise<{
     success: boolean;
@@ -37,54 +38,86 @@ export class CampaignEmailSenderService {
     try {
       logger.info('[CampaignEmailSender] Checking for due emails');
 
-      // Get all scheduled emails that are due and pending
-      const dueEmails = await db
+      // Get all active users
+      const activeUsers = await db
         .select()
-        .from(scheduledEmails)
-        .where(
-          and(
-            eq(scheduledEmails.status, 'pending'),
-            lte(scheduledEmails.scheduledFor, new Date())
+        .from(users)
+        .where(eq(users.status, 'active'));
+
+      let totalSentCount = 0;
+      let totalFailedCount = 0;
+
+      // Process each user's emails
+      for (const user of activeUsers) {
+        // Get all scheduled emails for this user that are due and pending
+        const dueEmails = await db
+          .select()
+          .from(scheduledEmails)
+          .where(
+            and(
+              eq(scheduledEmails.userId, user.id),
+              eq(scheduledEmails.status, 'pending'),
+              lte(scheduledEmails.scheduledFor, new Date())
+            )
           )
-        )
-        .limit(100); // Process max 100 emails per run to avoid overload
+          .limit(50); // Process max 50 emails per user per run to avoid overload
 
-      if (dueEmails.length === 0) {
-        logger.info('[CampaignEmailSender] No due emails found');
-        return { success: true, sentCount: 0, failedCount: 0 };
-      }
-
-      logger.info('[CampaignEmailSender] Found due emails', {
-        count: dueEmails.length,
-      });
-
-      let sentCount = 0;
-      let failedCount = 0;
-
-      // Process each email
-      for (const scheduledEmail of dueEmails) {
-        const result = await this.sendScheduledEmail(scheduledEmail.id);
-
-        if (result.success) {
-          sentCount++;
-        } else {
-          failedCount++;
+        if (dueEmails.length === 0) {
+          continue;
         }
 
-        // Check campaign completion after each email
-        await this.checkCampaignCompletion(scheduledEmail.campaignId);
+        logger.info('[CampaignEmailSender] Found due emails for user', {
+          userId: user.id,
+          userEmail: user.email,
+          count: dueEmails.length,
+        });
+
+        let sentCount = 0;
+        let failedCount = 0;
+
+        // Process each email
+        for (const scheduledEmail of dueEmails) {
+          const result = await this.sendScheduledEmail(scheduledEmail.id);
+
+          if (result.success) {
+            sentCount++;
+          } else {
+            failedCount++;
+          }
+
+          // Check campaign completion after each email
+          await this.checkCampaignCompletion(scheduledEmail.campaignId);
+        }
+
+        totalSentCount += sentCount;
+        totalFailedCount += failedCount;
+
+        logger.info('[CampaignEmailSender] User batch processing complete', {
+          userId: user.id,
+          userEmail: user.email,
+          sentCount,
+          failedCount,
+          totalProcessed: sentCount + failedCount,
+        });
+
+        // Small delay between users
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      logger.info('[CampaignEmailSender] Batch processing complete', {
-        sentCount,
-        failedCount,
-        totalProcessed: sentCount + failedCount,
-      });
+      if (totalSentCount === 0 && totalFailedCount === 0) {
+        logger.info('[CampaignEmailSender] No due emails found for any user');
+      } else {
+        logger.info('[CampaignEmailSender] All users batch processing complete', {
+          totalSentCount,
+          totalFailedCount,
+          totalProcessed: totalSentCount + totalFailedCount,
+        });
+      }
 
       return {
         success: true,
-        sentCount,
-        failedCount,
+        sentCount: totalSentCount,
+        failedCount: totalFailedCount,
       };
 
     } catch (error: any) {

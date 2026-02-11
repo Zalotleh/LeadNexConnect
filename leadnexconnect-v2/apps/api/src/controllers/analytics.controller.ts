@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { leads, campaigns, emails } from '@leadnex/database';
 import { eq, gte, sql, and, lt } from 'drizzle-orm';
@@ -9,8 +10,9 @@ export class AnalyticsController {
    * GET /api/analytics/dashboard - Get dashboard statistics
    * Query params: month, year, allTime
    */
-  async getDashboardStats(req: Request, res: Response) {
+  async getDashboardStats(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { month, year, allTime } = req.query;
       logger.info('[AnalyticsController] Getting dashboard stats', { month, year, allTime });
 
@@ -23,15 +25,16 @@ export class AnalyticsController {
         const periodEnd = new Date(selectedYear, selectedMonth, 1);
         
         dateFilter = and(
+          eq(leads.userId, userId),
           gte(leads.createdAt, periodStart),
           lt(leads.createdAt, periodEnd)
         );
+      } else {
+        dateFilter = eq(leads.userId, userId);
       }
 
       // Total leads with date filter
-      const allLeads = dateFilter
-        ? await db.select().from(leads).where(dateFilter)
-        : await db.select().from(leads);
+      const allLeads = await db.select().from(leads).where(dateFilter);
       
       const totalLeads = allLeads.length;
 
@@ -47,12 +50,15 @@ export class AnalyticsController {
       const convertedLeads = allLeads.filter((l) => l.status === 'converted').length;
 
       // Total campaigns
-      const allCampaigns = await db.select().from(campaigns);
+      const allCampaigns = await db.select().from(campaigns).where(eq(campaigns.userId, userId));
       const totalCampaigns = allCampaigns.length;
       const activeCampaigns = allCampaigns.filter((c) => c.status === 'active').length;
 
-      // Email metrics
-      const allEmails = await db.select().from(emails);
+      // Email metrics - filter by user's leads
+      const userLeadIds = allLeads.map(l => l.id);
+      const allEmails = userLeadIds.length > 0 
+        ? await db.select().from(emails).where(sql`${emails.leadId} IN (${sql.join(userLeadIds.map(id => sql`${id}`), sql`, `)})`)
+        : [];
       const totalEmailsSent = allEmails.filter((e) => e.status === 'sent' || e.status === 'delivered').length;
       const emailsOpened = allEmails.filter((e) => e.openedAt !== null).length;
       const emailsClicked = allEmails.filter((e) => e.clickedAt !== null).length;
@@ -145,13 +151,16 @@ export class AnalyticsController {
   /**
    * GET /api/analytics/campaigns/:id - Get campaign analytics
    */
-  async getCampaignAnalytics(req: Request, res: Response) {
+  async getCampaignAnalytics(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       logger.info('[AnalyticsController] Getting campaign analytics', { id });
 
-      const campaign = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+      const campaign = await db.select().from(campaigns)
+        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
+        .limit(1);
 
       if (!campaign[0]) {
         return res.status(404).json({
@@ -204,8 +213,9 @@ export class AnalyticsController {
   /**
    * GET /api/analytics/leads/timeline - Get leads generation timeline
    */
-  async getLeadsTimeline(req: Request, res: Response) {
+  async getLeadsTimeline(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { days = 30 } = req.query;
 
       logger.info('[AnalyticsController] Getting leads timeline', { days });
@@ -216,7 +226,7 @@ export class AnalyticsController {
       const recentLeads = await db
         .select()
         .from(leads)
-        .where(gte(leads.createdAt, daysAgo));
+        .where(and(eq(leads.userId, userId), gte(leads.createdAt, daysAgo)));
 
       // Group by date
       const timeline = recentLeads.reduce((acc: any, lead) => {

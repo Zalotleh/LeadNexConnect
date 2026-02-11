@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
@@ -10,7 +11,7 @@ export class ScrapingController {
   /**
    * GET /api/scraping/status - Get scraping job status
    */
-  async getStatus(req: Request, res: Response) {
+  async getStatus(req: AuthRequest, res: Response) {
     try {
       logger.info('[ScrapingController] Getting scraping status');
 
@@ -35,7 +36,7 @@ export class ScrapingController {
   /**
    * POST /api/scraping/start - Start scraping job
    */
-  async startScraping(req: Request, res: Response) {
+  async startScraping(req: AuthRequest, res: Response) {
     try {
       const { source, industry, location } = req.body;
 
@@ -69,7 +70,7 @@ export class ScrapingController {
   /**
    * POST /api/scraping/apollo - Generate leads from Apollo.io
    */
-  async generateFromApollo(req: Request, res: Response) {
+  async generateFromApollo(req: AuthRequest, res: Response) {
     try {
       const { industry, country, city, maxResults = 50 } = req.body;
 
@@ -121,7 +122,7 @@ export class ScrapingController {
   /**
    * POST /api/scraping/google-places - Generate leads from Google Places
    */
-  async generateFromGooglePlaces(req: Request, res: Response) {
+  async generateFromGooglePlaces(req: AuthRequest, res: Response) {
     try {
       const { industry, country, city, maxResults = 50 } = req.body;
 
@@ -174,7 +175,7 @@ export class ScrapingController {
    * POST /api/scraping/peopledatalabs - Enrich leads from People Data Labs
    * Note: PDL is used for enrichment, not lead generation
    */
-  async generateFromPDL(req: Request, res: Response) {
+  async generateFromPDL(req: AuthRequest, res: Response) {
     try {
       const { emails = [] } = req.body;
 

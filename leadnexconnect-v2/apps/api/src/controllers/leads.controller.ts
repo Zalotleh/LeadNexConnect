@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { leads, leadBatches, emails, campaigns } from '@leadnex/database';
 import { eq, and, gte, lte, ilike, desc, sql, isNull, or } from 'drizzle-orm';
@@ -17,8 +18,9 @@ export class LeadsController {
   /**
    * GET /api/leads - Get all leads with filters and pagination
    */
-  async getLeads(req: Request, res: Response) {
+  async getLeads(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const {
         page = 1,
         limit = 50,
@@ -33,12 +35,12 @@ export class LeadsController {
         withoutContacts,
       } = req.query;
 
-      logger.info('[LeadsController] Getting leads', { query: req.query });
+      logger.info('[LeadsController] Getting leads', { userId, query: req.query });
 
       let query = db.select().from(leads);
 
-      // Apply filters
-      const filters = [];
+      // Apply filters - ALWAYS filter by userId first
+      const filters = [eq(leads.userId, userId)];
       if (industry) filters.push(eq(leads.industry, industry as string));
       if (country) filters.push(eq(leads.country, country as string));
       if (status) filters.push(eq(leads.status, status as any));
@@ -105,16 +107,18 @@ export class LeadsController {
   /**
    * POST /api/leads/generate - Generate new leads
    */
-  async generateLeads(req: Request, res: Response) {
+  async generateLeads(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { batchName, industry, country, city, maxResults = 50, sources } = req.body;
 
-      logger.info('[LeadsController] Generating leads', { body: req.body });
+      logger.info('[LeadsController] Generating leads', { userId, body: req.body });
 
       // Create lead batch
       const batch = await db
         .insert(leadBatches)
         .values({
+          userId,
           name: batchName || `${industry} - ${new Date().toLocaleDateString()}`,
           uploadedBy: 'system',
           totalLeads: 0,
@@ -323,16 +327,18 @@ export class LeadsController {
   /**
    * GET /api/leads/batches - Get all lead batches
    */
-  async getBatches(req: Request, res: Response) {
+  async getBatches(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { sourceType } = req.query;
 
-      logger.info('[LeadsController] Getting lead batches');
+      logger.info('[LeadsController] Getting lead batches', { userId });
 
-      // Get all batches
+      // Get all batches for this user
       let query = db
         .select()
         .from(leadBatches)
+        .where(eq(leadBatches.userId, userId))
         .orderBy(desc(leadBatches.createdAt));
 
       const batches = await query;
@@ -385,17 +391,18 @@ export class LeadsController {
   /**
    * GET /api/leads/batches/:id/analytics - Get batch performance analytics
    */
-  async getBatchAnalytics(req: Request, res: Response) {
+  async getBatchAnalytics(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
-      logger.info('[LeadsController] Getting batch analytics', { batchId: id });
+      logger.info('[LeadsController] Getting batch analytics', { userId, batchId: id });
 
-      // Get batch details
+      // Get batch details - verify ownership
       const batch = await db
         .select()
         .from(leadBatches)
-        .where(eq(leadBatches.id, id))
+        .where(and(eq(leadBatches.id, id), eq(leadBatches.userId, userId)))
         .limit(1);
 
       if (batch.length === 0) {
@@ -516,11 +523,12 @@ export class LeadsController {
   /**
    * POST /api/leads/import - Import LinkedIn CSV
    */
-  async importLinkedIn(req: Request, res: Response) {
+  async importLinkedIn(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { csvData, industry, enrichEmail = true, batchName } = req.body;
 
-      logger.info('[LeadsController] Importing LinkedIn CSV');
+      logger.info('[LeadsController] Importing LinkedIn CSV', { userId });
 
       const leadsData = await linkedInImportService.importCSV(csvData, industry);
 
@@ -546,6 +554,7 @@ export class LeadsController {
       const finalBatchName = batchName || `CSV Import - ${currentDate}`;
       
       const [batch] = await db.insert(leadBatches).values({
+        userId,
         name: finalBatchName,
         totalLeads: leadsData.length,
         successfulImports: 0,
@@ -661,10 +670,11 @@ export class LeadsController {
   /**
    * GET /api/leads/:id - Get single lead
    */
-  async getLead(req: Request, res: Response) {
+  async getLead(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
-      const lead = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
+      const lead = await db.select().from(leads).where(and(eq(leads.id, id), eq(leads.userId, userId))).limit(1);
 
       if (!lead[0]) {
         return res.status(404).json({
@@ -689,8 +699,9 @@ export class LeadsController {
   /**
    * POST /api/leads - Create a new lead manually
    */
-  async createLead(req: Request, res: Response) {
+  async createLead(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const {
         companyName,
         contactName,
@@ -707,7 +718,7 @@ export class LeadsController {
         qualityScore,
       } = req.body;
 
-      logger.info('[LeadsController] Creating lead', { companyName, email });
+      logger.info('[LeadsController] Creating lead', { userId, companyName, email });
 
       // Validate required fields
       if (!companyName) {
@@ -724,11 +735,11 @@ export class LeadsController {
         });
       }
 
-      // Check if lead already exists by email
+      // Check if lead already exists by email for this user
       const existingLead = await db
         .select()
         .from(leads)
-        .where(eq(leads.email, email))
+        .where(and(eq(leads.email, email), eq(leads.userId, userId)))
         .limit(1);
 
       if (existingLead.length > 0) {
@@ -742,6 +753,7 @@ export class LeadsController {
       const newLead = await db
         .insert(leads)
         .values({
+          userId,
           companyName,
           contactName: contactName || null,
           email,
@@ -779,15 +791,16 @@ export class LeadsController {
   /**
    * PUT /api/leads/:id - Update lead
    */
-  async updateLead(req: Request, res: Response) {
+  async updateLead(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
-      const updateData = req.body;
+      const updates = req.body;
 
       const updated = await db
         .update(leads)
-        .set({ ...updateData, updatedAt: new Date() })
-        .where(eq(leads.id, id))
+        .set({ ...updates, updatedAt: new Date() })
+        .where(and(eq(leads.id, id), eq(leads.userId, userId)))
         .returning();
 
       if (!updated[0]) {
@@ -813,11 +826,12 @@ export class LeadsController {
   /**
    * DELETE /api/leads/:id - Delete lead
    */
-  async deleteLead(req: Request, res: Response) {
+  async deleteLead(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
-      await db.delete(leads).where(eq(leads.id, id));
+      await db.delete(leads).where(and(eq(leads.id, id), eq(leads.userId, userId)));
 
       res.json({
         success: true,
@@ -853,17 +867,18 @@ export class LeadsController {
   /**
    * GET /api/leads/export - Export leads to CSV
    */
-  async exportLeads(req: Request, res: Response) {
+  async exportLeads(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { status, industry, source, minScore, maxScore } = req.query;
 
-      logger.info('[LeadsController] Exporting leads', { filters: req.query });
+      logger.info('[LeadsController] Exporting leads', { userId, filters: req.query });
 
       // Build query
       let query = db.select().from(leads);
 
-      // Apply filters
-      const conditions: any[] = [];
+      // Apply filters - ALWAYS filter by userId first
+      const conditions: any[] = [eq(leads.userId, userId)];
       if (status && typeof status === 'string') {
         conditions.push(eq(leads.status, status as any));
       }
@@ -939,17 +954,18 @@ export class LeadsController {
     }
   }
 
-  async deleteBatch(req: Request, res: Response) {
+  async deleteBatch(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
-      logger.info('[LeadsController] Deleting batch', { batchId: id });
+      logger.info('[LeadsController] Deleting batch', { userId, batchId: id });
 
-      // First delete all leads associated with this batch
-      await db.delete(leads).where(eq(leads.batchId, id));
+      // First delete all leads associated with this batch (cascade will handle this, but being explicit)
+      await db.delete(leads).where(and(eq(leads.batchId, id), eq(leads.userId, userId)));
 
-      // Then delete the batch
-      await db.delete(leadBatches).where(eq(leadBatches.id, id));
+      // Then delete the batch - verify ownership
+      await db.delete(leadBatches).where(and(eq(leadBatches.id, id), eq(leadBatches.userId, userId)));
 
       logger.info('[LeadsController] Batch deleted successfully', { batchId: id });
 

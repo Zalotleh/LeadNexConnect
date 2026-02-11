@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { emailTemplates } from '@leadnex/database/src/schema';
 import { eq, desc, ilike, or, and } from 'drizzle-orm';
@@ -6,14 +7,15 @@ import { logger } from '../utils/logger';
 
 class TemplatesController {
   // Get all templates with optional filtering
-  async getTemplates(req: Request, res: Response) {
+  async getTemplates(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { category, search } = req.query;
 
       let query = db.select().from(emailTemplates);
 
       // Build where conditions
-      const conditions = [];
+      const conditions = [eq(emailTemplates.userId, userId)];
       
       if (category) {
         conditions.push(eq(emailTemplates.category, category as any));
@@ -53,14 +55,15 @@ class TemplatesController {
   }
 
   // Get single template by ID
-  async getTemplate(req: Request, res: Response) {
+  async getTemplate(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       const template = await db
         .select()
         .from(emailTemplates)
-        .where(eq(emailTemplates.id, id))
+        .where(and(eq(emailTemplates.id, id), eq(emailTemplates.userId, userId)))
         .limit(1);
 
       if (!template || template.length === 0) {
@@ -81,8 +84,9 @@ class TemplatesController {
   }
 
   // Create new template
-  async createTemplate(req: Request, res: Response) {
+  async createTemplate(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const {
         name,
         description,
@@ -107,6 +111,7 @@ class TemplatesController {
       const newTemplate = await db
         .insert(emailTemplates)
         .values({
+          userId,
           name,
           description,
           category: category || 'general',
@@ -138,8 +143,9 @@ class TemplatesController {
   }
 
   // Update existing template
-  async updateTemplate(req: Request, res: Response) {
+  async updateTemplate(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
       const {
         name,
@@ -169,7 +175,7 @@ class TemplatesController {
           isActive,
           updatedAt: new Date()
         })
-        .where(eq(emailTemplates.id, id))
+        .where(and(eq(emailTemplates.id, id), eq(emailTemplates.userId, userId)))
         .returning();
 
       if (!updatedTemplate || updatedTemplate.length === 0) {
@@ -190,13 +196,14 @@ class TemplatesController {
   }
 
   // Delete template
-  async deleteTemplate(req: Request, res: Response) {
+  async deleteTemplate(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       const deletedTemplate = await db
         .delete(emailTemplates)
-        .where(eq(emailTemplates.id, id))
+        .where(and(eq(emailTemplates.id, id), eq(emailTemplates.userId, userId)))
         .returning();
 
       if (!deletedTemplate || deletedTemplate.length === 0) {
@@ -221,14 +228,15 @@ class TemplatesController {
   }
 
   // Increment usage count
-  async incrementUsageCount(req: Request, res: Response) {
+  async incrementUsageCount(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       const template = await db
         .select()
         .from(emailTemplates)
-        .where(eq(emailTemplates.id, id))
+        .where(and(eq(emailTemplates.id, id), eq(emailTemplates.userId, userId)))
         .limit(1);
 
       if (!template || template.length === 0) {

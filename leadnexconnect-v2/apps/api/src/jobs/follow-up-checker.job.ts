@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import { db, leads, campaigns } from '@leadnex/database';
+import { db, leads, campaigns, users } from '@leadnex/database';
 import { eq, and, lt, isNotNull } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
@@ -9,6 +9,7 @@ import { emailQueueService } from '../services/outreach/email-queue.service';
  * Follow-up Checker Job
  * Runs every day at 10:00 AM
  * Sends follow-up emails to leads that haven't responded
+ * MULTI-USER: Processes each user's campaigns separately to maintain data isolation
  */
 export class FollowUpCheckerJob {
   private cronJob: cron.ScheduledTask | null = null;
@@ -37,41 +38,65 @@ export class FollowUpCheckerJob {
 
   /**
    * Execute the job
+   * Iterates through all active users and processes their campaigns
    */
   async execute() {
     try {
       logger.info('[FollowUpChecker] Starting follow-up check');
 
-      // Get all active campaigns with follow-up enabled
-      const activeCampaigns = await db
+      // Get all active users
+      const activeUsers = await db
         .select()
-        .from(campaigns)
-        .where(and(
-          eq(campaigns.status, 'active'),
-          eq(campaigns.followUpEnabled, true)
-        ));
+        .from(users)
+        .where(eq(users.status, 'active'));
 
-      if (activeCampaigns.length === 0) {
-        logger.info('[FollowUpChecker] No active campaigns with follow-ups enabled');
-        return;
-      }
+      logger.info(`[FollowUpChecker] Processing campaigns for ${activeUsers.length} active users`);
 
-      logger.info(`[FollowUpChecker] Found ${activeCampaigns.length} campaigns with follow-ups`);
-
-      // Process each campaign
-      for (const campaign of activeCampaigns) {
+      // Process each user's campaigns
+      for (const user of activeUsers) {
         try {
-          await this.checkFollowUpsForCampaign(campaign);
+          // Get all active campaigns with follow-up enabled for this user
+          const activeCampaigns = await db
+            .select()
+            .from(campaigns)
+            .where(and(
+              eq(campaigns.userId, user.id),
+              eq(campaigns.status, 'active'),
+              eq(campaigns.followUpEnabled, true)
+            ));
+
+          if (activeCampaigns.length === 0) {
+            continue;
+          }
+
+          logger.info(`[FollowUpChecker] Found ${activeCampaigns.length} campaigns with follow-ups for user ${user.email}`);
+
+          // Process each campaign
+          for (const campaign of activeCampaigns) {
+            try {
+              await this.checkFollowUpsForCampaign(campaign);
+            } catch (error: any) {
+              logger.error('[FollowUpChecker] Error checking follow-ups for campaign', {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                userId: user.id,
+                error: error.message,
+              });
+            }
+
+            // Add delay between campaigns
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         } catch (error: any) {
-          logger.error('[FollowUpChecker] Error checking follow-ups for campaign', {
-            campaignId: campaign.id,
-            campaignName: campaign.name,
+          logger.error('[FollowUpChecker] Error processing campaigns for user', {
+            userId: user.id,
+            userEmail: user.email,
             error: error.message,
           });
         }
 
-        // Add delay between campaigns
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Add delay between users
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       logger.info('[FollowUpChecker] Follow-up check completed');

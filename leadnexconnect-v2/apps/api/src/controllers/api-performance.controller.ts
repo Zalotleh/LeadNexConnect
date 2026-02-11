@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { apiPerformanceService } from '../services/tracking/api-performance.service';
 import { logger } from '../utils/logger';
 
@@ -6,13 +7,14 @@ export class APIPerformanceController {
   /**
    * GET /api/performance/report - Get monthly API performance report
    */
-  async getMonthlyReport(req: Request, res: Response) {
+  async getMonthlyReport(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { month, year, allTime } = req.query;
       
       if (allTime === 'true') {
         // Get all-time performance
-        const report = await apiPerformanceService.getAllTimeReport();
+        const report = await apiPerformanceService.getAllTimeReport(userId);
         
         res.json({
           success: true,
@@ -30,7 +32,7 @@ export class APIPerformanceController {
         ? new Date(Number(year), Number(month) - 1, 1)
         : new Date();
 
-      const report = await apiPerformanceService.getMonthlyReport(targetDate);
+      const report = await apiPerformanceService.getMonthlyReport(userId, targetDate);
 
       res.json({
         success: true,
@@ -56,8 +58,9 @@ export class APIPerformanceController {
   /**
    * POST /api/performance/conversion - Update conversion metrics
    */
-  async updateConversion(req: Request, res: Response) {
+  async updateConversion(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { leadId, apiSource, type } = req.body;
 
       const metrics: Record<string, any> = {};
@@ -90,8 +93,9 @@ export class APIPerformanceController {
   /**
    * GET /api/performance/roi - Get ROI summary
    */
-  async getROISummary(req: Request, res: Response) {
+  async getROISummary(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const summary = await apiPerformanceService.getROISummary();
 
       res.json({

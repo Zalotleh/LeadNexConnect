@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { campaigns, leads, emails, emailTemplates, campaignLeads, leadBatches } from '@leadnex/database';
 import { eq, desc, and, gte, count, sql } from 'drizzle-orm';
@@ -20,8 +21,9 @@ export class CampaignsController {
    * Query params:
    * - type: 'lead_generation' | 'outreach' | 'fully_automated' (optional - filter by campaign type)
    */
-  async getCampaigns(req: Request, res: Response) {
+  async getCampaigns(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { type } = req.query;
       
       logger.info('[CampaignsController] Getting campaigns', { type });
@@ -29,9 +31,10 @@ export class CampaignsController {
       // Build query with optional type filter
       const allCampaigns = type && typeof type === 'string'
         ? await db.select().from(campaigns)
-            .where(eq(campaigns.campaignType, type as any))
+            .where(and(eq(campaigns.userId, userId), eq(campaigns.campaignType, type as any)))
             .orderBy(desc(campaigns.createdAt))
         : await db.select().from(campaigns)
+            .where(eq(campaigns.userId, userId))
             .orderBy(desc(campaigns.createdAt));
 
       // Enrich each campaign with actual counts
@@ -133,14 +136,15 @@ export class CampaignsController {
   /**
    * GET /api/campaigns/:id - Get single campaign
    */
-  async getCampaign(req: Request, res: Response) {
+  async getCampaign(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       const campaign = await db
         .select()
         .from(campaigns)
-        .where(eq(campaigns.id, id))
+        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
         .limit(1);
 
       if (!campaign[0]) {
@@ -507,8 +511,9 @@ export class CampaignsController {
   /**
    * POST /api/campaigns - Create new campaign
    */
-  async createCampaign(req: Request, res: Response) {
+  async createCampaign(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const {
         name,
         description,
@@ -596,6 +601,7 @@ export class CampaignsController {
 
       // Prepare campaign data - only include emailTemplateId if it's a valid UUID
       const campaignData: any = {
+        userId,
         name,
         description,
         campaignType: campaignType || 'automated',
@@ -948,15 +954,16 @@ export class CampaignsController {
   /**
    * PUT /api/campaigns/:id - Update campaign
    */
-  async updateCampaign(req: Request, res: Response) {
+  async updateCampaign(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
       const updateData = req.body;
 
       const updated = await db
         .update(campaigns)
         .set({ ...updateData, updatedAt: new Date() })
-        .where(eq(campaigns.id, id))
+        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
         .returning();
 
       if (!updated[0]) {
@@ -1924,8 +1931,9 @@ export class CampaignsController {
   /**
    * POST /api/campaigns/:id/pause - Pause campaign
    */
-  async pauseCampaign(req: Request, res: Response) {
+  async pauseCampaign(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       // Update campaign status to paused
@@ -1936,7 +1944,7 @@ export class CampaignsController {
           pausedAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(campaigns.id, id))
+        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
         .returning();
 
       if (!updated[0]) {
@@ -1980,15 +1988,16 @@ export class CampaignsController {
   /**
    * POST /api/campaigns/:id/resume - Resume paused campaign
    */
-  async resumeCampaign(req: Request, res: Response) {
+  async resumeCampaign(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       // Get campaign details
       const campaignResult = await db
         .select()
         .from(campaigns)
-        .where(eq(campaigns.id, id))
+        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
         .limit(1);
 
       if (!campaignResult[0]) {
@@ -2227,12 +2236,13 @@ export class CampaignsController {
   /**
    * DELETE /api/campaigns/:id - Delete campaign
    */
-  async deleteCampaign(req: Request, res: Response) {
+  async deleteCampaign(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
       // Delete campaign (emails will cascade or be handled by FK constraints)
-      await db.delete(campaigns).where(eq(campaigns.id, id));
+      await db.delete(campaigns).where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)));
 
       res.json({
         success: true,

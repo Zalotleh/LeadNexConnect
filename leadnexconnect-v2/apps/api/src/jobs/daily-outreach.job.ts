@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import { db, leads, campaigns } from '@leadnex/database';
+import { db, leads, campaigns, users } from '@leadnex/database';
 import { eq, and, gte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
@@ -11,6 +11,7 @@ import { leadRoutingService } from '../services/outreach/lead-routing.service';
  * Runs every day at 9:00 AM
  * Sends initial emails to new leads using smart routing
  * Prioritizes hot leads (score >= 80), then warm leads (score >= 60)
+ * MULTI-USER: Processes each user's campaigns separately to maintain data isolation
  */
 export class DailyOutreachJob {
   private cronJob: cron.ScheduledTask | null = null;
@@ -39,58 +40,84 @@ export class DailyOutreachJob {
 
   /**
    * Execute the job
+   * Iterates through all active users and processes their campaigns
    */
   async execute() {
     try {
       logger.info('[DailyOutreach] Starting daily outreach');
 
-      // Get all active campaigns
-      const activeCampaigns = await db
+      // Get all active users
+      const activeUsers = await db
         .select()
-        .from(campaigns)
-        .where(eq(campaigns.status, 'active'));
+        .from(users)
+        .where(eq(users.status, 'active'));
 
-      if (activeCampaigns.length === 0) {
-        logger.info('[DailyOutreach] No active campaigns found');
-        return;
-      }
+      logger.info(`[DailyOutreach] Processing campaigns for ${activeUsers.length} active users`);
 
-      logger.info(`[DailyOutreach] Found ${activeCampaigns.length} active campaigns`);
+      // Process each user's campaigns
+      for (const user of activeUsers) {
+        try {
+          // Find all active campaigns for this user with scheduleType='daily'
+          const activeCampaigns = await db
+            .select()
+            .from(campaigns)
+            .where(and(
+              eq(campaigns.userId, user.id),
+              eq(campaigns.status, 'active')
+            ));
 
-      // Process each campaign
-      for (const campaign of activeCampaigns) {
-        // Only process campaigns with daily schedule
-        if (campaign.scheduleType !== 'daily') {
-          continue;
-        }
-
-        // Check if we should run based on schedule time
-        const now = new Date();
-        const currentHour = now.getHours();
-        
-        // Parse campaign schedule time (format: "HH:MM")
-        if (campaign.scheduleTime) {
-          const [scheduleHour] = campaign.scheduleTime.split(':').map(Number);
-          
-          // Only run if current hour matches
-          if (currentHour !== scheduleHour) {
+          if (activeCampaigns.length === 0) {
             continue;
           }
-          
-          logger.info(`[DailyOutreach] Processing campaign ${campaign.id} at scheduled time ${campaign.scheduleTime}`);
-        }
 
-        try {
-          await this.sendOutreachForCampaign(campaign);
+          logger.info(`[DailyOutreach] Found ${activeCampaigns.length} active campaigns for user ${user.email}`);
+
+          // Process each campaign
+          for (const campaign of activeCampaigns) {
+            // Only process campaigns with daily schedule
+            if (campaign.scheduleType !== 'daily') {
+              continue;
+            }
+
+            // Check if we should run based on schedule time
+            const now = new Date();
+            const currentHour = now.getHours();
+            
+            // Parse campaign schedule time (format: "HH:MM")
+            if (campaign.scheduleTime) {
+              const [scheduleHour] = campaign.scheduleTime.split(':').map(Number);
+              
+              // Only run if current hour matches
+              if (currentHour !== scheduleHour) {
+                continue;
+              }
+              
+              logger.info(`[DailyOutreach] Processing campaign ${campaign.id} at scheduled time ${campaign.scheduleTime} (User: ${user.email})`);
+            }
+
+            try {
+              await this.sendOutreachForCampaign(campaign);
+            } catch (error: any) {
+              logger.error('[DailyOutreach] Error sending outreach for campaign', {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                userId: user.id,
+                error: error.message,
+              });
+            }
+
+            // Add delay between campaigns to avoid rate limits
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
         } catch (error: any) {
-          logger.error('[DailyOutreach] Error sending outreach for campaign', {
-            campaignId: campaign.id,
-            campaignName: campaign.name,
+          logger.error('[DailyOutreach] Error processing campaigns for user', {
+            userId: user.id,
+            userEmail: user.email,
             error: error.message,
           });
         }
 
-        // Add delay between campaigns
+        // Add delay between users to avoid rate limits
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 

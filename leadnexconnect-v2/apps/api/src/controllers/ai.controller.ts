@@ -1,4 +1,5 @@
-import { Request, Response } from 'express'
+import { Response } from 'express'
+import { AuthRequest } from '../middleware/auth.middleware'
 import { anthropicService } from '../services/ai/anthropic.service'
 import { EmailGeneratorService } from '../services/outreach/email-generator.service'
 import { logger } from '../utils/logger'
@@ -6,7 +7,7 @@ import { logger } from '../utils/logger'
 class AIController {
   private emailGeneratorService = new EmailGeneratorService();
 
-  async generateEmailContent(req: Request, res: Response) {
+  async generateEmailContent(req: AuthRequest, res: Response) {
     try {
       const {
         industry,
@@ -60,7 +61,7 @@ class AIController {
     }
   }
 
-  async testAI(req: Request, res: Response) {
+  async testAI(req: AuthRequest, res: Response) {
     try {
       const isConnected = await anthropicService.testConnection()
       

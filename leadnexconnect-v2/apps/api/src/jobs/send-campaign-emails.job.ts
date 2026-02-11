@@ -8,6 +8,7 @@
  * - Calls campaignEmailSenderService.sendDueEmails()
  * - Sends all emails that are due (scheduledFor <= NOW())
  * - Updates campaign completion status automatically
+ * - MULTI-USER: Service filters emails by userId to maintain data isolation
  *
  * Schedule: Every 1 minute
  */

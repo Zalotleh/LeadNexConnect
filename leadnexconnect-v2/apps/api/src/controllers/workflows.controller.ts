@@ -1,6 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db, workflows, workflowSteps } from '@leadnex/database';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -8,13 +9,15 @@ export class WorkflowsController {
   /**
    * Get all workflows
    */
-  async getWorkflows(req: Request, res: Response) {
+  async getWorkflows(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       logger.info('[WorkflowsController] Getting workflows');
 
       const allWorkflows = await db
         .select()
         .from(workflows)
+        .where(eq(workflows.userId, userId))
         .orderBy(desc(workflows.createdAt));
 
       // Get steps for each workflow
@@ -53,15 +56,16 @@ export class WorkflowsController {
   /**
    * Get single workflow by ID
    */
-  async getWorkflow(req: Request, res: Response) {
+  async getWorkflow(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
       logger.info(`[WorkflowsController] Getting workflow ${id}`);
 
       const [workflow] = await db
         .select()
         .from(workflows)
-        .where(eq(workflows.id, id))
+        .where(and(eq(workflows.id, id), eq(workflows.userId, userId)))
         .limit(1);
 
       if (!workflow) {
@@ -101,8 +105,9 @@ export class WorkflowsController {
   /**
    * Generate workflow with AI
    */
-  async generateWorkflow(req: Request, res: Response) {
+  async generateWorkflow(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const {
         name,
         description,
@@ -217,6 +222,7 @@ Format your response as a JSON array with this structure:
       const [newWorkflow] = await db
         .insert(workflows)
         .values({
+          userId,
           name,
           description: description || null,
           stepsCount,
@@ -270,8 +276,9 @@ Format your response as a JSON array with this structure:
   /**
    * Update workflow
    */
-  async updateWorkflow(req: Request, res: Response) {
+  async updateWorkflow(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
       const { name, description, steps } = req.body;
       
@@ -281,7 +288,7 @@ Format your response as a JSON array with this structure:
       const [workflow] = await db
         .select()
         .from(workflows)
-        .where(eq(workflows.id, id))
+        .where(and(eq(workflows.id, id), eq(workflows.userId, userId)))
         .limit(1);
 
       if (!workflow) {
@@ -446,8 +453,9 @@ Format your response as a JSON array with this structure:
   /**
    * Delete workflow
    */
-  async deleteWorkflow(req: Request, res: Response) {
+  async deleteWorkflow(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
       logger.info(`[WorkflowsController] Deleting workflow ${id}`);
 
@@ -455,7 +463,7 @@ Format your response as a JSON array with this structure:
       const [workflow] = await db
         .select()
         .from(workflows)
-        .where(eq(workflows.id, id))
+        .where(and(eq(workflows.id, id), eq(workflows.userId, userId)))
         .limit(1);
 
       if (!workflow) {

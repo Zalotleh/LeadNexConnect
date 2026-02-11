@@ -1,6 +1,6 @@
 import * as cron from 'node-cron';
-import { db, campaigns, leadBatches, leads } from '@leadnex/database';
-import { eq } from 'drizzle-orm';
+import { db, campaigns, leadBatches, leads, users } from '@leadnex/database';
+import { eq, and } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
@@ -13,6 +13,7 @@ import { apiPerformanceService } from '../services/tracking/api-performance.serv
  * Daily Lead Generation Job
  * Runs every day at 9:00 AM
  * Generates leads for all active campaigns with enhanced scoring and analysis
+ * MULTI-USER: Processes each user's campaigns separately to maintain data isolation
  */
 export class DailyLeadGenerationJob {
   private cronJob: cron.ScheduledTask | null = null;
@@ -41,71 +42,97 @@ export class DailyLeadGenerationJob {
 
   /**
    * Execute the job
+   * Iterates through all active users and processes their campaigns
    */
   async execute() {
     try {
       logger.info('[DailyLeadGeneration] Starting daily lead generation');
 
-      // Get all active campaigns with daily schedule
-      const activeCampaigns = await db
+      // Get all active users
+      const activeUsers = await db
         .select()
-        .from(campaigns)
-        .where(eq(campaigns.status, 'active'));
+        .from(users)
+        .where(eq(users.status, 'active'));
 
-      if (activeCampaigns.length === 0) {
-        logger.info('[DailyLeadGeneration] No active campaigns found');
-        return;
-      }
+      logger.info(`[DailyLeadGeneration] Processing campaigns for ${activeUsers.length} active users`);
 
-      logger.info(`[DailyLeadGeneration] Found ${activeCampaigns.length} active campaigns`);
+      // Process each user's campaigns
+      for (const user of activeUsers) {
+        try {
+          // Get all active campaigns with daily schedule for this user
+          const activeCampaigns = await db
+            .select()
+            .from(campaigns)
+            .where(and(
+              eq(campaigns.userId, user.id),
+              eq(campaigns.status, 'active')
+            ));
 
-      // Process each campaign
-      for (const campaign of activeCampaigns) {
-        // Only process campaigns with daily schedule
-        if (campaign.scheduleType !== 'daily') {
-          continue;
-        }
-
-        // Check if we should run based on schedule time
-        const now = new Date();
-        const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
-        
-        // Parse campaign schedule time (format: "HH:MM")
-        if (campaign.scheduleTime) {
-          const [scheduleHour, scheduleMinute] = campaign.scheduleTime.split(':').map(Number);
-          
-          // Only run if current hour matches AND we haven't run in the last hour
-          if (currentHour !== scheduleHour) {
+          if (activeCampaigns.length === 0) {
             continue;
           }
-          
-          // Check if already ran today
-          if (campaign.lastRunAt) {
-            const lastRun = new Date(campaign.lastRunAt);
-            const hoursSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
-            
-            if (hoursSinceLastRun < 23) {
-              logger.info(`[DailyLeadGeneration] Skipping campaign ${campaign.id} - already ran today`);
+
+          logger.info(`[DailyLeadGeneration] Found ${activeCampaigns.length} active campaigns for user ${user.email}`);
+
+          // Process each campaign
+          for (const campaign of activeCampaigns) {
+            // Only process campaigns with daily schedule
+            if (campaign.scheduleType !== 'daily') {
               continue;
             }
-          }
-          
-          logger.info(`[DailyLeadGeneration] Running campaign ${campaign.id} at scheduled time ${campaign.scheduleTime}`);
-        }
 
-        try {
-          await this.generateLeadsForCampaign(campaign);
+            // Check if we should run based on schedule time
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            
+            // Parse campaign schedule time (format: "HH:MM")
+            if (campaign.scheduleTime) {
+              const [scheduleHour, scheduleMinute] = campaign.scheduleTime.split(':').map(Number);
+              
+              // Only run if current hour matches AND we haven't run in the last hour
+              if (currentHour !== scheduleHour) {
+                continue;
+              }
+              
+              // Check if already ran today
+              if (campaign.lastRunAt) {
+                const lastRun = new Date(campaign.lastRunAt);
+                const hoursSinceLastRun = (now.getTime() - lastRun.getTime()) / (1000 * 60 * 60);
+                
+                if (hoursSinceLastRun < 23) {
+                  logger.info(`[DailyLeadGeneration] Skipping campaign ${campaign.id} - already ran today`);
+                  continue;
+                }
+              }
+              
+              logger.info(`[DailyLeadGeneration] Running campaign ${campaign.id} at scheduled time ${campaign.scheduleTime} (User: ${user.email})`);
+            }
+
+            try {
+              await this.generateLeadsForCampaign(campaign);
+            } catch (error: any) {
+              logger.error('[DailyLeadGeneration] Error generating leads for campaign', {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                userId: user.id,
+                error: error.message,
+              });
+            }
+
+            // Add delay between campaigns to avoid rate limits
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
         } catch (error: any) {
-          logger.error('[DailyLeadGeneration] Error generating leads for campaign', {
-            campaignId: campaign.id,
-            campaignName: campaign.name,
+          logger.error('[DailyLeadGeneration] Error processing campaigns for user', {
+            userId: user.id,
+            userEmail: user.email,
             error: error.message,
           });
         }
 
-        // Add delay between campaigns to avoid rate limits
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Add delay between users to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
       logger.info('[DailyLeadGeneration] Daily lead generation completed');

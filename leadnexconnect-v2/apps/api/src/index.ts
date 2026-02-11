@@ -16,9 +16,12 @@ import { sendCampaignEmailsJob } from './jobs/send-campaign-emails.job';
 
 // Import middleware
 import { authMiddleware } from './middleware/auth.middleware';
+import { requireAdmin } from './middleware/role.middleware';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
+import usersRoutes from './routes/users.routes';
+import adminAnalyticsRoutes from './routes/admin-analytics.routes';
 import leadsRoutes from './routes/leads.routes';
 import campaignsRoutes from './routes/campaigns.routes';
 import emailsRoutes from './routes/emails.routes';
@@ -86,10 +89,16 @@ app.get('/health', (req, res) => {
 // API Routes - Public (no auth required)
 app.use('/api/auth', authRoutes);
 
+// API Routes - Admin Only (require authentication + admin role)
+app.use('/api/users', authMiddleware, requireAdmin, usersRoutes);
+app.use('/api/admin/analytics', authMiddleware, requireAdmin, adminAnalyticsRoutes);
+
+// API Routes - Mixed (some public, some protected - middleware applied in route file)
+app.use('/api/emails', emailsRoutes); // Tracking endpoints are public, others protected in routes
+
 // API Routes - Protected (require authentication)
 app.use('/api/leads', authMiddleware, leadsRoutes);
 app.use('/api/campaigns', authMiddleware, campaignsRoutes);
-app.use('/api/emails', authMiddleware, emailsRoutes);
 app.use('/api/analytics', authMiddleware, analyticsRoutes);
 app.use('/api/scraping', authMiddleware, scrapingRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);

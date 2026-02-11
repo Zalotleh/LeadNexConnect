@@ -1,5 +1,5 @@
 import * as cron from 'node-cron';
-import { db, campaigns } from '@leadnex/database';
+import { db, campaigns, users } from '@leadnex/database';
 import { eq, and, lte } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import axios from 'axios';
@@ -8,6 +8,7 @@ import axios from 'axios';
  * Scheduled Campaigns Job
  * Runs every minute to check for campaigns scheduled to start
  * Executes campaigns whose startDate has been reached
+ * MULTI-USER: Processes each user's campaigns separately to maintain data isolation
  */
 export class ScheduledCampaignsJob {
   private cronJob: cron.ScheduledTask | null = null;
@@ -41,163 +42,192 @@ export class ScheduledCampaignsJob {
 
   /**
    * Execute the job
+   * Iterates through all active users and processes their scheduled campaigns
    */
   async execute() {
     try {
       const now = new Date();
 
-      // 1. Get all active campaigns with a startDate in the past or now
-      // Only get campaigns where startDate exists and lastRunAt is null or before startDate
-      // This ensures we only execute each campaign once at its scheduled time
-      const scheduledCampaigns = await db
+      // Get all active users
+      const activeUsers = await db
         .select()
-        .from(campaigns)
-        .where(
-          and(
-            eq(campaigns.status, 'active'),
-            lte(campaigns.startDate, now)
-          )
-        );
+        .from(users)
+        .where(eq(users.status, 'active'));
 
-      // 2. Get all recurring lead_generation campaigns that are due to run
-      // These have isRecurring=true, nextRunAt in the past, and haven't reached endDate
-      const allActiveCampaigns = await db
-        .select()
-        .from(campaigns)
-        .where(eq(campaigns.status, 'active'));
-      
-      const recurringCampaigns = allActiveCampaigns.filter(campaign => 
-        campaign.isRecurring &&
-        campaign.nextRunAt &&
-        new Date(campaign.nextRunAt) <= now &&
-        (!campaign.endDate || new Date(campaign.endDate) > now)
-      );
-
-      const totalCampaigns = scheduledCampaigns.length + recurringCampaigns.length;
-
-      if (totalCampaigns === 0) {
-        return;
-      }
-
-      logger.info(`[ScheduledCampaigns] Found ${totalCampaigns} campaigns to execute (${scheduledCampaigns.length} scheduled, ${recurringCampaigns.length} recurring)`);
-
-      // Process scheduled one-time campaigns
-      for (const campaign of scheduledCampaigns) {
+      // Process each user's campaigns
+      for (const user of activeUsers) {
         try {
-          // Skip if no startDate (shouldn't happen due to query, but safety check)
-          if (!campaign.startDate) {
+          // 1. Get all active campaigns for this user with a startDate in the past or now
+          // Only get campaigns where startDate exists and lastRunAt is null or before startDate
+          // This ensures we only execute each campaign once at its scheduled time
+          const scheduledCampaigns = await db
+            .select()
+            .from(campaigns)
+            .where(
+              and(
+                eq(campaigns.userId, user.id),
+                eq(campaigns.status, 'active'),
+                lte(campaigns.startDate, now)
+              )
+            );
+
+          // 2. Get all recurring lead_generation campaigns for this user that are due to run
+          // These have isRecurring=true, nextRunAt in the past, and haven't reached endDate
+          const allActiveCampaigns = await db
+            .select()
+            .from(campaigns)
+            .where(and(
+              eq(campaigns.userId, user.id),
+              eq(campaigns.status, 'active')
+            ));
+          
+          const recurringCampaigns = allActiveCampaigns.filter(campaign => 
+            campaign.isRecurring &&
+            campaign.nextRunAt &&
+            new Date(campaign.nextRunAt) <= now &&
+            (!campaign.endDate || new Date(campaign.endDate) > now)
+          );
+
+          const totalCampaigns = scheduledCampaigns.length + recurringCampaigns.length;
+
+          if (totalCampaigns === 0) {
             continue;
           }
 
-          const startDate = new Date(campaign.startDate);
+          logger.info(`[ScheduledCampaigns] Found ${totalCampaigns} campaigns to execute for user ${user.email} (${scheduledCampaigns.length} scheduled, ${recurringCampaigns.length} recurring)`);
 
-          // Check if campaign has a scheduled time (e.g., "10:00")
-          if (campaign.scheduleTime) {
-            const [scheduleHour, scheduleMinute] = campaign.scheduleTime.split(':').map(Number);
-            const currentHour = now.getHours();
-            const currentMinute = now.getMinutes();
+          // Process scheduled one-time campaigns
+          for (const campaign of scheduledCampaigns) {
+            try {
+              // Skip if no startDate (shouldn't happen due to query, but safety check)
+              if (!campaign.startDate) {
+                continue;
+              }
 
-            // Check if current time matches scheduled time (within same minute)
-            const isScheduledTime = currentHour === scheduleHour && currentMinute === scheduleMinute;
+              const startDate = new Date(campaign.startDate);
 
-            if (!isScheduledTime) {
-              // Not the scheduled time yet, skip
-              continue;
-            }
-          }
+              // Check if campaign has a scheduled time (e.g., "10:00")
+              if (campaign.scheduleTime) {
+                const [scheduleHour, scheduleMinute] = campaign.scheduleTime.split(':').map(Number);
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
 
-          // Check if campaign has been executed today already
-          // Campaigns should run once per day at their scheduled time
-          if (campaign.lastRunAt) {
-            const lastRunAt = new Date(campaign.lastRunAt);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const lastRunDate = new Date(lastRunAt);
-            lastRunDate.setHours(0, 0, 0, 0);
+                // Check if current time matches scheduled time (within same minute)
+                const isScheduledTime = currentHour === scheduleHour && currentMinute === scheduleMinute;
 
-            // If campaign was already run today, skip it
-            if (lastRunDate.getTime() === today.getTime()) {
-              logger.debug('[ScheduledCampaigns] Campaign already executed today, skipping', {
+                if (!isScheduledTime) {
+                  // Not the scheduled time yet, skip
+                  continue;
+                }
+              }
+
+              // Check if campaign has been executed today already
+              // Campaigns should run once per day at their scheduled time
+              if (campaign.lastRunAt) {
+                const lastRunAt = new Date(campaign.lastRunAt);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const lastRunDate = new Date(lastRunAt);
+                lastRunDate.setHours(0, 0, 0, 0);
+
+                // If campaign was already run today, skip it
+                if (lastRunDate.getTime() === today.getTime()) {
+                  logger.debug('[ScheduledCampaigns] Campaign already executed today, skipping', {
+                    campaignId: campaign.id,
+                    lastRunAt: lastRunAt.toISOString(),
+                    today: today.toISOString(),
+                  });
+                  continue;
+                }
+              }
+
+              logger.info('[ScheduledCampaigns] Executing scheduled campaign', {
                 campaignId: campaign.id,
-                lastRunAt: lastRunAt.toISOString(),
-                today: today.toISOString(),
+                campaignName: campaign.name,
+                userId: user.id,
+                scheduledFor: startDate.toISOString(),
               });
-              continue;
+
+              // Call the execute endpoint first
+              // The execute endpoint will set lastRunAt after successful execution
+              await axios.post(
+                `${this.apiBaseUrl}/api/campaigns/${campaign.id}/execute`,
+                {},
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  timeout: 30000, // 30 second timeout for email queueing
+                }
+              );
+
+              logger.info('[ScheduledCampaigns] Successfully triggered campaign execution', {
+                campaignId: campaign.id,
+              });
+
+            } catch (error: any) {
+              logger.error('[ScheduledCampaigns] Error executing scheduled campaign', {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                userId: user.id,
+                error: error.message,
+              });
             }
+
+            // Add small delay between campaigns
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
 
-          logger.info('[ScheduledCampaigns] Executing scheduled campaign', {
-            campaignId: campaign.id,
-            campaignName: campaign.name,
-            scheduledFor: startDate.toISOString(),
-          });
+          // Process recurring lead_generation campaigns
+          for (const campaign of recurringCampaigns) {
+            try {
+              logger.info('[ScheduledCampaigns] Executing recurring campaign', {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                userId: user.id,
+                recurringInterval: campaign.recurringInterval,
+                nextRunAt: campaign.nextRunAt,
+                endDate: campaign.endDate,
+              });
 
-          // Call the execute endpoint first
-          // The execute endpoint will set lastRunAt after successful execution
-          await axios.post(
-            `${this.apiBaseUrl}/api/campaigns/${campaign.id}/execute`,
-            {},
-            {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              timeout: 30000, // 30 second timeout for email queueing
+              // Call the execute endpoint
+              // The execute endpoint will update lastRunAt and calculate nextRunAt
+              await axios.post(
+                `${this.apiBaseUrl}/api/campaigns/${campaign.id}/execute`,
+                {},
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  timeout: 30000, // 30 second timeout for lead generation
+                }
+              );
+
+              logger.info('[ScheduledCampaigns] Successfully triggered recurring campaign execution', {
+                campaignId: campaign.id,
+              });
+
+            } catch (error: any) {
+              logger.error('[ScheduledCampaigns] Error executing recurring campaign', {
+                campaignId: campaign.id,
+                campaignName: campaign.name,
+                userId: user.id,
+                error: error.message,
+              });
             }
-          );
 
-          logger.info('[ScheduledCampaigns] Successfully triggered campaign execution', {
-            campaignId: campaign.id,
-          });
-
+            // Add small delay between campaigns
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
         } catch (error: any) {
-          logger.error('[ScheduledCampaigns] Error executing scheduled campaign', {
-            campaignId: campaign.id,
-            campaignName: campaign.name,
+          logger.error('[ScheduledCampaigns] Error processing campaigns for user', {
+            userId: user.id,
+            userEmail: user.email,
             error: error.message,
           });
         }
 
-        // Add small delay between campaigns
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      // Process recurring lead_generation campaigns
-      for (const campaign of recurringCampaigns) {
-        try {
-          logger.info('[ScheduledCampaigns] Executing recurring campaign', {
-            campaignId: campaign.id,
-            campaignName: campaign.name,
-            recurringInterval: campaign.recurringInterval,
-            nextRunAt: campaign.nextRunAt,
-            endDate: campaign.endDate,
-          });
-
-          // Call the execute endpoint
-          // The execute endpoint will update lastRunAt and calculate nextRunAt
-          await axios.post(
-            `${this.apiBaseUrl}/api/campaigns/${campaign.id}/execute`,
-            {},
-            {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              timeout: 30000, // 30 second timeout for lead generation
-            }
-          );
-
-          logger.info('[ScheduledCampaigns] Successfully triggered recurring campaign execution', {
-            campaignId: campaign.id,
-          });
-
-        } catch (error: any) {
-          logger.error('[ScheduledCampaigns] Error executing recurring campaign', {
-            campaignId: campaign.id,
-            campaignName: campaign.name,
-            error: error.message,
-          });
-        }
-
-        // Add small delay between campaigns
+        // Add delay between users
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 

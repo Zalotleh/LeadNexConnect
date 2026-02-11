@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { customVariables } from '@leadnex/database';
 import { eq, like, or, desc, and } from 'drizzle-orm';
@@ -7,8 +8,9 @@ import { logger } from '../utils/logger';
 /**
  * Get all custom variables with optional search and filter
  */
-export const getCustomVariables = async (req: Request, res: Response) => {
+export const getCustomVariables = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { search, category, isActive } = req.query;
 
     logger.info('[CustomVariablesController] Fetching custom variables', {
@@ -17,8 +19,8 @@ export const getCustomVariables = async (req: Request, res: Response) => {
       isActive,
     });
 
-    // Build where conditions
-    const conditions: any[] = [];
+    // Build where conditions - always filter by userId
+    const conditions: any[] = [eq(customVariables.userId, userId)];
 
     if (search && typeof search === 'string') {
       conditions.push(
@@ -73,8 +75,9 @@ export const getCustomVariables = async (req: Request, res: Response) => {
 /**
  * Get a single custom variable by ID
  */
-export const getCustomVariable = async (req: Request, res: Response) => {
+export const getCustomVariable = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { id } = req.params;
 
     logger.info('[CustomVariablesController] Fetching variable', { id });
@@ -82,7 +85,7 @@ export const getCustomVariable = async (req: Request, res: Response) => {
     const [variable] = await db
       .select()
       .from(customVariables)
-      .where(eq(customVariables.id, id))
+      .where(and(eq(customVariables.id, id), eq(customVariables.userId, userId)))
       .limit(1);
 
     if (!variable) {
@@ -114,8 +117,9 @@ export const getCustomVariable = async (req: Request, res: Response) => {
 /**
  * Create a new custom variable
  */
-export const createCustomVariable = async (req: Request, res: Response) => {
+export const createCustomVariable = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { key, label, value, category, description, defaultValue, isActive } =
       req.body;
 
@@ -153,6 +157,7 @@ export const createCustomVariable = async (req: Request, res: Response) => {
     const [newVariable] = await db
       .insert(customVariables)
       .values({
+        userId,
         key,
         label,
         value,
@@ -198,8 +203,9 @@ export const createCustomVariable = async (req: Request, res: Response) => {
 /**
  * Update an existing custom variable
  */
-export const updateCustomVariable = async (req: Request, res: Response) => {
+export const updateCustomVariable = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { id } = req.params;
     const { label, category, description, defaultValue, isActive } = req.body;
 
@@ -209,7 +215,7 @@ export const updateCustomVariable = async (req: Request, res: Response) => {
     const [existingVariable] = await db
       .select()
       .from(customVariables)
-      .where(eq(customVariables.id, id))
+      .where(and(eq(customVariables.id, id), eq(customVariables.userId, userId)))
       .limit(1);
 
     if (!existingVariable) {
@@ -258,8 +264,9 @@ export const updateCustomVariable = async (req: Request, res: Response) => {
 /**
  * Delete a custom variable
  */
-export const deleteCustomVariable = async (req: Request, res: Response) => {
+export const deleteCustomVariable = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { id } = req.params;
 
     logger.info('[CustomVariablesController] Deleting variable', { id });
@@ -268,7 +275,7 @@ export const deleteCustomVariable = async (req: Request, res: Response) => {
     const [existingVariable] = await db
       .select()
       .from(customVariables)
-      .where(eq(customVariables.id, id))
+      .where(and(eq(customVariables.id, id), eq(customVariables.userId, userId)))
       .limit(1);
 
     if (!existingVariable) {
@@ -314,8 +321,9 @@ export const deleteCustomVariable = async (req: Request, res: Response) => {
 /**
  * Increment usage count for a variable
  */
-export const incrementUsageCount = async (req: Request, res: Response) => {
+export const incrementUsageCount = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.user!.id;
     const { id } = req.params;
 
     logger.info('[CustomVariablesController] Incrementing usage count', { id });
@@ -323,7 +331,7 @@ export const incrementUsageCount = async (req: Request, res: Response) => {
     const [variable] = await db
       .select()
       .from(customVariables)
-      .where(eq(customVariables.id, id))
+      .where(and(eq(customVariables.id, id), eq(customVariables.userId, userId)))
       .limit(1);
 
     if (!variable) {

@@ -1,10 +1,11 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { settingsService } from '../services/settings.service';
 import { emailSenderService } from '../services/outreach/email-sender.service';
 import { logger } from '../utils/logger';
 
 export class SettingsController {
-  async getSettings(req: Request, res: Response) {
+  async getSettings(req: AuthRequest, res: Response) {
     try {
       logger.info('[SettingsController] Getting all settings');
       const settings = await settingsService.getAllMasked();
@@ -15,7 +16,7 @@ export class SettingsController {
     }
   }
 
-  async getUnmaskedSetting(req: Request, res: Response) {
+  async getUnmaskedSetting(req: AuthRequest, res: Response) {
     try {
       const { key } = req.params;
       logger.info('[SettingsController] Getting unmasked setting', { key });
@@ -28,7 +29,7 @@ export class SettingsController {
     }
   }
 
-  async updateSettings(req: Request, res: Response) {
+  async updateSettings(req: AuthRequest, res: Response) {
     try {
       const settingsData = req.body;
       logger.info('[SettingsController] Updating settings', { keys: Object.keys(settingsData) });
@@ -50,7 +51,7 @@ export class SettingsController {
     }
   }
 
-  async testSMTP(req: Request, res: Response) {
+  async testSMTP(req: AuthRequest, res: Response) {
     try {
       const { smtpHost, smtpPort, smtpUser, smtpPass } = req.body;
       logger.info('[SettingsController] Testing SMTP connection', { host: smtpHost, port: smtpPort });
@@ -69,7 +70,7 @@ export class SettingsController {
     }
   }
 
-  async clearCache(req: Request, res: Response) {
+  async clearCache(req: AuthRequest, res: Response) {
     try {
       logger.info('[SettingsController] Clearing settings cache');
       settingsService.clearCache();

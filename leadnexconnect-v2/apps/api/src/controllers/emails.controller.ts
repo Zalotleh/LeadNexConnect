@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { emails, leads, campaigns } from '@leadnex/database';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
 import { emailSenderService } from '../services/outreach/email-sender.service';
@@ -10,13 +11,24 @@ export class EmailsController {
   /**
    * GET /api/emails - Get all emails
    */
-  async getEmails(req: Request, res: Response) {
+  async getEmails(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { leadId, campaignId, status } = req.query;
 
       logger.info('[EmailsController] Getting emails', { query: req.query });
 
-      let query = db.select().from(emails).orderBy(desc(emails.createdAt));
+      // Get user's lead IDs first
+      const userLeads = await db.select({ id: leads.id }).from(leads).where(eq(leads.userId, userId));
+      const userLeadIds = userLeads.map(l => l.id);
+
+      if (userLeadIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      let query = db.select().from(emails)
+        .where(inArray(emails.leadId, userLeadIds))
+        .orderBy(desc(emails.createdAt));
 
       // Apply filters (simplified - in production use proper query builder)
       const allEmails = await query;
@@ -48,13 +60,22 @@ export class EmailsController {
   /**
    * GET /api/emails/:id - Get single email
    */
-  async getEmail(req: Request, res: Response) {
+  async getEmail(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { id } = req.params;
 
-      const email = await db.select().from(emails).where(eq(emails.id, id)).limit(1);
+      // Get email and verify ownership via lead
+      const emailResults = await db.select({
+        email: emails,
+        lead: leads
+      })
+      .from(emails)
+      .innerJoin(leads, eq(emails.leadId, leads.id))
+      .where(and(eq(emails.id, id), eq(leads.userId, userId)))
+      .limit(1);
 
-      if (!email[0]) {
+      if (!emailResults[0]) {
         return res.status(404).json({
           success: false,
           error: { message: 'Email not found' },
@@ -63,7 +84,7 @@ export class EmailsController {
 
       res.json({
         success: true,
-        data: email[0],
+        data: emailResults[0].email,
       });
     } catch (error: any) {
       logger.error('[EmailsController] Error getting email', { error: error.message });
@@ -77,14 +98,17 @@ export class EmailsController {
   /**
    * POST /api/emails/send - Send email to a lead
    */
-  async sendEmail(req: Request, res: Response) {
+  async sendEmail(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { leadId, campaignId, followUpStage = 'initial' } = req.body;
 
       logger.info('[EmailsController] Sending email', { leadId, campaignId });
 
-      // Get lead info
-      const lead = await db.select().from(leads).where(eq(leads.id, leadId)).limit(1);
+      // Get lead info and verify ownership
+      const lead = await db.select().from(leads)
+        .where(and(eq(leads.id, leadId), eq(leads.userId, userId)))
+        .limit(1);
 
       if (!lead[0]) {
         return res.status(404).json({
@@ -136,7 +160,7 @@ export class EmailsController {
   }
 
   /**
-   * GET /api/emails/track/open/:id - Track email open
+   * GET /api/emails/track/open/:id - Track email open (public endpoint, no auth)
    */
   async trackOpen(req: Request, res: Response) {
     try {
@@ -238,7 +262,7 @@ export class EmailsController {
   }
 
   /**
-   * GET /api/emails/track/click/:id - Track email click and redirect
+   * GET /api/emails/track/click/:id - Track email click and redirect (public endpoint, no auth)
    */
   async trackClick(req: Request, res: Response) {
     try {
