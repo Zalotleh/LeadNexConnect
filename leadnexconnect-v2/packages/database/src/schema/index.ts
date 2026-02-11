@@ -14,6 +14,12 @@ import {
 import { relations } from 'drizzle-orm';
 
 // Enums
+
+// Authentication & User Management
+export const userRoleEnum = pgEnum('user_role', ['user', 'admin']);
+export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'suspended']);
+
+// Leads
 export const leadStatusEnum = pgEnum('lead_status', [
   'new',
   'contacted',
@@ -82,8 +88,52 @@ export const templateCategoryEnum = pgEnum('template_category', [
 
 // Main Tables
 
+// Authentication & User Management Tables
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  firstName: varchar('first_name', { length: 100 }).notNull(),
+  lastName: varchar('last_name', { length: 100 }).notNull(),
+  role: userRoleEnum('role').notNull().default('user'),
+  status: userStatusEnum('status').notNull().default('active'),
+  lastLoginAt: timestamp('last_login_at'),
+  lastActiveAt: timestamp('last_active_at'),
+  failedLoginAttempts: integer('failed_login_attempts').default(0),
+  lockedUntil: timestamp('locked_until'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  createdBy: uuid('created_by'), // References users(id) for audit trail
+});
+
+export const sessions = pgTable('sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: varchar('token', { length: 500 }).notNull().unique(),
+  refreshToken: varchar('refresh_token', { length: 500 }),
+  ipAddress: varchar('ip_address', { length: 50 }),
+  userAgent: text('user_agent'),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  lastUsedAt: timestamp('last_used_at').defaultNow(),
+});
+
+export const auditLog = pgTable('audit_log', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  action: varchar('action', { length: 100 }).notNull(),
+  entity: varchar('entity', { length: 100 }).notNull(),
+  entityId: uuid('entity_id'),
+  changes: jsonb('changes'),
+  ipAddress: varchar('ip_address', { length: 50 }),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Lead Management Tables
 export const leads = pgTable('leads', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Company Information
   companyName: varchar('company_name', { length: 255 }).notNull(),
@@ -163,6 +213,7 @@ export const leads = pgTable('leads', {
 
 export const campaigns = pgTable('campaigns', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
   // Basic Info
   name: varchar('name', { length: 255 }).notNull(),
@@ -250,6 +301,7 @@ export const campaigns = pgTable('campaigns', {
 
 export const emails = pgTable('emails', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // References
   leadId: uuid('lead_id').notNull().references(() => leads.id, { onDelete: 'cascade' }),
@@ -288,6 +340,7 @@ export const emails = pgTable('emails', {
 // Campaign only completes when all scheduled emails are sent/failed
 export const scheduledEmails = pgTable('scheduled_emails', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
   // References
   campaignId: uuid('campaign_id').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
@@ -319,6 +372,7 @@ export const scheduledEmails = pgTable('scheduled_emails', {
 // Tracks each individual run of a fully_automated campaign
 export const automatedCampaignRuns = pgTable('automated_campaign_runs', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
   // References
   campaignId: uuid('campaign_id')
@@ -350,6 +404,7 @@ export const automatedCampaignRuns = pgTable('automated_campaign_runs', {
 // Campaign Leads (Many-to-Many relationship for manual campaigns)
 export const campaignLeads = pgTable('campaign_leads', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // References
   campaignId: uuid('campaign_id').notNull().references(() => campaigns.id, { onDelete: 'cascade' }),
@@ -363,6 +418,7 @@ export const campaignLeads = pgTable('campaign_leads', {
 
 export const emailTemplates = pgTable('email_templates', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Basic Info
   name: varchar('name', { length: 255 }).notNull(),
@@ -392,6 +448,7 @@ export const emailTemplates = pgTable('email_templates', {
 
 export const scrapingJobs = pgTable('scraping_jobs', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Configuration
   source: varchar('source', { length: 50 }).notNull(),
@@ -421,6 +478,7 @@ export const scrapingJobs = pgTable('scraping_jobs', {
 
 export const apiUsage = pgTable('api_usage', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Service Info
   service: varchar('service', { length: 50 }).notNull(),
@@ -440,6 +498,7 @@ export const apiUsage = pgTable('api_usage', {
 
 export const settings = pgTable('settings', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }), // Nullable for global settings
   key: varchar('key', { length: 100 }).notNull().unique(),
   value: jsonb('value').notNull(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -463,6 +522,7 @@ export const activityLog = pgTable('activity_log', {
 // API Performance Tracking
 export const apiPerformance = pgTable('api_performance', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   apiSource: varchar('api_source', { length: 50 }).notNull(), // apollo, hunter, google_places, linkedin
   
   // Metrics
@@ -496,6 +556,7 @@ export const apiPerformance = pgTable('api_performance', {
 // Lead Source ROI Tracking
 export const leadSourceRoi = pgTable('lead_source_roi', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   leadId: uuid('lead_id').notNull().references(() => leads.id, { onDelete: 'cascade' }),
   source: varchar('source', { length: 50 }).notNull(),
   
@@ -550,6 +611,7 @@ export const websiteAnalysisCache = pgTable('website_analysis_cache', {
 // Lead Batches (CSV Upload Tracking)
 export const leadBatches = pgTable('lead_batches', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
   // Batch Information
   name: varchar('name', { length: 255 }).notNull(),
@@ -588,6 +650,7 @@ export const leadBatches = pgTable('lead_batches', {
 // Workflows - Multi-step email sequences
 export const workflows = pgTable('workflows', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Basic Information
   name: varchar('name', { length: 255 }).notNull(),
@@ -611,6 +674,7 @@ export const workflows = pgTable('workflows', {
 // Workflow Steps - Individual emails in a workflow sequence
 export const workflowSteps = pgTable('workflow_steps', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
 
   // Relationships
   workflowId: uuid('workflow_id')
@@ -639,6 +703,7 @@ export const workflowSteps = pgTable('workflow_steps', {
 // Custom Variables - User-defined email variables
 export const customVariables = pgTable('custom_variables', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Variable Identification
   key: varchar('key', { length: 100 }).notNull().unique(), // e.g., 'companyRevenue'
@@ -664,6 +729,7 @@ export const customVariables = pgTable('custom_variables', {
 // API Configuration (User-defined API keys, limits, and costs)
 export const apiConfig = pgTable('api_config', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   apiSource: varchar('api_source', { length: 50 }).notNull().unique(), // apollo, hunter, google_places, peopledatalabs
   
   // API Credentials
@@ -691,6 +757,7 @@ export const apiConfig = pgTable('api_config', {
 // SMTP Configuration (User-defined SMTP providers)
 export const smtpConfig = pgTable('smtp_config', {
   id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Provider Info
   provider: varchar('provider', { length: 100 }).notNull(), // gmail, outlook, sendgrid, mailgun, ses, custom
@@ -729,7 +796,42 @@ export const smtpConfig = pgTable('smtp_config', {
 });
 
 // Relations
+
+// User & Authentication Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  leads: many(leads),
+  campaigns: many(campaigns),
+  workflows: many(workflows),
+  emailTemplates: many(emailTemplates),
+  customVariables: many(customVariables),
+  sessions: many(sessions),
+  auditLogs: many(auditLog),
+  apiConfigs: many(apiConfig),
+  smtpConfigs: many(smtpConfig),
+  scrapingJobs: many(scrapingJobs),
+  leadBatches: many(leadBatches),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const auditLogRelations = relations(auditLog, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLog.userId],
+    references: [users.id],
+  }),
+}));
+
+// Lead Management Relations
 export const leadsRelations = relations(leads, ({ many, one }) => ({
+  user: one(users, {
+    fields: [leads.userId],
+    references: [users.id],
+  }),
   emails: many(emails),
   roiTracking: many(leadSourceRoi),
   campaignLeads: many(campaignLeads),
@@ -739,11 +841,19 @@ export const leadsRelations = relations(leads, ({ many, one }) => ({
   }),
 }));
 
-export const leadBatchesRelations = relations(leadBatches, ({ many }) => ({
+export const leadBatchesRelations = relations(leadBatches, ({ many, one }) => ({
+  user: one(users, {
+    fields: [leadBatches.userId],
+    references: [users.id],
+  }),
   leads: many(leads),
 }));
 
 export const campaignsRelations = relations(campaigns, ({ many, one }) => ({
+  user: one(users, {
+    fields: [campaigns.userId],
+    references: [users.id],
+  }),
   emails: many(emails),
   campaignLeads: many(campaignLeads),
   scheduledEmails: many(scheduledEmails),

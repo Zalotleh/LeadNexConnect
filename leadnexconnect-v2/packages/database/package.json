@@ -8,16 +8,20 @@
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx src/seed.ts"
+    "db:seed": "tsx src/seed.ts",
+    "db:seed-users": "tsx src/seed-users.ts",
+    "db:migrate-data": "tsx src/migrate-existing-data.ts"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.1",
+    "bcrypt": "^6.0.0",
+    "drizzle-orm": "0.37.0",
     "pg": "^8.11.3",
     "postgres": "^3.4.3"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/pg": "^8.10.9",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "0.28.1",
     "tsx": "^4.7.0"
   }
 }

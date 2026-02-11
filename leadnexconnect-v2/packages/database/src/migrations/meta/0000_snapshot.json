@@ -1,10 +1,8 @@
 {
-  "id": "71f423fa-e6fa-454a-bba0-f556a31d2c45",
-  "prevId": "00000000-0000-0000-0000-000000000000",
-  "version": "5",
-  "dialect": "pg",
+  "version": "7",
+  "dialect": "postgresql",
   "tables": {
-    "activity_log": {
+    "public.activity_log": {
       "name": "activity_log",
       "schema": "",
       "columns": {
@@ -56,9 +54,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "api_usage": {
+    "public.api_usage": {
       "name": "api_usage",
       "schema": "",
       "columns": {
@@ -125,9 +126,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "campaigns": {
+    "public.campaigns": {
       "name": "campaigns",
       "schema": "",
       "columns": {
@@ -334,9 +338,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "email_templates": {
+    "public.email_templates": {
       "name": "email_templates",
       "schema": "",
       "columns": {
@@ -428,9 +435,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "emails": {
+    "public.emails": {
       "name": "emails",
       "schema": "",
       "columns": {
@@ -560,34 +570,37 @@
         "emails_lead_id_leads_id_fk": {
           "name": "emails_lead_id_leads_id_fk",
           "tableFrom": "emails",
-          "tableTo": "leads",
           "columnsFrom": [
             "lead_id"
           ],
+          "tableTo": "leads",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "emails_campaign_id_campaigns_id_fk": {
           "name": "emails_campaign_id_campaigns_id_fk",
           "tableFrom": "emails",
-          "tableTo": "campaigns",
           "columnsFrom": [
             "campaign_id"
           ],
+          "tableTo": "campaigns",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "leads": {
+    "public.leads": {
       "name": "leads",
       "schema": "",
       "columns": {
@@ -785,9 +798,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "scraping_jobs": {
+    "public.scraping_jobs": {
       "name": "scraping_jobs",
       "schema": "",
       "columns": {
@@ -898,9 +914,12 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     },
-    "settings": {
+    "public.settings": {
       "name": "settings",
       "schema": "",
       "columns": {
@@ -937,85 +956,100 @@
       "uniqueConstraints": {
         "settings_key_unique": {
           "name": "settings_key_unique",
-          "nullsNotDistinct": false,
           "columns": [
             "key"
-          ]
+          ],
+          "nullsNotDistinct": false
         }
-      }
+      },
+      "policies": {},
+      "isRLSEnabled": false,
+      "checkConstraints": {}
     }
   },
   "enums": {
-    "campaign_status": {
+    "public.campaign_status": {
       "name": "campaign_status",
-      "values": {
-        "draft": "draft",
-        "active": "active",
-        "paused": "paused",
-        "completed": "completed",
-        "archived": "archived"
-      }
+      "schema": "public",
+      "values": [
+        "draft",
+        "active",
+        "paused",
+        "completed",
+        "archived"
+      ]
     },
-    "email_status": {
+    "public.email_status": {
       "name": "email_status",
-      "values": {
-        "queued": "queued",
-        "sent": "sent",
-        "delivered": "delivered",
-        "opened": "opened",
-        "clicked": "clicked",
-        "bounced": "bounced",
-        "failed": "failed",
-        "spam": "spam"
-      }
+      "schema": "public",
+      "values": [
+        "queued",
+        "sent",
+        "delivered",
+        "opened",
+        "clicked",
+        "bounced",
+        "failed",
+        "spam"
+      ]
     },
-    "lead_status": {
+    "public.lead_status": {
       "name": "lead_status",
-      "values": {
-        "new": "new",
-        "contacted": "contacted",
-        "follow_up_1": "follow_up_1",
-        "follow_up_2": "follow_up_2",
-        "responded": "responded",
-        "interested": "interested",
-        "not_interested": "not_interested",
-        "invalid": "invalid",
-        "converted": "converted"
-      }
+      "schema": "public",
+      "values": [
+        "new",
+        "contacted",
+        "follow_up_1",
+        "follow_up_2",
+        "responded",
+        "interested",
+        "not_interested",
+        "invalid",
+        "converted"
+      ]
     },
-    "schedule_type": {
+    "public.schedule_type": {
       "name": "schedule_type",
-      "values": {
-        "manual": "manual",
-        "daily": "daily",
-        "weekly": "weekly",
-        "custom": "custom"
-      }
+      "schema": "public",
+      "values": [
+        "manual",
+        "daily",
+        "weekly",
+        "custom"
+      ]
     },
-    "scraping_status": {
+    "public.scraping_status": {
       "name": "scraping_status",
-      "values": {
-        "queued": "queued",
-        "running": "running",
-        "completed": "completed",
-        "failed": "failed",
-        "cancelled": "cancelled"
-      }
+      "schema": "public",
+      "values": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
     },
-    "verification_status": {
+    "public.verification_status": {
       "name": "verification_status",
-      "values": {
-        "unverified": "unverified",
-        "email_verified": "email_verified",
-        "phone_verified": "phone_verified",
-        "fully_verified": "fully_verified"
-      }
+      "schema": "public",
+      "values": [
+        "unverified",
+        "email_verified",
+        "phone_verified",
+        "fully_verified"
+      ]
     }
   },
   "schemas": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
-  }
+    "tables": {},
+    "columns": {}
+  },
+  "id": "71f423fa-e6fa-454a-bba0-f556a31d2c45",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "sequences": {},
+  "policies": {},
+  "views": {},
+  "roles": {}
 }

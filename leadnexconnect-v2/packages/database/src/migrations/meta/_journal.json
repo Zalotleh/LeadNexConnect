@@ -36,6 +36,27 @@
       "when": 1764777094297,
       "tag": "0004_deep_changeling",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770815911279,
+      "tag": "0005_careless_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770820271782,
+      "tag": "0006_mean_aaron_stack",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770821103921,
+      "tag": "0007_faithful_penance",
+      "breakpoints": true
     }
   ]
 }

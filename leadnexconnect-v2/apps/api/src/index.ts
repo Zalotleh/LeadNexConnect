@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
 import { logger } from './utils/logger';
 import { emailQueueService } from './services/outreach/email-queue.service';
@@ -13,7 +14,11 @@ import { followUpCheckerJob } from './jobs/follow-up-checker.job';
 import { scheduledCampaignsJob } from './jobs/scheduled-campaigns.job';
 import { sendCampaignEmailsJob } from './jobs/send-campaign-emails.job';
 
+// Import middleware
+import { authMiddleware } from './middleware/auth.middleware';
+
 // Import routes
+import authRoutes from './routes/auth.routes';
 import leadsRoutes from './routes/leads.routes';
 import campaignsRoutes from './routes/campaigns.routes';
 import emailsRoutes from './routes/emails.routes';
@@ -44,6 +49,7 @@ app.use(cors({
 app.use(compression()); // Compress responses
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser()); // Parse cookies
 
 // Logging
 if (NODE_ENV === 'development') {
@@ -77,20 +83,23 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
-app.use('/api/leads', leadsRoutes);
-app.use('/api/campaigns', campaignsRoutes);
-app.use('/api/emails', emailsRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/scraping', scrapingRoutes);
-app.use('/api/settings', settingsRoutes);
-app.use('/api/performance', apiPerformanceRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/workflows', workflowsRoutes);
-app.use('/api/testing', testingRoutes);
-app.use('/api/templates', templatesRoutes);
-app.use('/api/custom-variables', customVariablesRoutes);
-app.use('/api/config', configRoutes);
+// API Routes - Public (no auth required)
+app.use('/api/auth', authRoutes);
+
+// API Routes - Protected (require authentication)
+app.use('/api/leads', authMiddleware, leadsRoutes);
+app.use('/api/campaigns', authMiddleware, campaignsRoutes);
+app.use('/api/emails', authMiddleware, emailsRoutes);
+app.use('/api/analytics', authMiddleware, analyticsRoutes);
+app.use('/api/scraping', authMiddleware, scrapingRoutes);
+app.use('/api/settings', authMiddleware, settingsRoutes);
+app.use('/api/performance', authMiddleware, apiPerformanceRoutes);
+app.use('/api/ai', authMiddleware, aiRoutes);
+app.use('/api/workflows', authMiddleware, workflowsRoutes);
+app.use('/api/testing', authMiddleware, testingRoutes);
+app.use('/api/templates', authMiddleware, templatesRoutes);
+app.use('/api/custom-variables', authMiddleware, customVariablesRoutes);
+app.use('/api/config', authMiddleware, configRoutes);
 
 // 404 handler
 app.use((req, res) => {
