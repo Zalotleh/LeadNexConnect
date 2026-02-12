@@ -71,7 +71,7 @@ const LeadItemSkeleton = () => (
   </div>
 )
 
-export default function Dashboard() {
+function Dashboard() {
   const [viewMode, setViewMode] = useState<'monthly' | 'allTime'>('allTime')
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())

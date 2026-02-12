@@ -66,157 +66,29 @@ export default function Layout({ children }: LayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1">
-            {/* Dashboard */}
-            <Link
-              href="/dashboard"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                isActive('/dashboard')
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <Home className="w-5 h-5 mr-3" />
-              Dashboard
-            </Link>
-
-            {/* Leads */}
-            <Link
-              href="/leads"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                isActive('/leads')
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <Users className="w-5 h-5 mr-3" />
-              Leads
-            </Link>
-
-            {/* Campaigns */}
-            <Link
-              href="/campaigns"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                isActive('/campaigns')
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <Mail className="w-5 h-5 mr-3" />
-              Campaigns
-            </Link>
-
-            {/* Content Dropdown */}
-            <div>
-              <button
-                onClick={() => setIsContentOpen(!isContentOpen)}
-                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  isContentActive()
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <div className="flex items-center">
-                  <FileText className="w-5 h-5 mr-3" />
-                  Content
-                </div>
-                {isContentOpen ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-              </button>
-
-              {/* Submenu */}
-              {isContentOpen && (
-                <div className="mt-1 ml-4 space-y-1">
-                  {contentSubmenu.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          isActive(item.href)
-                            ? 'bg-primary-50 text-primary-700'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4 mr-3" />
-                        {item.name}
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Analytics Dropdown */}
-            <div>
-              <button
-                onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)}
-                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                  isAnalyticsActive()
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <div className="flex items-center">
-                  <TrendingUp className="w-5 h-5 mr-3" />
-                  Analytics
-                </div>
-                {isAnalyticsOpen ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-              </button>
-
-              {/* Submenu */}
-              {isAnalyticsOpen && (
-                <div className="mt-1 ml-4 space-y-1">
-                  {analyticsSubmenu.map((item) => {
-                    const Icon = item.icon
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                          isActive(item.href)
-                            ? 'bg-primary-50 text-primary-700'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        <Icon className="w-4 h-4 mr-3" />
-                        {item.name}
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Settings */}
-            <Link
-              href="/settings"
-              className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                isActive('/settings')
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <Settings className="w-5 h-5 mr-3" />
-              Settings
-            </Link>
-
-            {/* Admin Section - Only visible to admins */}
-            {isAdmin && (
+            {/* Admin Navigation - Only for admins */}
+            {isAdmin ? (
               <>
+                {/* Dashboard */}
+                <Link
+                  href="/dashboard"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/dashboard')
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Home className="w-5 h-5 mr-3" />
+                  Dashboard
+                </Link>
+
                 <div className="border-t border-gray-200 my-4"></div>
                 <div className="px-4 mb-2">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Admin
                   </p>
                 </div>
+                
                 <Link
                   href="/admin/users"
                   className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
@@ -260,6 +132,151 @@ export default function Layout({ children }: LayoutProps) {
                 >
                   <ClipboardList className="w-5 h-5 mr-3" />
                   Audit Logs
+                </Link>
+              </>
+            ) : (
+              <>
+                {/* User Navigation - Only for regular users */}
+                {/* Dashboard */}
+                <Link
+                  href="/dashboard"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/dashboard')
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Home className="w-5 h-5 mr-3" />
+                  Dashboard
+                </Link>
+
+                {/* Leads */}
+                <Link
+                  href="/leads"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/leads')
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Users className="w-5 h-5 mr-3" />
+                  Leads
+                </Link>
+
+                {/* Campaigns */}
+                <Link
+                  href="/campaigns"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/campaigns')
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Mail className="w-5 h-5 mr-3" />
+                  Campaigns
+                </Link>
+
+                {/* Content Dropdown */}
+                <div>
+                  <button
+                    onClick={() => setIsContentOpen(!isContentOpen)}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                      isContentActive()
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <FileText className="w-5 h-5 mr-3" />
+                      Content
+                    </div>
+                    {isContentOpen ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {/* Submenu */}
+                  {isContentOpen && (
+                    <div className="mt-1 ml-4 space-y-1">
+                      {contentSubmenu.map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <Link
+                            key={item.name}
+                            href={item.href}
+                            className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              isActive(item.href)
+                                ? 'bg-primary-50 text-primary-700'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4 mr-3" />
+                            {item.name}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Analytics Dropdown */}
+                <div>
+                  <button
+                    onClick={() => setIsAnalyticsOpen(!isAnalyticsOpen)}
+                    className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                      isAnalyticsActive()
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <TrendingUp className="w-5 h-5 mr-3" />
+                      Analytics
+                    </div>
+                    {isAnalyticsOpen ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {/* Submenu */}
+                  {isAnalyticsOpen && (
+                    <div className="mt-1 ml-4 space-y-1">
+                      {analyticsSubmenu.map((item) => {
+                        const Icon = item.icon
+                        return (
+                          <Link
+                            key={item.name}
+                            href={item.href}
+                            className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              isActive(item.href)
+                                ? 'bg-primary-50 text-primary-700'
+                                : 'text-gray-600 hover:bg-gray-100'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4 mr-3" />
+                            {item.name}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Settings */}
+                <Link
+                  href="/settings"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/settings')
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Settings className="w-5 h-5 mr-3" />
+                  Settings
                 </Link>
               </>
             )}

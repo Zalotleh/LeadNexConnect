@@ -25,8 +25,8 @@ interface AuthContextType {
 // Create context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// API base URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+// API base URL (should already include /api path)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 // Auth Provider Component
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -42,12 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check authentication status
   const checkAuth = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/auth/me`, {
+      const response = await axios.get(`${API_BASE_URL}/auth/me`, {
         withCredentials: true, // Include cookies
       });
 
       if (response.data.success) {
-        setUser(response.data.data.user);
+        setUser(response.data.user);
       }
     } catch (error) {
       // Not authenticated or error
@@ -61,13 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/api/auth/login`,
+        `${API_BASE_URL}/auth/login`,
         { email, password },
         { withCredentials: true }
       );
 
       if (response.data.success) {
-        setUser(response.data.data.user);
+        setUser(response.data.user);
         
         // Redirect to dashboard after login
         router.push('/dashboard');
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await axios.post(
-        `${API_BASE_URL}/api/auth/logout`,
+        `${API_BASE_URL}/auth/logout`,
         {},
         { withCredentials: true }
       );

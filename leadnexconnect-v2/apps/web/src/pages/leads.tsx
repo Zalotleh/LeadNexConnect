@@ -27,7 +27,7 @@ import { BatchModals } from '@/components/leads/BatchModals'
 import { LeadsTableView } from '@/components/leads/LeadsTableView'
 import { BatchesView } from '@/components/leads/BatchesView'
 
-export default function Leads() {
+function Leads() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [dateViewMode, setDateViewMode] = useState<'monthly' | 'allTime'>('allTime')

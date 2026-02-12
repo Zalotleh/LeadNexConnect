@@ -132,15 +132,15 @@ export default function LoginPage() {
               <div className="space-y-2 text-xs">
                 <div className="bg-blue-50 p-2 rounded">
                   <p className="font-semibold text-blue-900">Admin:</p>
-                  <p className="text-blue-700">admin@leadnexconnect.com / Admin123!</p>
+                  <p className="text-blue-700">admin@leadnex.com / Admin@123!</p>
                 </div>
                 <div className="bg-green-50 p-2 rounded">
                   <p className="font-semibold text-green-900">User 1:</p>
-                  <p className="text-green-700">user1@leadnexconnect.com / User123!</p>
+                  <p className="text-green-700">user1@leadnex.com / ChangeMe123!</p>
                 </div>
                 <div className="bg-purple-50 p-2 rounded">
                   <p className="font-semibold text-purple-900">User 2:</p>
-                  <p className="text-purple-700">user2@leadnexconnect.com / User123!</p>
+                  <p className="text-purple-700">user2@leadnex.com / ChangeMe123!</p>
                 </div>
               </div>
             </div>

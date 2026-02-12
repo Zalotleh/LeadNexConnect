@@ -9,7 +9,7 @@ import SmtpConfigTab from '@/components/SmtpConfigTab'
 
 type TabType = 'api' | 'smtp' | 'ai';
 
-export default function Settings() {
+function Settings() {
   const [activeTab, setActiveTab] = useState<TabType>('api');
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
