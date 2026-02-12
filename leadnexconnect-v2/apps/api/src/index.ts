@@ -23,6 +23,7 @@ import authRoutes from './routes/auth.routes';
 import usersRoutes from './routes/users.routes';
 import adminAnalyticsRoutes from './routes/admin-analytics.routes';
 import adminAuditLogRoutes from './routes/admin-audit-log.routes';
+import adminSessionRoutes from './routes/admin-session.routes';
 import leadsRoutes from './routes/leads.routes';
 import campaignsRoutes from './routes/campaigns.routes';
 import emailsRoutes from './routes/emails.routes';
@@ -94,6 +95,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', authMiddleware, requireAdmin, usersRoutes);
 app.use('/api/admin/analytics', authMiddleware, requireAdmin, adminAnalyticsRoutes);
 app.use('/api/admin/audit-logs', authMiddleware, requireAdmin, adminAuditLogRoutes);
+app.use('/api/admin/sessions', authMiddleware, requireAdmin, adminSessionRoutes);
 
 // API Routes - Mixed (some public, some protected - middleware applied in route file)
 app.use('/api/emails', emailsRoutes); // Tracking endpoints are public, others protected in routes

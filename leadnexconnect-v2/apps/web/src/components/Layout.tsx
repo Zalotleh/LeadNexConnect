@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { Home, Users, Mail, TrendingUp, Settings, Workflow, FileText, Variable, ChevronDown, ChevronRight, Activity, Menu, X, LogOut, User, Shield, ClipboardList } from 'lucide-react'
+import { Home, Users, Mail, TrendingUp, Settings, Workflow, FileText, Variable, ChevronDown, ChevronRight, Activity, Menu, X, LogOut, User, Shield, ClipboardList, Monitor } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface LayoutProps {
@@ -238,6 +238,17 @@ export default function Layout({ children }: LayoutProps) {
                 >
                   <Activity className="w-5 h-5 mr-3" />
                   System Analytics
+                </Link>
+                <Link
+                  href="/admin/sessions"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/admin/sessions')
+                      ? 'bg-purple-50 text-purple-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Monitor className="w-5 h-5 mr-3" />
+                  Session Management
                 </Link>
                 <Link
                   href="/admin/audit-logs"
