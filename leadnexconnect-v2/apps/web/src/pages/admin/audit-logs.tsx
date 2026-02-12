@@ -139,12 +139,46 @@ export default function AdminAuditLogs() {
     return 'bg-gray-100 text-gray-800';
   };
 
+  const handleExport = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters.userId) queryParams.append('userId', filters.userId);
+      if (filters.action) queryParams.append('action', filters.action);
+      if (filters.entity) queryParams.append('entity', filters.entity);
+      if (filters.startDate) queryParams.append('startDate', filters.startDate);
+      if (filters.endDate) queryParams.append('endDate', filters.endDate);
+
+      const response = await api.get(`/api/admin/export/audit-logs?${queryParams.toString()}`, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `audit-logs-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Failed to export audit logs:', err);
+      setError('Failed to export audit logs');
+    }
+  };
+
   return (
     <ProtectedRoute requireAdmin>
       <Layout>
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Audit Logs</h1>
+            <button
+              onClick={handleExport}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Export CSV
+            </button>
           </div>
 
           {/* Statistics Cards */}

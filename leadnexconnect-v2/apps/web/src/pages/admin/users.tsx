@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import UserActivityTimeline from '@/components/UserActivityTimeline'
-import { Users, UserPlus, Edit, Trash2, Shield, User, Lock, Unlock, Mail, Clock, CheckSquare, Square } from 'lucide-react'
+import { Users, UserPlus, Edit, Trash2, Shield, User, Lock, Unlock, Mail, Clock, CheckSquare, Square, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 
@@ -182,6 +182,28 @@ function UserManagement() {
     }
   }
 
+  const handleExport = async () => {
+    try {
+      const response = await api.get('/api/admin/export/users', {
+        responseType: 'blob',
+      })
+      
+      const blob = new Blob([response.data], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `users-export-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast.success('Users exported successfully')
+    } catch (error: any) {
+      toast.error('Failed to export users')
+    }
+  }
+
   const handleCloseModal = () => {
     setShowCreateModal(false)
     setEditingUser(null)
@@ -200,13 +222,22 @@ function UserManagement() {
             </h1>
             <p className="text-gray-600 mt-2">Manage system users and permissions</p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <UserPlus className="w-5 h-5 mr-2" />
-            Add User
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExport}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Download className="w-5 h-5 mr-2" />
+              Export
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <UserPlus className="w-5 h-5 mr-2" />
+              Add User
+            </button>
+          </div>
         </div>
 
         {/* Bulk Actions Bar */}

@@ -129,6 +129,26 @@ export default function AdminSessions() {
     return <Monitor className="w-5 h-5 text-purple-500" />;
   };
 
+  const handleExport = async () => {
+    try {
+      const response = await api.get('/api/admin/export/sessions', {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sessions-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError('Failed to export sessions');
+    }
+  };
+
   // Parse user agent to get browser and OS
   const parseUserAgent = (userAgent: string | null) => {
     if (!userAgent) return 'Unknown';
@@ -179,15 +199,23 @@ export default function AdminSessions() {
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Session Management</h1>
-            <button
-              onClick={() => {
-                fetchSessions();
-                fetchStats();
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Refresh
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExport}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Export CSV
+              </button>
+              <button
+                onClick={() => {
+                  fetchSessions();
+                  fetchStats();
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
 
           {/* Statistics Cards */}
