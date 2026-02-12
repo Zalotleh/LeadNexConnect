@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
-import { Users, UserPlus, Edit, Trash2, Shield, User, Lock, Unlock, Mail } from 'lucide-react'
+import UserActivityTimeline from '@/components/UserActivityTimeline'
+import { Users, UserPlus, Edit, Trash2, Shield, User, Lock, Unlock, Mail, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 
@@ -21,6 +22,7 @@ function UserManagement() {
   const queryClient = useQueryClient()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [viewingTimeline, setViewingTimeline] = useState<User | null>(null)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -290,6 +292,14 @@ function UserManagement() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button
+                          onClick={() => setViewingTimeline(user)}
+                          className="text-blue-600 hover:text-blue-900 inline-flex items-center"
+                          title="View activity timeline"
+                        >
+                          <Clock className="w-4 h-4 mr-1" />
+                          Timeline
+                        </button>
+                        <button
                           onClick={() => handleEdit(user)}
                           className="text-indigo-600 hover:text-indigo-900 inline-flex items-center"
                         >
@@ -429,6 +439,15 @@ function UserManagement() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* User Activity Timeline Modal */}
+        {viewingTimeline && (
+          <UserActivityTimeline
+            userId={viewingTimeline.id}
+            userName={`${viewingTimeline.firstName} ${viewingTimeline.lastName}`}
+            onClose={() => setViewingTimeline(null)}
+          />
         )}
       </div>
     </Layout>
