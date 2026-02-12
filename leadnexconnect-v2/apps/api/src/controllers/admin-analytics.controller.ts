@@ -131,6 +131,102 @@ export class AdminAnalyticsController {
       });
     }
   }
+
+  /**
+   * GET /api/admin/analytics/charts/leads-trend
+   * Get leads trend data for charts
+   */
+  async getLeadsTrend(req: AuthRequest, res: Response) {
+    try {
+      const adminId = req.user!.id;
+      const trend = await adminAnalyticsService.getLeadsTrend(adminId);
+
+      res.json({
+        success: true,
+        data: trend,
+      });
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsController] Error in getLeadsTrend', {
+        error: error.message,
+      });
+      res.status(error.message.includes('Unauthorized') ? 403 : 500).json({
+        success: false,
+        error: { message: error.message || 'Failed to get leads trend' },
+      });
+    }
+  }
+
+  /**
+   * GET /api/admin/analytics/charts/campaign-distribution
+   * Get campaign distribution data for charts
+   */
+  async getCampaignDistribution(req: AuthRequest, res: Response) {
+    try {
+      const adminId = req.user!.id;
+      const distribution = await adminAnalyticsService.getCampaignDistribution(adminId);
+
+      res.json({
+        success: true,
+        data: distribution,
+      });
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsController] Error in getCampaignDistribution', {
+        error: error.message,
+      });
+      res.status(error.message.includes('Unauthorized') ? 403 : 500).json({
+        success: false,
+        error: { message: error.message || 'Failed to get campaign distribution' },
+      });
+    }
+  }
+
+  /**
+   * GET /api/admin/analytics/charts/email-engagement
+   * Get email engagement data for charts
+   */
+  async getEmailEngagement(req: AuthRequest, res: Response) {
+    try {
+      const adminId = req.user!.id;
+      const engagement = await adminAnalyticsService.getEmailEngagement(adminId);
+
+      res.json({
+        success: true,
+        data: engagement,
+      });
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsController] Error in getEmailEngagement', {
+        error: error.message,
+      });
+      res.status(error.message.includes('Unauthorized') ? 403 : 500).json({
+        success: false,
+        error: { message: error.message || 'Failed to get email engagement' },
+      });
+    }
+  }
+
+  /**
+   * GET /api/admin/analytics/charts/lead-tiers
+   * Get lead tier distribution for charts
+   */
+  async getLeadTierDistribution(req: AuthRequest, res: Response) {
+    try {
+      const adminId = req.user!.id;
+      const distribution = await adminAnalyticsService.getLeadTierDistribution(adminId);
+
+      res.json({
+        success: true,
+        data: distribution,
+      });
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsController] Error in getLeadTierDistribution', {
+        error: error.message,
+      });
+      res.status(error.message.includes('Unauthorized') ? 403 : 500).json({
+        success: false,
+        error: { message: error.message || 'Failed to get lead tier distribution' },
+      });
+    }
+  }
 }
 
 export const adminAnalyticsController = new AdminAnalyticsController();

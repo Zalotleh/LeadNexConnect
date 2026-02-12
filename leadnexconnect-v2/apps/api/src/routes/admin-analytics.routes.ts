@@ -29,4 +29,21 @@ router.get('/api-usage', (req, res) =>
   adminAnalyticsController.getApiUsageMetrics(req as any, res)
 );
 
+// Chart data endpoints
+router.get('/charts/leads-trend', (req, res) =>
+  adminAnalyticsController.getLeadsTrend(req as any, res)
+);
+
+router.get('/charts/campaign-distribution', (req, res) =>
+  adminAnalyticsController.getCampaignDistribution(req as any, res)
+);
+
+router.get('/charts/email-engagement', (req, res) =>
+  adminAnalyticsController.getEmailEngagement(req as any, res)
+);
+
+router.get('/charts/lead-tiers', (req, res) =>
+  adminAnalyticsController.getLeadTierDistribution(req as any, res)
+);
+
 export default router;

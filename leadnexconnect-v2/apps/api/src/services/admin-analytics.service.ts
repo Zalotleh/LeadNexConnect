@@ -498,6 +498,148 @@ export class AdminAnalyticsService {
       throw error;
     }
   }
+
+  /**
+   * Get leads trend over time (last 30 days)
+   */
+  async getLeadsTrend(adminId: string) {
+    try {
+      // Verify admin
+      const admin = await db.query.users.findFirst({
+        where: eq(users.id, adminId),
+      });
+
+      if (!admin || admin.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      // Get leads grouped by date for last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const leadsTrend = await db
+        .select({
+          date: sql<string>`DATE(${leads.createdAt})`,
+          count: count(leads.id),
+        })
+        .from(leads)
+        .where(gte(leads.createdAt, thirtyDaysAgo))
+        .groupBy(sql`DATE(${leads.createdAt})`)
+        .orderBy(sql`DATE(${leads.createdAt})`);
+
+      return leadsTrend;
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsService] Error getting leads trend', {
+        adminId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get campaign status distribution
+   */
+  async getCampaignDistribution(adminId: string) {
+    try {
+      // Verify admin
+      const admin = await db.query.users.findFirst({
+        where: eq(users.id, adminId),
+      });
+
+      if (!admin || admin.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      const campaignDistribution = await db
+        .select({
+          status: campaigns.status,
+          count: count(campaigns.id),
+        })
+        .from(campaigns)
+        .groupBy(campaigns.status);
+
+      return campaignDistribution;
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsService] Error getting campaign distribution', {
+        adminId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get email engagement metrics
+   */
+  async getEmailEngagement(adminId: string) {
+    try {
+      // Verify admin
+      const admin = await db.query.users.findFirst({
+        where: eq(users.id, adminId),
+      });
+
+      if (!admin || admin.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      const [emailStats] = await db
+        .select({
+          total: count(emails.id),
+          delivered: sql<number>`COUNT(CASE WHEN ${emails.deliveredAt} IS NOT NULL THEN 1 END)`,
+          opened: sql<number>`COUNT(CASE WHEN ${emails.openedAt} IS NOT NULL THEN 1 END)`,
+          clicked: sql<number>`COUNT(CASE WHEN ${emails.clickedAt} IS NOT NULL THEN 1 END)`,
+          bounced: sql<number>`COUNT(CASE WHEN ${emails.bouncedAt} IS NOT NULL THEN 1 END)`,
+        })
+        .from(emails);
+
+      return {
+        total: emailStats.total || 0,
+        delivered: Number(emailStats.delivered) || 0,
+        opened: Number(emailStats.opened) || 0,
+        clicked: Number(emailStats.clicked) || 0,
+        bounced: Number(emailStats.bounced) || 0,
+      };
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsService] Error getting email engagement', {
+        adminId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get lead tier distribution
+   */
+  async getLeadTierDistribution(adminId: string) {
+    try {
+      // Verify admin
+      const admin = await db.query.users.findFirst({
+        where: eq(users.id, adminId),
+      });
+
+      if (!admin || admin.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      const tierDistribution = await db
+        .select({
+          tier: leads.bookingPotential,
+          count: count(leads.id),
+        })
+        .from(leads)
+        .groupBy(leads.bookingPotential);
+
+      return tierDistribution;
+    } catch (error: any) {
+      logger.error('[AdminAnalyticsService] Error getting lead tier distribution', {
+        adminId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
 }
 
 export const adminAnalyticsService = new AdminAnalyticsService();
