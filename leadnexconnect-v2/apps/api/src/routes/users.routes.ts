@@ -15,6 +15,9 @@ router.get('/', (req, res) => usersController.getAllUsers(req as any, res));
 // Create new user
 router.post('/', (req, res) => usersController.createUser(req as any, res));
 
+// Bulk operations on users
+router.post('/bulk', (req, res) => usersController.bulkOperation(req as any, res));
+
 // Get user by ID
 router.get('/:id', (req, res) => usersController.getUserById(req as any, res));
 

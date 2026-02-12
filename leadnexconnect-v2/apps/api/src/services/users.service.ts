@@ -384,6 +384,108 @@ export class UsersService {
       throw error;
     }
   }
+
+  /**
+   * Bulk operations on multiple users (admin only)
+   */
+  async bulkOperation(
+    adminId: string, 
+    userIds: string[], 
+    operation: 'activate' | 'deactivate' | 'delete'
+  ) {
+    try {
+      // Verify admin exists
+      const admin = await db.query.users.findFirst({
+        where: eq(users.id, adminId),
+      });
+
+      if (!admin || admin.role !== 'admin') {
+        throw new Error('Unauthorized: Admin access required');
+      }
+
+      let successCount = 0;
+      let failedCount = 0;
+      const errors: string[] = [];
+
+      for (const userId of userIds) {
+        try {
+          // Prevent admin from operating on themselves
+          if (userId === adminId) {
+            errors.push(`Cannot perform ${operation} on yourself`);
+            failedCount++;
+            continue;
+          }
+
+          // Verify user exists
+          const targetUser = await db.query.users.findFirst({
+            where: eq(users.id, userId),
+          });
+
+          if (!targetUser) {
+            errors.push(`User ${userId} not found`);
+            failedCount++;
+            continue;
+          }
+
+          // Perform operation
+          switch (operation) {
+            case 'activate':
+              await db
+                .update(users)
+                .set({ 
+                  status: 'active',
+                  updatedAt: new Date() 
+                })
+                .where(eq(users.id, userId));
+              successCount++;
+              break;
+
+            case 'deactivate':
+              await db
+                .update(users)
+                .set({ 
+                  status: 'inactive',
+                  updatedAt: new Date() 
+                })
+                .where(eq(users.id, userId));
+              successCount++;
+              break;
+
+            case 'delete':
+              await db.delete(users).where(eq(users.id, userId));
+              successCount++;
+              break;
+
+            default:
+              errors.push(`Invalid operation: ${operation}`);
+              failedCount++;
+          }
+        } catch (error: any) {
+          logger.error('[UsersService] Error in bulk operation for user', { 
+            error: error.message, 
+            userId 
+          });
+          errors.push(`${userId}: ${error.message}`);
+          failedCount++;
+        }
+      }
+
+      return {
+        success: successCount,
+        failed: failedCount,
+        total: userIds.length,
+        errors: errors.length > 0 ? errors : undefined,
+      };
+    } catch (error: any) {
+      logger.error('[UsersService] Error in bulk operation', { 
+        error: error.message, 
+        adminId,
+        operation 
+      });
+      throw error;
+    }
+  }
 }
 
 export const usersService = new UsersService();
+

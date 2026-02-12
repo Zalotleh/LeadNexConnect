@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import UserActivityTimeline from '@/components/UserActivityTimeline'
-import { Users, UserPlus, Edit, Trash2, Shield, User, Lock, Unlock, Mail, Clock } from 'lucide-react'
+import { Users, UserPlus, Edit, Trash2, Shield, User, Lock, Unlock, Mail, Clock, CheckSquare, Square } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 
@@ -23,6 +23,9 @@ function UserManagement() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [viewingTimeline, setViewingTimeline] = useState<User | null>(null)
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false)
+  const [bulkOperation, setBulkOperation] = useState<'activate' | 'deactivate' | 'delete' | null>(null)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -90,6 +93,27 @@ function UserManagement() {
     }
   })
 
+  // Bulk operation mutation
+  const bulkOperationMutation = useMutation({
+    mutationFn: async ({ userIds, operation }: { userIds: string[], operation: string }) => {
+      const response = await api.post('/api/admin/users/bulk', { userIds, operation })
+      return response.data
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      setSelectedUsers([])
+      setShowBulkConfirm(false)
+      setBulkOperation(null)
+      const result = data.data
+      toast.success(
+        `Bulk operation completed: ${result.success} succeeded, ${result.failed} failed`
+      )
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to perform bulk operation')
+    }
+  })
+
   const resetForm = () => {
     setFormData({
       email: '',
@@ -99,6 +123,33 @@ function UserManagement() {
       role: 'user',
       status: 'active'
     })
+  }
+
+  const handleBulkAction = (operation: 'activate' | 'deactivate' | 'delete') => {
+    setBulkOperation(operation)
+    setShowBulkConfirm(true)
+  }
+
+  const confirmBulkOperation = () => {
+    if (bulkOperation && selectedUsers.length > 0) {
+      bulkOperationMutation.mutate({ userIds: selectedUsers, operation: bulkOperation })
+    }
+  }
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    )
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedUsers.length === users?.length) {
+      setSelectedUsers([])
+    } else {
+      setSelectedUsers(users?.map(u => u.id) || [])
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -158,6 +209,46 @@ function UserManagement() {
           </button>
         </div>
 
+        {/* Bulk Actions Bar */}
+        {selectedUsers.length > 0 && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-indigo-900">
+                {selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''} selected
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleBulkAction('activate')}
+                  className="px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors flex items-center gap-1"
+                >
+                  <Unlock className="w-4 h-4" />
+                  Activate
+                </button>
+                <button
+                  onClick={() => handleBulkAction('deactivate')}
+                  className="px-3 py-1.5 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors flex items-center gap-1"
+                >
+                  <Lock className="w-4 h-4" />
+                  Deactivate
+                </button>
+                <button
+                  onClick={() => handleBulkAction('delete')}
+                  className="px-3 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors flex items-center gap-1"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+                <button
+                  onClick={() => setSelectedUsers([])}
+                  className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white rounded-lg shadow p-6">
@@ -213,6 +304,18 @@ function UserManagement() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <button
+                      onClick={toggleSelectAll}
+                      className="flex items-center justify-center w-5 h-5 rounded border-2 border-gray-300 hover:border-indigo-600 transition-colors"
+                    >
+                      {selectedUsers.length === users?.length && users?.length > 0 ? (
+                        <CheckSquare className="w-5 h-5 text-indigo-600" />
+                      ) : (
+                        <Square className="w-5 h-5 text-gray-400" />
+                      )}
+                    </button>
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     User
                   </th>
@@ -236,7 +339,7 @@ function UserManagement() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       <div className="flex items-center justify-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                       </div>
@@ -245,6 +348,18 @@ function UserManagement() {
                 ) : users && users.length > 0 ? (
                   users.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => toggleUserSelection(user.id)}
+                          className="flex items-center justify-center"
+                        >
+                          {selectedUsers.includes(user.id) ? (
+                            <CheckSquare className="w-5 h-5 text-indigo-600" />
+                          ) : (
+                            <Square className="w-5 h-5 text-gray-400" />
+                          )}
+                        </button>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center ${
@@ -318,7 +433,7 @@ function UserManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                       No users found
                     </td>
                   </tr>
@@ -327,6 +442,49 @@ function UserManagement() {
             </table>
           </div>
         </div>
+
+        {/* Bulk Operation Confirmation Modal */}
+        {showBulkConfirm && bulkOperation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">
+                Confirm Bulk {bulkOperation.charAt(0).toUpperCase() + bulkOperation.slice(1)}
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to {bulkOperation} {selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''}?
+                {bulkOperation === 'delete' && (
+                  <span className="block mt-2 text-red-600 font-medium">
+                    This action cannot be undone.
+                  </span>
+                )}
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowBulkConfirm(false)
+                    setBulkOperation(null)
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmBulkOperation}
+                  disabled={bulkOperationMutation.isPending}
+                  className={`px-4 py-2 rounded-lg text-white transition-colors ${
+                    bulkOperation === 'delete' 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : bulkOperation === 'activate'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-yellow-600 hover:bg-yellow-700'
+                  } disabled:opacity-50`}
+                >
+                  {bulkOperationMutation.isPending ? 'Processing...' : `Confirm ${bulkOperation.charAt(0).toUpperCase() + bulkOperation.slice(1)}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Create/Edit User Modal */}
         {showCreateModal && (

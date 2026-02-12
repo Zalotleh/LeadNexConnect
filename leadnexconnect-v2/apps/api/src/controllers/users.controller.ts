@@ -333,6 +333,49 @@ export class UsersController {
       });
     }
   }
+
+  /**
+   * POST /api/users/bulk
+   * Perform bulk operations on multiple users (admin only)
+   */
+  async bulkOperation(req: AuthRequest, res: Response) {
+    try {
+      const adminId = req.user!.id;
+      const { userIds, operation } = req.body;
+
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'userIds array is required' },
+        });
+      }
+
+      if (!operation || !['activate', 'deactivate', 'delete'].includes(operation)) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Invalid operation. Must be: activate, deactivate, or delete' },
+        });
+      }
+
+      const result = await usersService.bulkOperation(adminId, userIds, operation);
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Bulk ${operation} completed successfully`,
+      });
+    } catch (error: any) {
+      logger.error('[UsersController] Error in bulkOperation', { error: error.message });
+
+      res.status(error.message.includes('Unauthorized') ? 403 : 500).json({
+        success: false,
+        error: {
+          message: error.message || 'Failed to perform bulk operation',
+          code: error.message.includes('Unauthorized') ? 'FORBIDDEN' : 'INTERNAL_ERROR',
+        },
+      });
+    }
+  }
 }
 
 export const usersController = new UsersController();
