@@ -10,9 +10,8 @@ export class ConfigController {
 
   async getAllApiConfigs(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       logger.info('[ConfigController] Getting all API configurations');
-      const configs = await configService.getAllApiConfigs(userId);
+      const configs = await configService.getAllApiConfigs();
       
       // Mask sensitive data (API keys)
       const maskedConfigs = configs.map((config) => ({
@@ -30,11 +29,10 @@ export class ConfigController {
 
   async getApiConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const { apiSource } = req.params;
       logger.info('[ConfigController] Getting API config', { apiSource });
       
-      const config = await configService.getApiConfig(userId, apiSource);
+      const config = await configService.getApiConfig(apiSource);
       
       if (!config) {
         return res.status(404).json({ success: false, error: { message: 'API configuration not found' } });
@@ -56,11 +54,10 @@ export class ConfigController {
 
   async getUnmaskedApiConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const { apiSource } = req.params;
       logger.info('[ConfigController] Getting unmasked API config', { apiSource });
       
-      const config = await configService.getApiConfig(userId, apiSource);
+      const config = await configService.getApiConfig(apiSource);
       
       if (!config) {
         return res.status(404).json({ success: false, error: { message: 'API configuration not found' } });
@@ -75,7 +72,6 @@ export class ConfigController {
 
   async upsertApiConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const configData = req.body;
       logger.info('[ConfigController] Upserting API config', { apiSource: configData.apiSource });
       
@@ -83,7 +79,7 @@ export class ConfigController {
         return res.status(400).json({ success: false, error: { message: 'apiSource is required' } });
       }
       
-      const config = await configService.upsertApiConfig(userId, configData);
+      const config = await configService.upsertApiConfig(configData);
       
       // Mask sensitive data in response
       const maskedConfig = {
@@ -101,11 +97,10 @@ export class ConfigController {
 
   async deleteApiConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const { apiSource } = req.params;
       logger.info('[ConfigController] Deleting API config', { apiSource });
       
-      await configService.deleteApiConfig(userId, apiSource);
+      await configService.deleteApiConfig(apiSource);
       
       res.json({ success: true, message: 'API configuration deleted successfully' });
     } catch (error: any) {
@@ -120,9 +115,8 @@ export class ConfigController {
 
   async getAllSmtpConfigs(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       logger.info('[ConfigController] Getting all SMTP configurations');
-      const configs = await configService.getAllSmtpConfigs(userId);
+      const configs = await configService.getAllSmtpConfigs();
       
       // Mask sensitive data (passwords)
       const maskedConfigs = configs.map((config) => ({
@@ -139,11 +133,10 @@ export class ConfigController {
 
   async getSmtpConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
       logger.info('[ConfigController] Getting SMTP config', { id });
       
-      const config = await configService.getSmtpConfig(userId, id);
+      const config = await configService.getSmtpConfig(id);
       
       if (!config) {
         return res.status(404).json({ success: false, error: { message: 'SMTP configuration not found' } });
@@ -164,11 +157,10 @@ export class ConfigController {
 
   async getUnmaskedSmtpConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
       logger.info('[ConfigController] Getting unmasked SMTP config', { id });
       
-      const config = await configService.getSmtpConfig(userId, id);
+      const config = await configService.getSmtpConfig(id);
       
       if (!config) {
         return res.status(404).json({ success: false, error: { message: 'SMTP configuration not found' } });
@@ -183,7 +175,6 @@ export class ConfigController {
 
   async createSmtpConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const configData = req.body;
       logger.info('[ConfigController] Creating SMTP config', { provider: configData.provider });
       
@@ -195,7 +186,7 @@ export class ConfigController {
         });
       }
       
-      const config = await configService.createSmtpConfig(userId, configData);
+      const config = await configService.createSmtpConfig(configData);
       
       // Mask sensitive data in response
       const maskedConfig = {
@@ -212,12 +203,11 @@ export class ConfigController {
 
   async updateSmtpConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
       const configData = req.body;
       logger.info('[ConfigController] Updating SMTP config', { id });
       
-      const config = await configService.updateSmtpConfig(userId, id, configData);
+      const config = await configService.updateSmtpConfig(id, configData);
       
       // Mask sensitive data in response
       const maskedConfig = {
@@ -234,11 +224,10 @@ export class ConfigController {
 
   async deleteSmtpConfig(req: AuthRequest, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
       logger.info('[ConfigController] Deleting SMTP config', { id });
       
-      await configService.deleteSmtpConfig(userId, id);
+      await configService.deleteSmtpConfig(id);
       
       res.json({ success: true, message: 'SMTP configuration deleted successfully' });
     } catch (error: any) {

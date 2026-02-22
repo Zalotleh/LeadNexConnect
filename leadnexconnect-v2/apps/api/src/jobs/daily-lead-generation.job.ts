@@ -272,6 +272,7 @@ export class DailyLeadGenerationJob {
     for (const [source, metrics] of Object.entries(apiMetrics)) {
       try {
         await apiPerformanceService.logAPIUsage({
+          userId: user.id,
           apiSource: source,
           leadsGenerated: metrics.leads,
           apiCallsUsed: metrics.calls,

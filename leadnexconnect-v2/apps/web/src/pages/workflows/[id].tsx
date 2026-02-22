@@ -449,11 +449,11 @@ export default function WorkflowDetail() {
                           enableTemplates={true}
                           defaultSubject={editForm.steps[index].subject}
                           aiContext={{
-                            companyName: 'Example Company',
-                            contactName: 'John',
-                            industry: 'technology',
-                            city: 'San Francisco',
-                            country: 'USA',
+                            companyName: '{{companyName}}',
+                            contactName: '{{contactName}}',
+                            industry: workflow.industry || 'hospitality',
+                            city: '{{city}}',
+                            country: workflow.country || '{{country}}',
                             followUpStage: index === 0 ? 'initial' : `follow_up_${index}`
                           }}
                         />

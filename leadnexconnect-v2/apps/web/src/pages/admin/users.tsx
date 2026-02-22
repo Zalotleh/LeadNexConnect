@@ -15,7 +15,7 @@ interface User {
   role: 'admin' | 'user'
   status: 'active' | 'inactive'
   createdAt: string
-  lastLogin: string | null
+  lastLoginAt: string | null
 }
 
 function UserManagement() {
@@ -39,15 +39,15 @@ function UserManagement() {
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ['admin-users'],
     queryFn: async () => {
-      const response = await api.get('/api/admin/users')
-      return response.data.data
+      const response = await api.get('/users')
+      return response.data.data.users
     }
   })
 
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof formData) => {
-      const response = await api.post('/api/admin/users', userData)
+      const response = await api.post('/users', userData)
       return response.data
     },
     onSuccess: () => {
@@ -57,31 +57,32 @@ function UserManagement() {
       toast.success('User created successfully')
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create user')
+      toast.error(error.response?.data?.error?.message || 'Failed to create user')
     }
   })
 
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string, data: Partial<typeof formData> }) => {
-      const response = await api.put(`/api/admin/users/${id}`, data)
+      const response = await api.put(`/users/${id}`, data)
       return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+      setShowCreateModal(false)
       setEditingUser(null)
       resetForm()
       toast.success('User updated successfully')
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update user')
+      toast.error(error.response?.data?.error?.message || 'Failed to update user')
     }
   })
 
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.delete(`/api/admin/users/${id}`)
+      const response = await api.delete(`/users/${id}`)
       return response.data
     },
     onSuccess: () => {
@@ -89,14 +90,14 @@ function UserManagement() {
       toast.success('User deleted successfully')
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete user')
+      toast.error(error.response?.data?.error?.message || 'Failed to delete user')
     }
   })
 
   // Bulk operation mutation
   const bulkOperationMutation = useMutation({
     mutationFn: async ({ userIds, operation }: { userIds: string[], operation: string }) => {
-      const response = await api.post('/api/admin/users/bulk', { userIds, operation })
+      const response = await api.post('/users/bulk', { userIds, operation })
       return response.data
     },
     onSuccess: (data) => {
@@ -110,7 +111,7 @@ function UserManagement() {
       )
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to perform bulk operation')
+      toast.error(error.response?.data?.error?.message || 'Failed to perform bulk operation')
     }
   })
 
@@ -434,7 +435,7 @@ function UserManagement() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                        {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                         <button

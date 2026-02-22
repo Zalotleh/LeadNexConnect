@@ -1,0 +1,2 @@
+ALTER TABLE "api_config" DROP CONSTRAINT "api_config_api_source_unique";--> statement-breakpoint
+ALTER TABLE "api_config" ADD CONSTRAINT "api_config_user_id_api_source_unique" UNIQUE("user_id","api_source");

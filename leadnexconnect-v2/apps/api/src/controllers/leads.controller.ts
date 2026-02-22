@@ -145,19 +145,45 @@ export class LeadsController {
           industry,
           country,
           city,
-          maxResults: Math.min(maxResults, 10),
+          maxResults: Math.min(maxResults, 100),
         });
         allLeads.push(...apolloLeads);
       }
 
       if (sources.includes('google_places')) {
-        const placesLeads = await googlePlacesService.searchLeads({
-          industry,
-          country,
-          city,
-          maxResults: Math.min(maxResults, 50),
-        });
-        allLeads.push(...placesLeads);
+        // Best-effort loop: cycle through keyword variants until the target is met
+        // or all available variants are exhausted — same logic as the campaign executor.
+        const totalVariants = googlePlacesService.getVariantCount(industry);
+        const now = new Date();
+        const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
+        const baseVariantIndex = dayOfYear; // rotates automatically each day
+
+        const googleRaw: any[] = [];
+
+        for (let attempt = 0; attempt < totalVariants; attempt++) {
+          const stillNeeded = maxResults - googleRaw.length;
+          if (stillNeeded <= 0) break;
+
+          const queryVariantIndex = baseVariantIndex + attempt;
+
+          try {
+            const placesLeads = await googlePlacesService.searchLeads({
+              industry,
+              country,
+              city,
+              maxResults: stillNeeded,
+              queryVariantIndex,
+            });
+            googleRaw.push(...placesLeads);
+            logger.info(`[LeadsController] Google Places variant ${attempt + 1}/${totalVariants}: got ${placesLeads.length} (total: ${googleRaw.length}/${maxResults})`);
+          } catch (variantError: any) {
+            logger.warn(`[LeadsController] Google Places variant ${attempt + 1} failed`, { error: variantError.message });
+          }
+
+          if (googleRaw.length >= maxResults) break;
+        }
+
+        allLeads.push(...googleRaw);
       }
 
       logger.info('[LeadsController] Processing leads with enhancements', { 
@@ -198,6 +224,7 @@ export class LeadsController {
         
         return {
           ...lead,
+          userId, // Associate with user
           batchId, // Associate with batch
           qualityScore,
           digitalMaturityScore,
@@ -262,6 +289,7 @@ export class LeadsController {
       for (const [source, metrics] of Object.entries(sourceMetrics)) {
         if (metrics.leads > 0) {
           await apiPerformanceService.logAPIUsage({
+            userId,
             apiSource: source,
             leadsGenerated: metrics.leads,
             apiCallsUsed: metrics.calls,

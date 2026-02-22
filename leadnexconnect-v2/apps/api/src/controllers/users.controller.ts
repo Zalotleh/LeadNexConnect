@@ -78,7 +78,7 @@ export class UsersController {
   async createUser(req: AuthRequest, res: Response) {
     try {
       const adminId = req.user!.id;
-      const { email, password, firstName, lastName, role } = req.body;
+      const { email, password, firstName, lastName, role, status } = req.body;
 
       // Validation
       if (!email || !password || !firstName || !lastName) {
@@ -121,6 +121,7 @@ export class UsersController {
         firstName,
         lastName,
         role: role || 'user',
+        status: status || 'active',
       });
 
       res.status(201).json({
@@ -155,7 +156,7 @@ export class UsersController {
     try {
       const adminId = req.user!.id;
       const { id } = req.params;
-      const { email, firstName, lastName, role } = req.body;
+      const { email, firstName, lastName, role, status, password } = req.body;
 
       // Email format validation if provided
       if (email) {
@@ -171,11 +172,27 @@ export class UsersController {
         }
       }
 
+      // Password validation if provided
+      if (password) {
+        const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+        if (!passwordRegex.test(password)) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              message: 'Password must be at least 8 characters with 1 uppercase letter and 1 number',
+              code: 'VALIDATION_ERROR',
+            },
+          });
+        }
+      }
+
       const updatedUser = await usersService.updateUser(adminId, id, {
         email,
         firstName,
         lastName,
         role,
+        status,
+        password,
       });
 
       res.json({

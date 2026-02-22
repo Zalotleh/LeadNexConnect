@@ -52,7 +52,7 @@ export const leadsAPI = {
     city?: string
     sources: string[]
     maxResults: number
-  }) => api.post('/leads/generate', data),
+  }) => api.post('/leads/generate', data, { timeout: 120000 }), // 2 minutes timeout for lead generation
   getLeads: (params?: {
     page?: number
     limit?: number

@@ -682,8 +682,8 @@ export const workflowSteps = pgTable('workflow_steps', {
     .notNull(),
 
   // NEW: Email Template Reference (PROMPT 1)
+  // Nullable for backward compatibility with legacy workflows
   emailTemplateId: uuid('email_template_id')
-    .notNull()
     .references(() => emailTemplates.id),
 
   // Step Configuration
@@ -726,10 +726,9 @@ export const customVariables = pgTable('custom_variables', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// API Configuration (User-defined API keys, limits, and costs)
+// API Configuration (Admin-managed, global API keys, limits, and costs)
 export const apiConfig = pgTable('api_config', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   apiSource: varchar('api_source', { length: 50 }).notNull().unique(), // apollo, hunter, google_places, peopledatalabs
   
   // API Credentials
@@ -754,10 +753,9 @@ export const apiConfig = pgTable('api_config', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
-// SMTP Configuration (User-defined SMTP providers)
+// SMTP Configuration (Admin-managed, global SMTP providers)
 export const smtpConfig = pgTable('smtp_config', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   
   // Provider Info
   provider: varchar('provider', { length: 100 }).notNull(), // gmail, outlook, sendgrid, mailgun, ses, custom

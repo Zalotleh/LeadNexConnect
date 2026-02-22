@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, Code, Sparkles, Save, X, FileText, ChevronDown, Eye, Monitor, Smartphone } from 'lucide-react';
+import { Palette, Code, Sparkles, Save, X, FileText, ChevronDown, Eye, Monitor, Smartphone, RefreshCw, MessageSquarePlus } from 'lucide-react';
 import { getAllEmailVariables } from '@/lib/emailVariables';
 import EmailEditor from '../EmailEditor';
 import TinyMCEEmailEditor from './TinyMCEEmailEditor';
@@ -44,6 +44,9 @@ export default function EnhancedEmailEditor({
   const [editorMode, setEditorMode] = useState<'simple' | 'visual'>('simple');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [regenerateInstructions, setRegenerateInstructions] = useState('');
+  const [pendingGeneratedContent, setPendingGeneratedContent] = useState<string | null>(null);
   
   // Store separate content for each mode to preserve formatting
   const [simpleContent, setSimpleContent] = useState(value);
@@ -200,14 +203,9 @@ export default function EnhancedEmailEditor({
       if (templateSearch) params.append('search', templateSearch);
       if (templateCategory) params.append('category', templateCategory);
       
-      const url = params.toString() ? `/api/templates?${params}` : '/api/templates';
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error('Failed to load templates');
-      }
-      
-      const data = await response.json();
+      const url = params.toString() ? `/templates?${params}` : '/templates';
+      const response = await api.get(url);
+      const data = response.data;
       // Ensure we extract the array from the response structure
       const templatesArray = Array.isArray(data) ? data : (data.data || data.templates || []);
       setTemplates(templatesArray);
@@ -238,9 +236,7 @@ export default function EnhancedEmailEditor({
       onChange(content);
       
       // Increment usage count
-      await fetch(`/api/templates/${template.id}/use`, {
-        method: 'POST',
-      });
+      await api.post(`/templates/${template.id}/use`);
       
       toast.success(`Loaded template: ${template.name}`);
       setShowLoadTemplateModal(false);
@@ -255,7 +251,7 @@ export default function EnhancedEmailEditor({
     }
   };
 
-  const handleAIGenerate = async () => {
+  const handleAIGenerate = async (extraInstructions?: string) => {
     if (!aiContext || !aiContext.companyName || !aiContext.industry) {
       setAiError('Missing required information for AI generation');
       return;
@@ -263,43 +259,63 @@ export default function EnhancedEmailEditor({
 
     setIsGeneratingAI(true);
     setAiError(null);
+    setShowRegenerateModal(false);
 
     try {
-      const response = await fetch('/api/ai/generate-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(aiContext),
-      });
+      const currentEmailText = value ? htmlToText(value).trim() : '';
 
-      if (!response.ok) {
-        throw new Error('Failed to generate email');
-      }
+      let content = '';
 
-      const result = await response.json();
-      
-      // Load the AI-generated HTML into both states
-      const content = result.data?.bodyHtml || result.data?.bodyText || '';
-      
-      if (content.includes('<')) {
-        setVisualContent(content);
-        setSimpleContent(htmlToText(content));
+      if (currentEmailText && extraInstructions?.trim()) {
+        // Has existing content + user instructions → use the dedicated improve endpoint
+        // which keeps template variables intact and only applies the requested changes
+        const response = await api.post('/ai/improve-email', {
+          existingEmail: currentEmailText,
+          instructions: extraInstructions.trim(),
+        });
+        const result = response.data;
+        content = result.data?.bodyHtml || result.data?.bodyText || '';
       } else {
-        setSimpleContent(content);
-        setVisualContent(textToHtml(content));
+        // No existing content, or no instructions → fresh generation
+        const response = await api.post('/ai/generate-email', {
+          ...aiContext,
+          ...(extraInstructions?.trim() ? { additionalInstructions: extraInstructions.trim() } : {}),
+        });
+        const result = response.data;
+        content = result.data?.bodyHtml || result.data?.bodyText || '';
       }
-      
-      onChange(content);
-      
-      // Switch to visual mode to show the generated content
-      setEditorMode('visual');
+
+      if (!content) {
+        throw new Error('AI returned empty content');
+      }
+
+      if (value?.trim()) {
+        // Has existing content — hold for review before replacing
+        setPendingGeneratedContent(content);
+      } else {
+        // No existing content — apply immediately
+        applyGeneratedContent(content);
+        toast.success('Email generated!');
+      }
     } catch (error: any) {
       console.error('AI generation error:', error);
-      setAiError(error.message || 'Failed to generate email with AI');
+      setAiError(error.response?.data?.message || error.message || 'Failed to generate email with AI');
     } finally {
       setIsGeneratingAI(false);
     }
+  };
+
+  const applyGeneratedContent = (content: string) => {
+    if (content.includes('<')) {
+      setVisualContent(content);
+      setSimpleContent(htmlToText(content));
+    } else {
+      setSimpleContent(content);
+      setVisualContent(textToHtml(content));
+    }
+    onChange(content);
+    setEditorMode('visual');
+    setPendingGeneratedContent(null);
   };
 
   const handleSaveAsTemplate = async () => {
@@ -326,28 +342,16 @@ export default function EnhancedEmailEditor({
     setIsSavingTemplate(true);
 
     try {
-      const response = await fetch('/api/templates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: templateForm.name,
-          description: templateForm.description,
-          subject: templateForm.subject,
-          category: templateForm.category,
-          bodyHtml: value,
-          bodyText: value.replace(/<[^>]*>/g, ''), // Strip HTML for plain text version
-          isActive: true
-        }),
+      await api.post('/templates', {
+        name: templateForm.name,
+        description: templateForm.description,
+        subject: templateForm.subject,
+        category: templateForm.category,
+        bodyHtml: value,
+        bodyText: value.replace(/<[^>]*>/g, ''),
+        isActive: true,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to save template');
-      }
-
-      const savedTemplate = await response.json();
-      
       toast.success('Template saved successfully!');
       setShowSaveTemplateModal(false);
       
@@ -414,17 +418,31 @@ export default function EnhancedEmailEditor({
             </button>
           )}
 
-          {/* AI Generate Button */}
+          {/* AI Generate / Regenerate Button */}
           {enableAI && aiContext && (
             <button
               type="button"
-              onClick={handleAIGenerate}
+              onClick={() => {
+                if (value && value.trim()) {
+                  // Has existing content → show instructions modal
+                  setRegenerateInstructions('');
+                  setShowRegenerateModal(true);
+                } else {
+                  // No content yet → generate fresh
+                  handleAIGenerate();
+                }
+              }}
               disabled={isGeneratingAI}
               className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-md hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-              title="Generate email content with AI"
+              title={value?.trim() ? 'Regenerate this email with AI using new instructions' : 'Generate email content with AI'}
             >
-              <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAI ? 'animate-spin' : ''}`} />
-              {isGeneratingAI ? 'Generating...' : 'AI Generate'}
+              {isGeneratingAI ? (
+                <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Regenerating...</>
+              ) : value?.trim() ? (
+                <><RefreshCw className="w-3.5 h-3.5" /> Regenerate with AI</>
+              ) : (
+                <><Sparkles className="w-3.5 h-3.5" /> Generate with AI</>
+              )}
             </button>
           )}
 
@@ -858,6 +876,156 @@ export default function EnhancedEmailEditor({
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate with AI Modal */}
+      {showRegenerateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b bg-gradient-to-r from-purple-50 to-indigo-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg">
+                  <RefreshCw className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Regenerate with AI</h3>
+                  <p className="text-xs text-gray-500">Tell the AI what to change, add, or improve</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRegenerateModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <MessageSquarePlus className="w-4 h-4 inline mr-1 text-purple-600" />
+                  What would you like to change or improve?
+                </label>
+                <textarea
+                  value={regenerateInstructions}
+                  onChange={(e) => setRegenerateInstructions(e.target.value)}
+                  placeholder={`e.g. "Make the tone more casual", "Add a stronger call to action", "Shorten it by 30%", "Add a section about our pricing", "Make it more personalised for a luxury hotel"...`}
+                  rows={5}
+                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                  autoFocus
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  The AI will use the existing email as a base and apply your instructions. Leave blank to fully regenerate from scratch.
+                </p>
+              </div>
+
+              {/* Existing email preview snippet */}
+              {value?.trim() && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Current email (will be used as reference)</p>
+                  <p className="text-xs text-gray-600 line-clamp-3">
+                    {htmlToText(value).slice(0, 200)}{htmlToText(value).length > 200 ? '…' : ''}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50">
+              <button
+                onClick={() => setShowRegenerateModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAIGenerate(regenerateInstructions)}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Regenerate Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Review Modal — shown after generation when existing content exists */}
+      {pendingGeneratedContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 flex flex-col" style={{ maxHeight: '90vh' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b bg-gradient-to-r from-purple-50 to-indigo-50 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Review AI-Generated Email</h3>
+                  <p className="text-xs text-gray-500">Accept to replace your current email, or discard to keep the original</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPendingGeneratedContent(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Side-by-side comparison */}
+            <div className="grid grid-cols-2 divide-x overflow-y-auto flex-1">
+              {/* Left: Current */}
+              <div className="flex flex-col">
+                <div className="px-4 py-2.5 bg-gray-50 border-b shrink-0">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Current email</p>
+                </div>
+                <div
+                  className="p-4 prose prose-sm max-w-none text-gray-700 flex-1"
+                  dangerouslySetInnerHTML={{ __html: value?.includes('<') ? value : textToHtml(value || '') }}
+                />
+              </div>
+
+              {/* Right: New */}
+              <div className="flex flex-col">
+                <div className="px-4 py-2.5 bg-purple-50 border-b shrink-0">
+                  <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> AI-Generated email
+                  </p>
+                </div>
+                <div
+                  className="p-4 prose prose-sm max-w-none text-gray-700 flex-1"
+                  dangerouslySetInnerHTML={{ __html: pendingGeneratedContent.includes('<') ? pendingGeneratedContent : textToHtml(pendingGeneratedContent) }}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 p-4 border-t bg-gray-50 shrink-0">
+              <p className="text-xs text-gray-400">Not happy? Close and try regenerating with different instructions.</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setPendingGeneratedContent(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Discard — Keep Original
+                </button>
+                <button
+                  onClick={() => {
+                    applyGeneratedContent(pendingGeneratedContent);
+                    toast.success('Email replaced with AI-generated version!');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-sm"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Accept &amp; Replace
+                </button>
+              </div>
             </div>
           </div>
         </div>

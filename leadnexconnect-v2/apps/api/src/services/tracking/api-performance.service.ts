@@ -8,6 +8,7 @@ interface APIUsageLog {
   apiSource: string;
   leadsGenerated: number;
   apiCallsUsed: number;
+  userId?: string; // optional — system-level calls (e.g. cron jobs) may omit this
 }
 
 export class APIPerformanceService {
@@ -18,6 +19,7 @@ export class APIPerformanceService {
 
   /**
    * Get API limits and costs from database (with caching)
+   * Admin-configured global API configs
    */
   private async getApiConfigsFromDB(): Promise<void> {
     const now = Date.now();
@@ -107,17 +109,24 @@ export class APIPerformanceService {
       const periodStart = new Date(today.getFullYear(), today.getMonth(), 1);
       const periodEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-      // Check if record exists for this month
-      const existing = await db
-        .select()
-        .from(apiPerformance)
-        .where(
-          and(
+      // Check if record exists for this month (scoped to this user if userId provided)
+      const existingWhere = log.userId
+        ? and(
+            eq(apiPerformance.apiSource, log.apiSource),
+            eq(apiPerformance.periodStart, periodStart.toISOString().split('T')[0]),
+            eq(apiPerformance.periodEnd, periodEnd.toISOString().split('T')[0]),
+            eq(apiPerformance.userId, log.userId)
+          )
+        : and(
             eq(apiPerformance.apiSource, log.apiSource),
             eq(apiPerformance.periodStart, periodStart.toISOString().split('T')[0]),
             eq(apiPerformance.periodEnd, periodEnd.toISOString().split('T')[0])
-          )
-        )
+          );
+
+      const existing = await db
+        .select()
+        .from(apiPerformance)
+        .where(existingWhere)
         .limit(1);
 
       if (existing.length > 0) {
@@ -137,6 +146,7 @@ export class APIPerformanceService {
           apiCallsLimit: this.apiLimitsCache[log.apiSource] || 0,
           periodStart: periodStart.toISOString().split('T')[0],
           periodEnd: periodEnd.toISOString().split('T')[0],
+          ...(log.userId ? { userId: log.userId } : {}),
         });
       }
 
@@ -151,9 +161,9 @@ export class APIPerformanceService {
   /**
    * Get monthly performance report - calculates real-time stats from leads table
    */
-  async getMonthlyReport(month?: Date): Promise<any> {
+  async getMonthlyReport(userId: string, month?: Date): Promise<any> {
     try {
-      // Load API configs from database
+      // Load API configs from database (global admin-configured)
       await this.getApiConfigsFromDB();
       
       const targetMonth = month || new Date();
@@ -163,12 +173,13 @@ export class APIPerformanceService {
       const periodEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 1);
       periodEnd.setHours(0, 0, 0, 0);
 
-      // Get all leads created in this period
+      // Get all leads created in this period FOR THIS USER
       const allLeads = await db
         .select()
         .from(leads)
         .where(
           and(
+            eq(leads.userId, userId),
             gte(leads.createdAt, periodStart),
             lt(leads.createdAt, periodEnd)
           )
@@ -212,6 +223,7 @@ export class APIPerformanceService {
           .where(
             and(
               eq(apiPerformance.apiSource, source),
+              eq(apiPerformance.userId, userId),
               gte(apiPerformance.periodStart, periodStart.toISOString().split('T')[0]),
               lte(apiPerformance.periodEnd, periodEnd.toISOString().split('T')[0])
             )
@@ -283,13 +295,16 @@ export class APIPerformanceService {
   /**
    * Get all-time performance report
    */
-  async getAllTimeReport(): Promise<any> {
+  async getAllTimeReport(userId: string): Promise<any> {
     try {
-      // Load API configs from database
+      // Load API configs from database (global admin-configured)
       await this.getApiConfigsFromDB();
       
-      // Get ALL leads (no date filter)
-      const allLeads = await db.select().from(leads);
+      // Get ALL leads FOR THIS USER (no date filter)
+      const allLeads = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.userId, userId));
 
       // Group leads by source and calculate metrics
       const report: Record<string, any> = {};
@@ -466,9 +481,9 @@ export class APIPerformanceService {
   /**
    * Get ROI summary for all sources
    */
-  async getROISummary(): Promise<any> {
+  async getROISummary(userId: string): Promise<any> {
     try {
-      const allROI = await db.select().from(leadSourceRoi);
+      const allROI = await db.select().from(leadSourceRoi).where(eq(leadSourceRoi.userId, userId));
 
       const summary: Record<string, any> = {};
 

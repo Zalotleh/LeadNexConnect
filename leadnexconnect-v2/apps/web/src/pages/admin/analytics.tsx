@@ -32,10 +32,24 @@ interface UserActivity {
   userId: string;
   userName: string;
   email: string;
-  leadsGenerated: number;
-  campaignsActive: number;
-  emailsSent: number;
-  lastActive: string;
+  stats: {
+    totalLeads: number;
+    highPotential: number;
+    mediumPotential: number;
+    lowPotential: number;
+    totalCampaigns: number;
+    activeCampaigns: number;
+    totalWorkflows: number;
+    totalTemplates: number;
+    emailsSent: number;
+    emailsOpened: number;
+    emailsClicked: number;
+    emailsDelivered: number;
+    engagementRate: number;
+  };
+  lastActiveAt: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
 }
 
 interface LeadsTrendData {
@@ -81,7 +95,7 @@ function SystemAnalytics() {
   const { data: stats, isLoading: statsLoading } = useQuery<SystemStats>({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const response = await api.get('/api/admin/analytics/stats');
+      const response = await api.get('/admin/analytics/overview');
       return response.data.data;
     },
   });
@@ -90,7 +104,7 @@ function SystemAnalytics() {
   const { data: userActivity, isLoading: activityLoading } = useQuery<UserActivity[]>({
     queryKey: ['admin-user-activity'],
     queryFn: async () => {
-      const response = await api.get('/api/admin/analytics/user-activity');
+      const response = await api.get('/admin/analytics/users');
       return response.data.data;
     },
   });
@@ -99,7 +113,7 @@ function SystemAnalytics() {
   const { data: leadsTrend } = useQuery<LeadsTrendData[]>({
     queryKey: ['admin-leads-trend'],
     queryFn: async () => {
-      const response = await api.get('/api/admin/analytics/charts/leads-trend');
+      const response = await api.get('/admin/analytics/charts/leads-trend');
       return response.data.data.map((item: any) => ({
         date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         count: Number(item.count),
@@ -111,7 +125,7 @@ function SystemAnalytics() {
   const { data: campaignDistribution } = useQuery<CampaignDistribution[]>({
     queryKey: ['admin-campaign-distribution'],
     queryFn: async () => {
-      const response = await api.get('/api/admin/analytics/charts/campaign-distribution');
+      const response = await api.get('/admin/analytics/charts/campaign-distribution');
       return response.data.data.map((item: any) => ({
         status: item.status || 'unknown',
         count: Number(item.count),
@@ -123,7 +137,7 @@ function SystemAnalytics() {
   const { data: emailEngagement } = useQuery<EmailEngagement>({
     queryKey: ['admin-email-engagement'],
     queryFn: async () => {
-      const response = await api.get('/api/admin/analytics/charts/email-engagement');
+      const response = await api.get('/admin/analytics/charts/email-engagement');
       return response.data.data;
     },
   });
@@ -132,7 +146,7 @@ function SystemAnalytics() {
   const { data: leadTiers } = useQuery<LeadTierDistribution[]>({
     queryKey: ['admin-lead-tiers'],
     queryFn: async () => {
-      const response = await api.get('/api/admin/analytics/charts/lead-tiers');
+      const response = await api.get('/admin/analytics/charts/lead-tiers');
       return response.data.data.map((item: any) => ({
         tier: item.tier || 'unknown',
         count: Number(item.count),
@@ -462,17 +476,17 @@ function SystemAnalytics() {
                         <div className="text-sm text-gray-500">{user.email}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.leadsGenerated.toLocaleString()}</div>
+                        <div className="text-sm text-gray-900">{user.stats.totalLeads.toLocaleString()}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.campaignsActive}</div>
+                        <div className="text-sm text-gray-900">{user.stats.activeCampaigns}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{user.emailsSent.toLocaleString()}</div>
+                        <div className="text-sm text-gray-900">{user.stats.emailsSent.toLocaleString()}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500">
-                          {user.lastActive ? new Date(user.lastActive).toLocaleDateString() : 'Never'}
+                          {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleDateString() : 'Never'}
                         </div>
                       </td>
                     </tr>

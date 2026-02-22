@@ -57,6 +57,20 @@
       "when": 1770821103921,
       "tag": "0007_faithful_penance",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771678525738,
+      "tag": "0008_chunky_johnny_blaze",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1771694424335,
+      "tag": "0009_faithful_ultron",
+      "breakpoints": true
     }
   ]
 }

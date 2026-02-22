@@ -78,7 +78,7 @@ interface Campaign {
   endDate?: string
 }
 
-export default function Campaigns() {
+function Campaigns() {
   const [dateViewMode, setDateViewMode] = useState<'monthly' | 'allTime'>('allTime')
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -251,7 +251,10 @@ export default function Campaigns() {
       
       // Use the correct endpoint based on campaign type
       const campaignType = (window as any).__startCampaignType
-      const endpoint = campaignType === 'lead_generation' 
+      // automated/fully_automated/lead_generation need /execute (generates leads + emails)
+      // outreach/manual use /start (schedules emails for pre-existing leads)
+      const needsExecution = campaignType === 'lead_generation' || campaignType === 'automated' || campaignType === 'fully_automated'
+      const endpoint = needsExecution
         ? `/campaigns/${campaignToStart}/execute`
         : `/campaigns/${campaignToStart}/start`
       
@@ -1014,6 +1017,7 @@ export default function Campaigns() {
                   return (
                     <div
                       key={campaign.id}
+                      onClick={() => window.location.href = `/campaigns/${campaign.id}`}
                       className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
                         selectedCampaigns.has(campaign.id) ? 'ring-2 ring-purple-500' : ''
                       }`}
@@ -1033,10 +1037,7 @@ export default function Campaigns() {
                               className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
                             />
                             <div className="flex-1 min-w-0">
-                              <h3
-                                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                                className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-purple-600"
-                              >
+                              <h3 className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-purple-600">
                                 {campaign.name}
                               </h3>
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1066,10 +1067,7 @@ export default function Campaigns() {
                         </div>
 
                         {/* Campaign Details */}
-                        <div
-                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                          className="space-y-2 text-sm mb-4"
-                        >
+                        <div className="space-y-2 text-sm mb-4">
                           {campaign.industry && (
                             <div className="flex justify-between">
                               <span className="text-gray-600">Industry:</span>
@@ -1097,10 +1095,7 @@ export default function Campaigns() {
                         </div>
 
                         {/* Stats */}
-                        <div
-                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                          className="pt-3 border-t grid grid-cols-2 gap-3 mb-4"
-                        >
+                        <div className="pt-3 border-t grid grid-cols-2 gap-3 mb-4">
                           <div className="text-center bg-purple-50 rounded-lg p-3">
                             <div className="text-2xl font-bold text-purple-700">{campaign.leadsGenerated || 0}</div>
                             <div className="text-xs text-gray-600">Leads Generated</div>
@@ -1113,20 +1108,14 @@ export default function Campaigns() {
 
                         {/* Next/Last Run */}
                         {campaign.isRecurring && campaign.nextRunAt && campaign.status === 'running' && (
-                          <div
-                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                            className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 p-3 rounded-lg mb-2"
-                          >
+                          <div className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 p-3 rounded-lg mb-2">
                             <Calendar className="w-4 h-4 text-blue-600" />
                             <span>Next run: {new Date(campaign.nextRunAt).toLocaleString()}</span>
                           </div>
                         )}
 
                         {campaign.lastRunAt && (
-                          <div
-                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                            className="text-xs text-gray-600 mb-2"
-                          >
+                          <div className="text-xs text-gray-600 mb-2">
                             Last run: {new Date(campaign.lastRunAt).toLocaleString()}
                           </div>
                         )}
@@ -1191,6 +1180,7 @@ export default function Campaigns() {
                   return (
                     <div
                       key={campaign.id}
+                      onClick={() => window.location.href = `/campaigns/${campaign.id}`}
                       className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
                         selectedCampaigns.has(campaign.id) ? 'ring-2 ring-orange-500' : ''
                       }`}
@@ -1210,10 +1200,7 @@ export default function Campaigns() {
                               className="mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500 cursor-pointer"
                             />
                             <div className="flex-1 min-w-0">
-                              <h3
-                                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                                className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-orange-600"
-                              >
+                              <h3 className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-orange-600">
                                 {campaign.name}
                               </h3>
                               <div className="flex items-center gap-2">
@@ -1241,10 +1228,7 @@ export default function Campaigns() {
                         </div>
 
                         {/* Configuration Summary */}
-                        <div
-                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4"
-                        >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4">
                           <div className="flex items-start gap-2 bg-orange-50 p-3 rounded-lg">
                             <Database className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
                             <div>
@@ -1268,10 +1252,7 @@ export default function Campaigns() {
                         </div>
 
                         {/* Stats */}
-                        <div
-                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                          className="grid grid-cols-3 gap-2 pt-3 border-t mb-4"
-                        >
+                        <div className="grid grid-cols-3 gap-2 pt-3 border-t mb-4">
                           <div className="text-center bg-orange-50 rounded-lg p-3">
                             <div className="text-xl font-bold text-orange-700">{campaign.totalRunsCompleted || 0}</div>
                             <div className="text-xs text-gray-600">Runs</div>
@@ -1288,10 +1269,7 @@ export default function Campaigns() {
 
                         {/* Next Run */}
                         {campaign.status === 'running' && campaign.nextRunAt && (
-                          <div
-                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                            className="flex items-center gap-2 bg-blue-50 p-3 rounded-lg text-sm mb-2"
-                          >
+                          <div className="flex items-center gap-2 bg-blue-50 p-3 rounded-lg text-sm mb-2">
                             <Calendar className="w-4 h-4 text-blue-600" />
                             <span className="text-gray-700">Next run: {new Date(campaign.nextRunAt).toLocaleString()}</span>
                           </div>
@@ -1299,10 +1277,7 @@ export default function Campaigns() {
 
                         {/* End Date */}
                         {campaign.endDate && (
-                          <div
-                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                            className="text-xs text-gray-600"
-                          >
+                          <div className="text-xs text-gray-600">
                             Ends: {new Date(campaign.endDate).toLocaleDateString()}
                           </div>
                         )}
@@ -1365,6 +1340,7 @@ export default function Campaigns() {
                 return (
                   <div
                     key={campaign.id}
+                    onClick={() => window.location.href = `/campaigns/${campaign.id}`}
                     className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
                       selectedCampaigns.has(campaign.id) ? 'ring-2 ring-blue-500' : ''
                     }`}
@@ -1384,10 +1360,7 @@ export default function Campaigns() {
                             className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                           />
                           <div className="flex-1 min-w-0">
-                            <h3
-                              onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                              className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-blue-600"
-                            >
+                            <h3 className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-blue-600">
                               {campaign.name}
                             </h3>
                             <div className="flex items-center gap-2 mb-1">
@@ -1402,10 +1375,7 @@ export default function Campaigns() {
                                 {campaign.status}
                               </span>
                             </div>
-                            <div
-                              onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                              className="flex items-center gap-3 text-sm text-gray-600 flex-wrap"
-                            >
+                            <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
                               <span className="flex items-center gap-1">
                                 {campaign.useWorkflow ? (
                                   <>
@@ -1788,7 +1758,7 @@ export default function Campaigns() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Leads Per Day
+                        Target Leads Per Run
                       </label>
                       <input
                         type="number"
@@ -1798,6 +1768,9 @@ export default function Campaigns() {
                         max="500"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       />
+                      <p className="mt-1 text-xs text-gray-500">
+                        The system will try its best to reach this number. Actual results may be lower due to deduplication, quality filtering, and API availability.
+                      </p>
                     </div>
                   </div>
                 )}

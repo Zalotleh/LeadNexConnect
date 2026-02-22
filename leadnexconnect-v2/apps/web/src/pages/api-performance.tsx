@@ -46,7 +46,7 @@ const TableRowSkeleton = () => (
   </tr>
 )
 
-export default function APIPerformance() {
+function APIPerformance() {
   const [viewMode, setViewMode] = useState<'monthly' | 'allTime'>('allTime')
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())

@@ -96,7 +96,7 @@ export class APIPerformanceController {
   async getROISummary(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
-      const summary = await apiPerformanceService.getROISummary();
+      const summary = await apiPerformanceService.getROISummary(userId);
 
       res.json({
         success: true,

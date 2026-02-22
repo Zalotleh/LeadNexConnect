@@ -232,7 +232,7 @@ export class EmailSenderService {
    */
   private async getSMTPConfig(): Promise<SMTPConfig> {
     try {
-      // First try to get SMTP config from the new config service
+      // Get SMTP config from the config service (admin-managed, global)
       const smtpConfig = await configService.getNextAvailableSmtpConfig();
       
       if (smtpConfig) {
@@ -420,14 +420,7 @@ export class EmailSenderService {
     followUpStage: string;
   }): Promise<void> {
     try {
-      // Initialize transporter if needed
-      await this.initializeTransporter();
-
-      if (!this.transporter || !this.currentConfig) {
-        throw new Error('SMTP transporter not initialized');
-      }
-
-      // Get lead info
+      // Get lead info first
       const lead = await db
         .select()
         .from(leads)
@@ -436,6 +429,13 @@ export class EmailSenderService {
 
       if (!lead[0] || !lead[0].email) {
         throw new Error('Lead email not found');
+      }
+
+      // Initialize transporter if needed (uses global admin-configured SMTP)
+      await this.initializeTransporter();
+
+      if (!this.transporter || !this.currentConfig) {
+        throw new Error('SMTP transporter not initialized');
       }
 
       logger.info('[EmailSender] Sending email', {

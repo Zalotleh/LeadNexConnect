@@ -30,7 +30,10 @@ export class ConfigService {
   async getAllApiConfigs() {
     try {
       logger.info('[ConfigService] Getting all API configurations');
-      const configs = await db.select().from(apiConfig).orderBy(apiConfig.apiSource);
+      const configs = await db
+        .select()
+        .from(apiConfig)
+        .orderBy(apiConfig.apiSource);
       return configs;
     } catch (error: any) {
       logger.error('[ConfigService] Error getting API configs', { error: error.message });
@@ -137,7 +140,9 @@ export class ConfigService {
   async deleteApiConfig(apiSource: string) {
     try {
       logger.info('[ConfigService] Deleting API config', { apiSource });
-      await db.delete(apiConfig).where(eq(apiConfig.apiSource, apiSource));
+      await db
+        .delete(apiConfig)
+        .where(eq(apiConfig.apiSource, apiSource));
       logger.info('[ConfigService] API config deleted', { apiSource });
     } catch (error: any) {
       logger.error('[ConfigService] Error deleting API config', {
@@ -198,7 +203,12 @@ export class ConfigService {
       const result = await db
         .select()
         .from(smtpConfig)
-        .where(and(eq(smtpConfig.isActive, true), eq(smtpConfig.isPrimary, true)))
+        .where(
+          and(
+            eq(smtpConfig.isActive, true),
+            eq(smtpConfig.isPrimary, true)
+          )
+        )
         .limit(1);
       
       return result.length > 0 ? result[0] : null;
@@ -343,7 +353,9 @@ export class ConfigService {
   async deleteSmtpConfig(id: string) {
     try {
       logger.info('[ConfigService] Deleting SMTP config', { id });
-      await db.delete(smtpConfig).where(eq(smtpConfig.id, id));
+      await db
+        .delete(smtpConfig)
+        .where(eq(smtpConfig.id, id));
       logger.info('[ConfigService] SMTP config deleted', { id });
     } catch (error: any) {
       logger.error('[ConfigService] Error deleting SMTP config', { id, error: error.message });
@@ -384,7 +396,10 @@ export class ConfigService {
         updateData.emailsSentToday = (config.emailsSentToday || 0) + 1;
       }
 
-      await db.update(smtpConfig).set(updateData).where(eq(smtpConfig.id, id));
+      await db
+        .update(smtpConfig)
+        .set(updateData)
+        .where(eq(smtpConfig.id, id));
 
       logger.info('[ConfigService] Email counter incremented', {
         id,

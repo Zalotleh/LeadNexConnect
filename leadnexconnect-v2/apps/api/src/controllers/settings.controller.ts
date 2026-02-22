@@ -7,8 +7,9 @@ import { logger } from '../utils/logger';
 export class SettingsController {
   async getSettings(req: AuthRequest, res: Response) {
     try {
-      logger.info('[SettingsController] Getting all settings');
-      const settings = await settingsService.getAllMasked();
+      const userId = req.user!.id;
+      logger.info('[SettingsController] Getting all settings', { userId });
+      const settings = await settingsService.getAllMasked(userId);
       res.json({ success: true, data: settings });
     } catch (error: any) {
       logger.error('[SettingsController] Error getting settings', { error: error.message });
@@ -18,10 +19,11 @@ export class SettingsController {
 
   async getUnmaskedSetting(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { key } = req.params;
-      logger.info('[SettingsController] Getting unmasked setting', { key });
+      logger.info('[SettingsController] Getting unmasked setting', { key, userId });
       
-      const value = await settingsService.get(key);
+      const value = await settingsService.get(key, undefined, userId);
       res.json({ success: true, data: { key, value } });
     } catch (error: any) {
       logger.error('[SettingsController] Error getting unmasked setting', { error: error.message });
@@ -31,9 +33,10 @@ export class SettingsController {
 
   async updateSettings(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const settingsData = req.body;
-      logger.info('[SettingsController] Updating settings', { keys: Object.keys(settingsData) });
-      await settingsService.updateMany(settingsData);
+      logger.info('[SettingsController] Updating settings', { keys: Object.keys(settingsData), userId });
+      await settingsService.updateMany(settingsData, userId);
       
       // Check if any SMTP settings were updated
       const smtpKeys = ['smtpProvider', 'smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'smtpSecure', 'fromName', 'fromEmail'];

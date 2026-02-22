@@ -44,7 +44,7 @@ interface Workflow {
   steps?: WorkflowStep[]
 }
 
-export default function Workflows() {
+function Workflows() {
   const queryClient = useQueryClient()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)

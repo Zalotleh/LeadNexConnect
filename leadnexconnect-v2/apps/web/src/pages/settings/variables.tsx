@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { emailVariableManager } from '@/lib/emailVariables';
+import api from '@/services/api';
 
 interface CustomVariable {
   id: string;
@@ -72,14 +73,11 @@ export default function VariablesPage() {
       if (categoryFilter) params.append('category', categoryFilter);
       
       const url = params.toString() 
-        ? `/api/custom-variables?${params}` 
-        : '/api/custom-variables';
+        ? `/custom-variables?${params}` 
+        : '/custom-variables';
       
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to load variables');
-      
-      const data = await response.json();
-      setVariables(data.data || []);
+      const response = await api.get(url);
+      setVariables(response.data.data || []);
     } catch (error: any) {
       console.error('Load variables error:', error);
       toast.error('Failed to load variables');
@@ -102,24 +100,15 @@ export default function VariablesPage() {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/custom-variables', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key: form.key,
-          label: form.label,
-          value: `{{${form.key}}}`,
-          category: form.category,
-          description: form.description || null,
-          defaultValue: form.defaultValue || null,
-          isActive: form.isActive,
-        }),
+      const response = await api.post('/custom-variables', {
+        key: form.key,
+        label: form.label,
+        value: `{{${form.key}}}`,
+        category: form.category,
+        description: form.description || null,
+        defaultValue: form.defaultValue || null,
+        isActive: form.isActive,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create variable');
-      }
 
       toast.success('Variable created successfully');
       setShowAddModal(false);
@@ -144,22 +133,13 @@ export default function VariablesPage() {
 
     setSaving(true);
     try {
-      const response = await fetch(`/api/custom-variables/${selectedVariable.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          label: form.label,
-          category: form.category,
-          description: form.description || null,
-          defaultValue: form.defaultValue || null,
-          isActive: form.isActive,
-        }),
+      const response = await api.put(`/custom-variables/${selectedVariable.id}`, {
+        label: form.label,
+        category: form.category,
+        description: form.description || null,
+        defaultValue: form.defaultValue || null,
+        isActive: form.isActive,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update variable');
-      }
 
       toast.success('Variable updated successfully');
       setShowEditModal(false);
@@ -182,14 +162,7 @@ export default function VariablesPage() {
 
     setSaving(true);
     try {
-      const response = await fetch(`/api/custom-variables/${selectedVariable.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to delete variable');
-      }
+      const response = await api.delete(`/custom-variables/${selectedVariable.id}`);
 
       toast.success('Variable deleted successfully');
       setShowDeleteModal(false);

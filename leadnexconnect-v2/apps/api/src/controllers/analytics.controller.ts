@@ -13,8 +13,12 @@ export class AnalyticsController {
   async getDashboardStats(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
+      const userRole = req.user!.role;
       const { month, year, allTime } = req.query;
-      logger.info('[AnalyticsController] Getting dashboard stats', { month, year, allTime });
+      logger.info('[AnalyticsController] Getting dashboard stats', { userId, userRole, month, year, allTime });
+
+      // For admin users, show system-wide stats. For regular users, show only their own stats.
+      const isAdmin = userRole === 'admin';
 
       // Build date filter
       let dateFilter;
@@ -24,17 +28,33 @@ export class AnalyticsController {
         const periodStart = new Date(selectedYear, selectedMonth - 1, 1);
         const periodEnd = new Date(selectedYear, selectedMonth, 1);
         
-        dateFilter = and(
-          eq(leads.userId, userId),
-          gte(leads.createdAt, periodStart),
-          lt(leads.createdAt, periodEnd)
-        );
+        if (isAdmin) {
+          // Admin sees all data
+          dateFilter = and(
+            gte(leads.createdAt, periodStart),
+            lt(leads.createdAt, periodEnd)
+          );
+        } else {
+          // Regular user sees only their data
+          dateFilter = and(
+            eq(leads.userId, userId),
+            gte(leads.createdAt, periodStart),
+            lt(leads.createdAt, periodEnd)
+          );
+        }
       } else {
-        dateFilter = eq(leads.userId, userId);
+        // All time filter
+        if (isAdmin) {
+          dateFilter = undefined; // No filter for admin = all leads
+        } else {
+          dateFilter = eq(leads.userId, userId);
+        }
       }
 
       // Total leads with date filter
-      const allLeads = await db.select().from(leads).where(dateFilter);
+      const allLeads = dateFilter 
+        ? await db.select().from(leads).where(dateFilter)
+        : await db.select().from(leads);
       
       const totalLeads = allLeads.length;
 
@@ -50,9 +70,11 @@ export class AnalyticsController {
       const convertedLeads = allLeads.filter((l) => l.status === 'converted').length;
 
       // Total campaigns
-      const allCampaigns = await db.select().from(campaigns).where(eq(campaigns.userId, userId));
+      const allCampaigns = isAdmin 
+        ? await db.select().from(campaigns)
+        : await db.select().from(campaigns).where(eq(campaigns.userId, userId));
       const totalCampaigns = allCampaigns.length;
-      const activeCampaigns = allCampaigns.filter((c) => c.status === 'active').length;
+      const activeCampaigns = allCampaigns.filter((c) => c.status === 'active' || c.status === 'running').length;
 
       // Email metrics - filter by user's leads
       const userLeadIds = allLeads.map(l => l.id);

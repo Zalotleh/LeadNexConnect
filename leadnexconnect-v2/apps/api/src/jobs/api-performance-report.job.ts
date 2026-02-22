@@ -57,7 +57,7 @@ export class APIPerformanceReportJob {
       for (const user of activeUsers) {
         try {
           // Get monthly report for this user (using current date)
-          const monthlyReport = await apiPerformanceService.getMonthlyReport(now, user.id);
+          const monthlyReport = await apiPerformanceService.getMonthlyReport(user.id, now);
           
           if (monthlyReport.length === 0) {
             logger.info(`[APIPerformanceReport] No API usage data for user ${user.email}`);

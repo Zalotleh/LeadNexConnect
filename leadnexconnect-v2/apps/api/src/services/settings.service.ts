@@ -40,14 +40,12 @@ export class SettingsService {
 
   /**
    * Get a setting value by key
-
-   * Priority: 1. Database, 2. .env file, 3. default value
+   * Priority: 1. User-specific database, 2. Global database, 3. .env file, 4. default value
    */
-  async get(key: string, defaultValue?: any): Promise<any> {
+  async get(key: string, defaultValue?: any, userId?: string): Promise<any> {
     try {
       // Check cache first
-
-      const cacheKey = `setting:${key}`;
+      const cacheKey = userId ? `setting:${userId}:${key}` : `setting:${key}`;
       if (this.cache.has(cacheKey)) {
         const cached = this.cache.get(cacheKey);
         if (cached.expiry > Date.now()) {
@@ -56,11 +54,33 @@ export class SettingsService {
       }
 
       // Try database first
-      const result = await db
-        .select()
-        .from(settings)
-        .where(eq(settings.key, key))
-        .limit(1);
+      let result;
+      if (userId) {
+        // First try user-specific setting
+        const { and, isNull } = await import('drizzle-orm');
+        result = await db
+          .select()
+          .from(settings)
+          .where(and(eq(settings.key, key), eq(settings.userId, userId)))
+          .limit(1);
+        
+        // If not found, try global setting (userId = null)
+        if (result.length === 0) {
+          result = await db
+            .select()
+            .from(settings)
+            .where(and(eq(settings.key, key), isNull(settings.userId)))
+            .limit(1);
+        }
+      } else {
+        // No userId provided, get global setting
+        const { and, isNull } = await import('drizzle-orm');
+        result = await db
+          .select()
+          .from(settings)
+          .where(and(eq(settings.key, key), isNull(settings.userId)))
+          .limit(1);
+      }
 
       if (result.length > 0 && result[0].value) {
         const value = result[0].value;
@@ -74,12 +94,12 @@ export class SettingsService {
         return envValue;
       }
 
-
       // Return default value
       return defaultValue;
     } catch (error: any) {
       logger.error('[SettingsService] Error getting setting', {
         key,
+        userId,
         error: error.message,
       });
       
@@ -90,47 +110,46 @@ export class SettingsService {
   }
 
   /**
-   * Get all settings
+   * Get all settings for a specific user
    */
-  async getAll(): Promise<SettingsData> {
+  async getAll(userId?: string): Promise<SettingsData> {
     try {
-      const allSettings = await db.select().from(settings);
-      
       const settingsData: SettingsData = {
         // AI Keys
-        anthropicApiKey: await this.get('anthropicApiKey', process.env.ANTHROPIC_API_KEY),
+        anthropicApiKey: await this.get('anthropicApiKey', process.env.ANTHROPIC_API_KEY, userId),
         
         // Lead Generation Keys
-        apolloApiKey: await this.get('apolloApiKey', process.env.APOLLO_API_KEY),
-        hunterApiKey: await this.get('hunterApiKey', process.env.HUNTER_API_KEY),
-        peopleDataLabsApiKey: await this.get('peopleDataLabsApiKey', process.env.PEOPLEDATALABS_API_KEY),
-        googlePlacesApiKey: await this.get('googlePlacesApiKey', process.env.GOOGLE_PLACES_API_KEY),
-        googleCustomSearchApiKey: await this.get('googleCustomSearchApiKey', process.env.GOOGLE_CUSTOM_SEARCH_API_KEY),
-        googleCustomSearchEngineId: await this.get('googleCustomSearchEngineId', process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID),
+        apolloApiKey: await this.get('apolloApiKey', process.env.APOLLO_API_KEY, userId),
+        hunterApiKey: await this.get('hunterApiKey', process.env.HUNTER_API_KEY, userId),
+        peopleDataLabsApiKey: await this.get('peopleDataLabsApiKey', process.env.PEOPLEDATALABS_API_KEY, userId),
+        googlePlacesApiKey: await this.get('googlePlacesApiKey', process.env.GOOGLE_PLACES_API_KEY, userId),
+        googleCustomSearchApiKey: await this.get('googleCustomSearchApiKey', process.env.GOOGLE_CUSTOM_SEARCH_API_KEY, userId),
+        googleCustomSearchEngineId: await this.get('googleCustomSearchEngineId', process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID, userId),
         
         // SMTP Config
-        smtpProvider: await this.get('smtpProvider', process.env.SMTP_PROVIDER || 'smtp2go'),
-        smtpHost: await this.get('smtpHost', process.env.SMTP_HOST),
-        smtpPort: await this.get('smtpPort', process.env.SMTP_PORT),
-        smtpUser: await this.get('smtpUser', process.env.SMTP_USER),
-        smtpPass: await this.get('smtpPass', process.env.SMTP_PASS),
-        smtpSecure: await this.get('smtpSecure', process.env.SMTP_SECURE),
-        fromName: await this.get('fromName', process.env.FROM_NAME),
-        fromEmail: await this.get('fromEmail', process.env.FROM_EMAIL),
+        smtpProvider: await this.get('smtpProvider', process.env.SMTP_PROVIDER || 'smtp2go', userId),
+        smtpHost: await this.get('smtpHost', process.env.SMTP_HOST, userId),
+        smtpPort: await this.get('smtpPort', process.env.SMTP_PORT, userId),
+        smtpUser: await this.get('smtpUser', process.env.SMTP_USER, userId),
+        smtpPass: await this.get('smtpPass', process.env.SMTP_PASS, userId),
+        smtpSecure: await this.get('smtpSecure', process.env.SMTP_SECURE, userId),
+        fromName: await this.get('fromName', process.env.FROM_NAME, userId),
+        fromEmail: await this.get('fromEmail', process.env.FROM_EMAIL, userId),
         
         // AWS SES Config
-        awsAccessKeyId: await this.get('awsAccessKeyId', process.env.AWS_ACCESS_KEY_ID),
-        awsSecretAccessKey: await this.get('awsSecretAccessKey', process.env.AWS_SECRET_ACCESS_KEY),
-        awsRegion: await this.get('awsRegion', process.env.AWS_REGION || 'us-east-1'),
+        awsAccessKeyId: await this.get('awsAccessKeyId', process.env.AWS_ACCESS_KEY_ID, userId),
+        awsSecretAccessKey: await this.get('awsSecretAccessKey', process.env.AWS_SECRET_ACCESS_KEY, userId),
+        awsRegion: await this.get('awsRegion', process.env.AWS_REGION || 'us-east-1', userId),
         
         // Email Settings
-        emailsPerHour: await this.get('emailsPerHour', 50),
-        dailyEmailLimit: await this.get('dailyEmailLimit', 500),
+        emailsPerHour: await this.get('emailsPerHour', 50, userId),
+        dailyEmailLimit: await this.get('dailyEmailLimit', 500, userId),
       };
 
       return settingsData;
     } catch (error: any) {
       logger.error('[SettingsService] Error getting all settings', {
+        userId,
         error: error.message,
       });
       throw error;
@@ -140,13 +159,18 @@ export class SettingsService {
   /**
    * Set a setting value
    */
-  async set(key: string, value: any): Promise<void> {
+  async set(key: string, value: any, userId?: string): Promise<void> {
     try {
+      const { and, isNull } = await import('drizzle-orm');
       // Check if setting exists
       const existing = await db
         .select()
         .from(settings)
-        .where(eq(settings.key, key))
+        .where(
+          userId 
+            ? and(eq(settings.key, key), eq(settings.userId, userId))
+            : and(eq(settings.key, key), isNull(settings.userId))
+        )
         .limit(1);
 
       if (existing.length > 0) {
@@ -154,22 +178,25 @@ export class SettingsService {
         await db
           .update(settings)
           .set({ value, updatedAt: new Date() })
-          .where(eq(settings.key, key));
+          .where(eq(settings.id, existing[0].id));
       } else {
         // Insert new
         await db.insert(settings).values({
           key,
           value,
+          userId: userId || null,
         });
       }
 
       // Clear cache
-      this.cache.delete(`setting:${key}`);
+      const cacheKey = userId ? `setting:${userId}:${key}` : `setting:${key}`;
+      this.cache.delete(cacheKey);
 
-      logger.info('[SettingsService] Setting updated', { key });
+      logger.info('[SettingsService] Setting updated', { key, userId });
     } catch (error: any) {
       logger.error('[SettingsService] Error setting value', {
         key,
+        userId,
         error: error.message,
       });
       throw error;
@@ -179,16 +206,17 @@ export class SettingsService {
   /**
    * Update multiple settings at once
    */
-  async updateMany(settingsData: Partial<SettingsData>): Promise<void> {
+  async updateMany(settingsData: Partial<SettingsData>, userId?: string): Promise<void> {
     try {
       logger.info('[SettingsService] Updating multiple settings', {
         keys: Object.keys(settingsData),
+        userId,
       });
 
       // Update each setting
       for (const [key, value] of Object.entries(settingsData)) {
         if (value !== undefined && value !== null && value !== '') {
-          await this.set(key, value);
+          await this.set(key, value, userId);
         }
       }
 
@@ -207,8 +235,8 @@ export class SettingsService {
   /**
    * Get masked version of API keys for display
    */
-  async getAllMasked(): Promise<SettingsData> {
-    const allSettings = await this.getAll();
+  async getAllMasked(userId?: string): Promise<SettingsData> {
+    const allSettings = await this.getAll(userId);
     
     return {
       ...allSettings,

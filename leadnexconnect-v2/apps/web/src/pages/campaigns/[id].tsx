@@ -453,7 +453,7 @@ export default function CampaignDetail() {
                   <Edit className="w-4 h-4 inline mr-2" />
                   Edit
                 </button>
-                {campaign.status === 'active' ? (
+                {campaign.status === 'running' || campaign.status === 'active' ? (
                   <button
                     onClick={() => pauseMutation.mutate()}
                     disabled={pauseMutation.isPending}

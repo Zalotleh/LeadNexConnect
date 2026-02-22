@@ -127,24 +127,41 @@ export class ScrapingController {
       const { industry, country, city, maxResults = 50 } = req.body;
 
       logger.info('[ScrapingController] Generating leads from Google Places', {
-        industry,
-        country,
-        city,
-        maxResults,
+        industry, country, city, maxResults,
       });
 
-      // Fetch leads from Google Places
-      const placesLeads = await googlePlacesService.searchLeads({
-        industry,
-        country,
-        city,
-        maxResults,
-      });
+      // Best-effort loop: cycle through keyword variants until the target is met
+      const totalVariants = googlePlacesService.getVariantCount(industry);
+      const now = new Date();
+      const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000);
 
-      logger.info(`[ScrapingController] Fetched ${placesLeads.length} leads from Google Places`);
+      const allPlacesLeads: any[] = [];
+
+      for (let attempt = 0; attempt < totalVariants; attempt++) {
+        const stillNeeded = maxResults - allPlacesLeads.length;
+        if (stillNeeded <= 0) break;
+
+        try {
+          const placesLeads = await googlePlacesService.searchLeads({
+            industry,
+            country,
+            city,
+            maxResults: stillNeeded,
+            queryVariantIndex: dayOfYear + attempt,
+          });
+          allPlacesLeads.push(...placesLeads);
+          logger.info(`[ScrapingController] Google Places variant ${attempt + 1}/${totalVariants}: ${placesLeads.length} leads (total: ${allPlacesLeads.length}/${maxResults})`);
+        } catch (variantError: any) {
+          logger.warn(`[ScrapingController] Google Places variant ${attempt + 1} failed`, { error: variantError.message });
+        }
+
+        if (allPlacesLeads.length >= maxResults) break;
+      }
+
+      logger.info(`[ScrapingController] Fetched ${allPlacesLeads.length} leads from Google Places`);
 
       // Enrich leads through pipeline (automatically saves to DB)
-      const enrichmentResults = await enrichmentPipelineService.enrichBatch(placesLeads);
+      const enrichmentResults = await enrichmentPipelineService.enrichBatch(allPlacesLeads);
       
       const successful = enrichmentResults.filter(r => r.success).length;
       const duplicates = enrichmentResults.filter(r => r.isDuplicate).length;

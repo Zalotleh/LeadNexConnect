@@ -34,17 +34,6 @@ export const GenerateLeadsModal: React.FC<GenerateLeadsModalProps> = ({
   onSubmit,
 }) => {
   const [showManualCountry, setShowManualCountry] = React.useState(false);
-  const [manualCountry, setManualCountry] = React.useState('');
-
-  // Check if "Other (Manual Entry)" is selected
-  React.useEffect(() => {
-    if (generateForm.country === 'Other (Manual Entry)') {
-      setShowManualCountry(true);
-    } else {
-      setShowManualCountry(false);
-      setManualCountry('');
-    }
-  }, [generateForm.country]);
 
   if (!show) return null;
 
@@ -202,7 +191,6 @@ export const GenerateLeadsModal: React.FC<GenerateLeadsModalProps> = ({
                     const selectedCountry = e.target.value;
                     if (selectedCountry === 'Other (Manual Entry)') {
                       setShowManualCountry(true);
-                      onFormChange({ ...generateForm, country: '' });
                     } else {
                       setShowManualCountry(false);
                       onFormChange({ ...generateForm, country: selectedCountry });
@@ -240,14 +228,14 @@ export const GenerateLeadsModal: React.FC<GenerateLeadsModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={manualCountry || generateForm.country}
+                  value={generateForm.country}
                   onChange={(e) => {
-                    setManualCountry(e.target.value);
                     onFormChange({ ...generateForm, country: e.target.value });
                   }}
                   placeholder="e.g., Malaysia, Thailand, Vietnam"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   disabled={generating}
+                  autoFocus
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Enter the full country name for targeting
@@ -259,7 +247,7 @@ export const GenerateLeadsModal: React.FC<GenerateLeadsModalProps> = ({
           {/* Max Results */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Maximum Results
+              Target Number of Leads
             </label>
             <input
               type="number"
@@ -271,7 +259,7 @@ export const GenerateLeadsModal: React.FC<GenerateLeadsModalProps> = ({
               disabled={generating}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Note: Actual results may be lower based on API limits and data availability
+              The system will try its best to reach this number. Actual results may be lower due to deduplication, quality filtering, and API availability.
             </p>
           </div>
 

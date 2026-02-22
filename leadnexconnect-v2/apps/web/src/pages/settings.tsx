@@ -1,7 +1,10 @@
 import SettingsLayout from '@/components/SettingsLayout'
 import ProtectedRoute from '@/components/ProtectedRoute'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/router'
+import { useEffect } from 'react'
 import { Save, Eye, EyeOff, Settings as SettingsIcon, Server, Mail } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import ApiConfigTab from '@/components/ApiConfigTab'
@@ -10,6 +13,8 @@ import SmtpConfigTab from '@/components/SmtpConfigTab'
 type TabType = 'api' | 'smtp' | 'ai';
 
 function Settings() {
+  const { user, isAdmin } = useAuth()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabType>('api');
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -63,6 +68,14 @@ function Settings() {
     awsSecretAccessKey: '',
     awsRegion: 'us-east-1',
   })
+
+  // Redirect non-admin users
+  useEffect(() => {
+    if (user && !isAdmin) {
+      toast.error('Access denied. Settings page is admin-only.')
+      router.push('/dashboard')
+    }
+  }, [user, isAdmin, router])
 
   useEffect(() => {
     loadSettings()

@@ -20,7 +20,6 @@ export default function Layout({ children }: LayoutProps) {
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Leads', href: '/leads', icon: Users },
     { name: 'Campaigns', href: '/campaigns', icon: Mail },
-    { name: 'Settings', href: '/settings', icon: Settings },
   ]
 
   const contentSubmenu = [
@@ -132,6 +131,17 @@ export default function Layout({ children }: LayoutProps) {
                 >
                   <ClipboardList className="w-5 h-5 mr-3" />
                   Audit Logs
+                </Link>
+                <Link
+                  href="/settings"
+                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/settings')
+                      ? 'bg-purple-50 text-purple-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Settings className="w-5 h-5 mr-3" />
+                  Settings
                 </Link>
               </>
             ) : (
@@ -265,19 +275,6 @@ export default function Layout({ children }: LayoutProps) {
                     </div>
                   )}
                 </div>
-
-                {/* Settings */}
-                <Link
-                  href="/settings"
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive('/settings')
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Settings className="w-5 h-5 mr-3" />
-                  Settings
-                </Link>
               </>
             )}
           </nav>

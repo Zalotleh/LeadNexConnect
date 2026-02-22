@@ -11,6 +11,7 @@ export interface CreateUserData {
   firstName: string;
   lastName: string;
   role?: 'user' | 'admin';
+  status?: 'active' | 'inactive';
 }
 
 export interface UpdateUserData {
@@ -18,6 +19,8 @@ export interface UpdateUserData {
   firstName?: string;
   lastName?: string;
   role?: 'user' | 'admin';
+  status?: 'active' | 'inactive';
+  password?: string;
 }
 
 export class UsersService {
@@ -144,7 +147,7 @@ export class UsersService {
         firstName: data.firstName,
         lastName: data.lastName,
         role: data.role || 'user',
-        status: 'active',
+        status: data.status || 'active',
         createdBy: adminId,
       }).returning({
         id: users.id,
@@ -211,12 +214,21 @@ export class UsersService {
         }
       }
 
+      // Prepare update data
+      const updateData: any = {
+        ...data,
+        updatedAt: new Date(),
+      };
+
+      // Hash password if provided
+      if (data.password) {
+        updateData.passwordHash = await bcrypt.hash(data.password, SALT_ROUNDS);
+        delete updateData.password;
+      }
+
       // Update user
       const [updatedUser] = await db.update(users)
-        .set({
-          ...data,
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(eq(users.id, userId))
         .returning({
           id: users.id,

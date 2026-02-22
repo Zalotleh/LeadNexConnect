@@ -216,18 +216,18 @@ function Leads() {
     try {
       setGenerating(true)
       
-      // Close generate modal
+      // Close generate modal immediately
       setShowGenerateModal(false)
       
-      // Show progress dialog
-      setProgressTitle('Generating Leads')
-      setProgressMessage(`Connecting to ${generateForm.source === 'apollo' ? 'Apollo.io' : generateForm.source === 'google_places' ? 'Google Places' : 'PeopleDataLabs'}...`)
-      setShowProgressDialog(true)
+      // Show success toast that generation started
+      toast.success('🚀 Lead generation started! This may take a minute...', {
+        duration: 4000,
+      })
       
-      // Switch to batch view
+      // Switch to batch view immediately so user can see progress
       setViewMode('batches')
 
-      // Use the new unified generation endpoint with batch name
+      // Run generation in "background" - user can still navigate
       const response = await leadsAPI.generateLeads({
         batchName: generateForm.batchName,
         industry: generateForm.industry,
@@ -237,18 +237,10 @@ function Leads() {
         maxResults: generateForm.maxResults,
       })
 
-      setProgressMessage('Analyzing websites and scoring leads...')
-      
-      // Wait for analysis to complete
-      await new Promise(resolve => setTimeout(resolve, 1500))
-
       const data = response.data.data
       const savedCount = data?.saved || data?.count || 0
       const duplicatesCount = data?.duplicates || 0
       const byTier = data?.byTier || { hot: 0, warm: 0, cold: 0 }
-      
-      // Hide progress dialog
-      setShowProgressDialog(false)
       
       // Show result dialog with statistics
       setResultData({
@@ -283,12 +275,8 @@ function Leads() {
         maxResults: 50,
       })
     } catch (error: any) {
-      setShowProgressDialog(false)
       toast.error(error.response?.data?.error?.message || 'Failed to generate leads')
       console.error(error)
-      
-      // Switch back to table view on error
-      setViewMode('table')
     } finally {
       setGenerating(false)
       setGenerationProgress('')
@@ -972,6 +960,12 @@ function Leads() {
 
         {/* Action Buttons - Different for each view */}
         <div className="flex items-center justify-end space-x-3">
+          {generating && (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <Loader className="w-4 h-4 text-blue-600 animate-spin" />
+              <span className="text-sm text-blue-700 font-medium">Generating leads...</span>
+            </div>
+          )}
           {viewMode === 'table' ? (
             <>
               <button 

@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api';
 
 export interface ApiConfig {
   id: string;
@@ -47,25 +47,25 @@ class ConfigService {
   // =========================
 
   async getAllApiConfigs(): Promise<ApiConfig[]> {
-    const response = await axios.get('/api/config/apis');
+    const response = await api.get('/config/apis');
     return response.data.data;
   }
 
   async getApiConfig(apiSource: string, unmasked: boolean = false): Promise<ApiConfig> {
     const url = unmasked
-      ? `/api/config/apis/${apiSource}/unmasked`
-      : `/api/config/apis/${apiSource}`;
-    const response = await axios.get(url);
+      ? `/config/apis/${apiSource}/unmasked`
+      : `/config/apis/${apiSource}`;
+    const response = await api.get(url);
     return response.data.data;
   }
 
   async upsertApiConfig(data: Partial<ApiConfig>): Promise<ApiConfig> {
-    const response = await axios.post('/api/config/apis', data);
+    const response = await api.post('/config/apis', data);
     return response.data.data;
   }
 
   async deleteApiConfig(apiSource: string): Promise<void> {
-    await axios.delete(`/api/config/apis/${apiSource}`);
+    await api.delete(`/config/apis/${apiSource}`);
   }
 
   // ==========================
@@ -73,30 +73,30 @@ class ConfigService {
   // ==========================
 
   async getAllSmtpConfigs(): Promise<SmtpConfig[]> {
-    const response = await axios.get('/api/config/smtp');
+    const response = await api.get('/config/smtp');
     return response.data.data;
   }
 
   async getSmtpConfig(id: string, unmasked: boolean = false): Promise<SmtpConfig> {
     const url = unmasked
-      ? `/api/config/smtp/${id}/unmasked`
-      : `/api/config/smtp/${id}`;
-    const response = await axios.get(url);
+      ? `/config/smtp/${id}/unmasked`
+      : `/config/smtp/${id}`;
+    const response = await api.get(url);
     return response.data.data;
   }
 
   async createSmtpConfig(data: Partial<SmtpConfig>): Promise<SmtpConfig> {
-    const response = await axios.post('/api/config/smtp', data);
+    const response = await api.post('/config/smtp', data);
     return response.data.data;
   }
 
   async updateSmtpConfig(id: string, data: Partial<SmtpConfig>): Promise<SmtpConfig> {
-    const response = await axios.put(`/api/config/smtp/${id}`, data);
+    const response = await api.put(`/config/smtp/${id}`, data);
     return response.data.data;
   }
 
   async deleteSmtpConfig(id: string): Promise<void> {
-    await axios.delete(`/api/config/smtp/${id}`);
+    await api.delete(`/config/smtp/${id}`);
   }
 
   async testSmtpConnection(data: {
@@ -106,7 +106,7 @@ class ConfigService {
     username?: string;
     password?: string;
   }): Promise<{ success: boolean; message: string }> {
-    const response = await axios.post('/api/config/smtp/test', data);
+    const response = await api.post('/config/smtp/test', data);
     return response.data;
   }
 }
