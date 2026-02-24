@@ -47,6 +47,7 @@ interface Workflow {
 function Workflows() {
   const queryClient = useQueryClient()
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showWorkflowTypePicker, setShowWorkflowTypePicker] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -155,18 +156,11 @@ function Workflows() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => window.location.href = '/workflows/manual'}
-              className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-            >
-              <Edit className="w-5 h-5" />
-              Manual Workflow
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowWorkflowTypePicker(true)}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
             >
-              <Sparkles className="w-5 h-5" />
-              AI Workflow
+              <Plus className="w-5 h-5" />
+              New Workflow
             </button>
           </div>
         </div>
@@ -202,7 +196,7 @@ function Workflows() {
               Create your first email sequence workflow with AI
             </p>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => setShowWorkflowTypePicker(true)}
               className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 inline-flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
@@ -468,6 +462,68 @@ function Workflows() {
                       Generate Workflow
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Workflow Type Picker Modal */}
+        {showWorkflowTypePicker && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+              <div className="flex items-center justify-between px-8 pt-8 pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Create a Workflow</h2>
+                  <p className="text-gray-500 mt-1 text-sm">How would you like to build your email sequence?</p>
+                </div>
+                <button
+                  onClick={() => setShowWorkflowTypePicker(false)}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="px-8 pb-8 grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => {
+                    setShowWorkflowTypePicker(false)
+                    setShowCreateModal(true)
+                  }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-primary-300 hover:bg-primary-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-primary-200 transition-colors">
+                    <Sparkles className="w-6 h-6 text-primary-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">AI Workflow</h3>
+                      <span className="text-xs font-medium px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full">Recommended</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Generate a complete email sequence instantly using AI. Just describe your goal.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowWorkflowTypePicker(false)
+                    window.location.href = '/workflows/manual'
+                  }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 transition-colors">
+                    <Edit className="w-6 h-6 text-gray-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">Manual Workflow</h3>
+                      <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">Full control</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Write each email step yourself with complete control over every detail.
+                    </p>
+                  </div>
                 </button>
               </div>
             </div>

@@ -83,6 +83,48 @@ export class SettingsController {
       res.status(500).json({ success: false, error: { message: error.message } });
     }
   }
+
+  /**
+   * GET /api/settings/company-profile
+   * Readable by all authenticated users (used read-only on Signature page).
+   */
+  async getCompanyProfile(req: AuthRequest, res: Response) {
+    try {
+      const profile = await settingsService.get('company_profile');
+      res.json({ success: true, data: profile ?? {} });
+    } catch (error: any) {
+      logger.error('[SettingsController] Error fetching company profile', { error: error.message });
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
+
+  /**
+   * PUT /api/settings/company-profile
+   * Admin only — updates the global company_profile settings key.
+   */
+  async updateCompanyProfile(req: AuthRequest, res: Response) {
+    try {
+      const {
+        companyName, productName, productDescription,
+        websiteUrl, signUpLink, featuresLink, pricingLink,
+        demoLink, integrationsLink, supportEmail,
+      } = req.body;
+
+      await settingsService.updateMany(
+        { company_profile: {
+          companyName, productName, productDescription,
+          websiteUrl, signUpLink, featuresLink, pricingLink,
+          demoLink, integrationsLink, supportEmail,
+        }},
+      );
+
+      logger.info('[SettingsController] Company profile updated');
+      res.json({ success: true, message: 'Company profile updated successfully' });
+    } catch (error: any) {
+      logger.error('[SettingsController] Error updating company profile', { error: error.message });
+      res.status(500).json({ success: false, error: { message: error.message } });
+    }
+  }
 }
 
 export const settingsController = new SettingsController();

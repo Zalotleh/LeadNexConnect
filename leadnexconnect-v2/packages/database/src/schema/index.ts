@@ -700,6 +700,24 @@ export const workflowSteps = pgTable('workflow_steps', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// Sender Profiles - Per-user sender identity (name, email, signature)
+export const senderProfiles = pgTable('sender_profiles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+
+  // Sender Identity
+  senderName: varchar('sender_name', { length: 255 }),       // e.g. "John Smith"
+  senderEmail: varchar('sender_email', { length: 255 }),     // e.g. "john@company.com"
+  replyTo: varchar('reply_to', { length: 255 }),             // optional reply-to override
+
+  // Signature
+  signatureHtml: text('signature_html'),                     // full HTML signature block
+
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Custom Variables - User-defined email variables
 export const customVariables = pgTable('custom_variables', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -796,7 +814,7 @@ export const smtpConfig = pgTable('smtp_config', {
 // Relations
 
 // User & Authentication Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   leads: many(leads),
   campaigns: many(campaigns),
   workflows: many(workflows),
@@ -808,11 +826,22 @@ export const usersRelations = relations(users, ({ many }) => ({
   smtpConfigs: many(smtpConfig),
   scrapingJobs: many(scrapingJobs),
   leadBatches: many(leadBatches),
+  senderProfile: one(senderProfiles, {
+    fields: [users.id],
+    references: [senderProfiles.userId],
+  }),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, {
     fields: [sessions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const senderProfilesRelations = relations(senderProfiles, ({ one }) => ({
+  user: one(users, {
+    fields: [senderProfiles.userId],
     references: [users.id],
   }),
 }));

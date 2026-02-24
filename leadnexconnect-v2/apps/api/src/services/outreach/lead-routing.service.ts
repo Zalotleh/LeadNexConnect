@@ -140,37 +140,35 @@ export class LeadRoutingService {
 
 No website? No problem!
 
-BookNex gives you:
+{{ourCompanyName}} gives you:
 • Simple booking link (share anywhere)
 • QR code for your location
 • WhatsApp booking confirmations
-• Starts at $9.99/month
 
 Perfect for solo practitioners and small studios.
 
-See how it works: [link]
+See how it works: {{signUpLink}}
 
 Best,
-BookNex Team`,
+{{sender_name}}`,
       },
 
       'switch-from-calendly': {
-        subject: 'Better than Calendly for {{industry}} businesses',
+        subject: 'Better alternative for {{industry}} businesses',
         body: `Hi {{contact_name}},
 
 I noticed {{company_name}} uses Calendly for bookings.
 
-Many {{industry}} businesses switch to BookNex because:
+Many {{industry}} businesses switch to {{ourCompanyName}} because:
 
-✅ WhatsApp notifications (Calendly only has email)
+✅ WhatsApp notifications
 ✅ Multi-location support
-✅ Lower price ($9.99 vs $12)
 ✅ Payment integration included
 ✅ Industry-specific features
 
 14-day free trial - test side-by-side.
 
-Worth a look? [trial link]`,
+Worth a look? {{signUpLink}}`,
       },
 
       'multi-location-management': {
@@ -179,16 +177,13 @@ Worth a look? [trial link]`,
 
 Managing bookings across multiple locations?
 
-BookNex gives you:
+{{ourCompanyName}} gives you:
 • Single dashboard for all locations
 • Location-specific availability
 • Staff management per location
 • Centralized reporting
-• White-label option
 
-{{industry}} chains save 15+ hours/week.
-
-Let's discuss your needs: [schedule call]`,
+Let's discuss your needs: {{demoLink}}`,
       },
 
       'ready-to-buy': {
@@ -199,15 +194,15 @@ I see {{company_name}} is looking for booking automation.
 
 Quick question: What's your biggest scheduling challenge?
 
-BookNex solves:
+We solve:
 • Double bookings
-• No-shows (60% reduction)
+• No-shows
 • Manual coordination
 • Payment collection
 
 14-day free trial - setup in 5 minutes.
 
-Ready to start? [trial link]`,
+Ready to start? {{signUpLink}}`,
       },
 
       'phone-only-pain-points': {
@@ -215,56 +210,43 @@ Ready to start? [trial link]`,
         body: `Hi {{contact_name}},
 
 {{company_name}} probably loses bookings to:
-• After-hours calls (67% of inquiries)
+• After-hours calls
 • Busy phone lines
 • Manual back-and-forth
 
-BookNex automates this:
+{{ourCompanyName}} automates this:
 ✅ 24/7 online booking
 ✅ Automatic confirmations
 ✅ Calendar sync
-✅ No phone tag needed
 
-See it in action: [demo link]`,
+See it in action: {{demoLink}}`,
       },
 
       'personalized-high-value': {
         subject: 'Booking automation for {{company_name}}',
         body: `Hi {{contact_name}},
 
-{{company_name}} has an impressive {{google_rating}}★ rating!
+{{company_name}} has an impressive reputation in the {{industry}} space.
 
-With that reputation, you shouldn't lose bookings to:
-- Manual scheduling
-- After-hours inquiries
-- No-shows
+With that standing, you shouldn't be losing bookings to manual scheduling.
 
-BookNex helps top-rated {{industry}} businesses:
-• Increase bookings 120%
-• Reduce no-shows 60%
-• Save 10+ hours/week
+{{ourCompanyName}} helps top-rated {{industry}} businesses book more, follow up automatically, and save hours every week.
 
-Can I show you how? [schedule demo]`,
+Can I show you how? {{demoLink}}`,
       },
 
       'default': {
         subject: 'Modern booking for {{industry}} - {{company_name}}',
         body: `Hi {{contact_name}},
 
-{{industry}} businesses using BookNex report:
-• 120% more bookings
-• 60% fewer no-shows
-• 5-10 hours saved weekly
+{{industry}} businesses using {{ourCompanyName}} report:
+• More bookings with 24/7 availability
+• Fewer no-shows with automatic reminders
+• Hours saved weekly on admin
 
-Features:
-✅ 24/7 online booking
-✅ WhatsApp reminders
-✅ Payment integration
-✅ Calendar sync
+No credit card required for trial.
 
-$9.99/month - no credit card for trial.
-
-Try it: [trial link]`,
+Try it: {{signUpLink}}`,
       },
     };
   }

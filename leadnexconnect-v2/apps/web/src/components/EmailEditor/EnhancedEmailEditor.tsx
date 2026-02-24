@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, Code, Sparkles, Save, X, FileText, ChevronDown, Eye, Monitor, Smartphone, RefreshCw, MessageSquarePlus } from 'lucide-react';
+import { Palette, Code, Sparkles, Save, X, FileText, ChevronDown, Eye, Monitor, Smartphone, RefreshCw, MessageSquarePlus, PenLine } from 'lucide-react';
 import { getAllEmailVariables } from '@/lib/emailVariables';
 import EmailEditor from '../EmailEditor';
 import TinyMCEEmailEditor from './TinyMCEEmailEditor';
@@ -445,6 +445,33 @@ export default function EnhancedEmailEditor({
               )}
             </button>
           )}
+
+          {/* Insert Signature Button */}
+          <button
+            type="button"
+            onClick={() => {
+              const placeholder = '{{signature}}';
+              if (value && value.includes(placeholder)) {
+                toast('Signature placeholder already in email', { icon: 'ℹ️' });
+                return;
+              }
+              const newValue = value
+                ? (value.trimEnd() + (value.includes('<') ? '<br><br>' : '\n\n') + placeholder)
+                : placeholder;
+              onChange(newValue);
+              if (value?.includes('<')) {
+                setVisualContent(newValue);
+              } else {
+                setSimpleContent(newValue);
+              }
+              toast.success('Signature placeholder inserted');
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors shadow-sm"
+            title="Insert {{signature}} placeholder at the end of the email"
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            Insert Signature
+          </button>
 
           {/* Editor Mode Toggle */}
           {enableVisualEditor && (

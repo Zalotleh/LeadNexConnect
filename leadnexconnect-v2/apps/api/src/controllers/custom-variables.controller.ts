@@ -5,8 +5,28 @@ import { customVariables } from '@leadnex/database';
 import { eq, like, or, desc, and } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
+/** Default variables auto-seeded for new users on first visit */
+const DEFAULT_VARIABLES = [
+  { key: 'contact_name',    label: 'Contact Name',    value: '{{contact_name}}',    category: 'lead',    description: 'Full name of the lead contact person',           defaultValue: '[Contact Name]' },
+  { key: 'first_name',      label: 'First Name',      value: '{{first_name}}',      category: 'lead',    description: 'First name of the contact',                       defaultValue: '[First Name]' },
+  { key: 'company_name',    label: 'Company Name',    value: '{{company_name}}',    category: 'lead',    description: "The lead's company name",                         defaultValue: '[Company Name]' },
+  { key: 'contact_email',   label: 'Contact Email',   value: '{{contact_email}}',   category: 'lead',    description: 'Email address of the lead contact',               defaultValue: 'contact@example.com' },
+  { key: 'city',            label: 'City',            value: '{{city}}',            category: 'lead',    description: "City where the lead's business is located",       defaultValue: '[City]' },
+  { key: 'industry',        label: 'Industry',        value: '{{industry}}',        category: 'lead',    description: 'Industry category of the lead',                   defaultValue: '[Industry]' },
+  { key: 'sender_name',     label: 'Sender Name',     value: '{{sender_name}}',     category: 'sender',  description: 'Your name or team member name',                   defaultValue: 'Your Name' },
+  { key: 'sender_email',    label: 'Sender Email',    value: '{{sender_email}}',    category: 'sender',  description: 'Your email address',                              defaultValue: 'hello@yourcompany.com' },
+  { key: 'sender_company',  label: 'Sender Company',  value: '{{sender_company}}',  category: 'sender',  description: 'Your company name',                               defaultValue: 'Your Company' },
+  { key: 'product_name',    label: 'Product Name',    value: '{{product_name}}',    category: 'product', description: 'Name of your product or service',                 defaultValue: 'Your Product' },
+  { key: 'product_url',     label: 'Product URL',     value: '{{product_url}}',     category: 'link',    description: 'Your product or company website URL',             defaultValue: 'https://yourwebsite.com' },
+  { key: 'sign_up_link',    label: 'Sign Up Link',    value: '{{sign_up_link}}',    category: 'link',    description: 'Link to your sign-up or registration page',       defaultValue: 'https://yourwebsite.com/signup' },
+  { key: 'demo_link',       label: 'Demo Link',       value: '{{demo_link}}',       category: 'link',    description: 'Link to your product demo or booking page',       defaultValue: 'https://yourwebsite.com/demo' },
+  { key: 'unsubscribe_link',label: 'Unsubscribe Link',value: '{{unsubscribe_link}}',category: 'system',  description: 'Link to unsubscribe from emails',                 defaultValue: '[Unsubscribe URL]' },
+  { key: 'current_date',    label: 'Current Date',    value: '{{current_date}}',    category: 'system',  description: 'The current date when the email is sent',         defaultValue: new Date().toISOString().split('T')[0] },
+];
+
 /**
- * Get all custom variables with optional search and filter
+ * Get all custom variables with optional search and filter.
+ * Auto-seeds default variables for users with no variables yet.
  */
 export const getCustomVariables = async (req: AuthRequest, res: Response) => {
   try {
@@ -41,7 +61,7 @@ export const getCustomVariables = async (req: AuthRequest, res: Response) => {
     }
 
     // Execute query with conditions
-    const variables =
+    let variables =
       conditions.length > 0
         ? await db
             .select()
@@ -52,6 +72,42 @@ export const getCustomVariables = async (req: AuthRequest, res: Response) => {
             .select()
             .from(customVariables)
             .orderBy(desc(customVariables.createdAt));
+
+    // Auto-seed defaults for new users (no search/filter active, zero results)
+    const isUnfiltered = !search && !category && isActive === undefined;
+    if (variables.length === 0 && isUnfiltered) {
+      logger.info('[CustomVariablesController] No variables for user — auto-seeding defaults', { userId });
+      try {
+        // Insert each default individually so a key conflict on one row
+        // doesn't block the rest (another user may already own that key globally).
+        for (const v of DEFAULT_VARIABLES) {
+          try {
+            await db.insert(customVariables).values({
+              ...v,
+              userId,
+              usageCount: 0,
+              isActive: true,
+            });
+          } catch (rowErr: any) {
+            // 23505 = unique_violation — key already taken by another user; skip silently
+            if (rowErr.code !== '23505') throw rowErr;
+            logger.warn('[CustomVariablesController] Key conflict on auto-seed, skipping', { key: v.key });
+          }
+        }
+
+        // Re-fetch after seeding
+        variables = await db
+          .select()
+          .from(customVariables)
+          .where(eq(customVariables.userId, userId))
+          .orderBy(desc(customVariables.createdAt));
+
+        logger.info('[CustomVariablesController] Auto-seed complete', { count: variables.length });
+      } catch (seedErr: any) {
+        logger.error('[CustomVariablesController] Auto-seed failed', { error: seedErr.message });
+        // Non-fatal — return empty list rather than crashing
+      }
+    }
 
     logger.info('[CustomVariablesController] Variables fetched', {
       count: variables.length,

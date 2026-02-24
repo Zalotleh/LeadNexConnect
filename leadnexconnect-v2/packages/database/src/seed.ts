@@ -525,6 +525,21 @@ BookNex Solutions</p>`,
 
       await db.insert(settings).values([
         {
+          key: 'company_profile',
+          value: {
+            companyName: 'BookNex Solutions',
+            productName: 'BookNex',
+            productDescription: 'All-in-one booking and CRM platform',
+            websiteUrl: 'https://www.booknexsolutions.com',
+            signUpLink: 'https://booknexsolutions.com/sign-up/',
+            featuresLink: 'https://booknexsolutions.com/features/',
+            pricingLink: 'https://booknexsolutions.com/pricing/',
+            demoLink: 'https://booknexsolutions.com/demo/',
+            integrationsLink: 'https://booknexsolutions.com/integrations/',
+            supportEmail: 'support@booknexsolutions.com',
+          },
+        },
+        {
           key: 'api_limits',
           value: {
             apollo: { limit: 100, period: 'monthly' },

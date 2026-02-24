@@ -83,6 +83,7 @@ function Campaigns() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [showModal, setShowModal] = useState(false)
+  const [showTypePickerModal, setShowTypePickerModal] = useState(false)
   const [showLeadGenForm, setShowLeadGenForm] = useState(false)
   const [showOutreachForm, setShowOutreachForm] = useState(false)
   const [showAutomatedForm, setShowAutomatedForm] = useState(false)
@@ -162,9 +163,8 @@ function Campaigns() {
     } else if (campaignTypeFilter === 'fully_automated') {
       setShowAutomatedForm(true)
     } else {
-      // If "All" tab is selected, show old modal (or we can default to one type)
-      setShowModal(true)
-      setCurrentStep(1)
+      // If "All" tab is selected, show the type-picker modal
+      setShowTypePickerModal(true)
     }
   }
 
@@ -564,263 +564,174 @@ function Campaigns() {
 
   return (
     <Layout>
-      <div className="space-y-6 max-w-full overflow-x-hidden">
+      <div className="space-y-5 max-w-full overflow-x-hidden">
+
+        {/* ── Header ─────────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
-          <div className="flex-1">
+          <div>
             <h1 className="text-3xl font-bold text-gray-900">Campaigns</h1>
-            <p className="text-gray-600 mt-2">Manage your email campaigns</p>
+            <p className="text-gray-500 mt-1 text-sm">Manage, run and track all your campaigns</p>
           </div>
-          <div className="flex items-center space-x-4">
-            {/* Date Filter Controls */}
-            <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setDateViewMode('monthly')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  dateViewMode === 'monthly'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Monthly
-              </button>
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${dateViewMode === 'monthly' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600'}`}
+              >Monthly</button>
               <button
                 onClick={() => setDateViewMode('allTime')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  dateViewMode === 'allTime'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                All Time
-              </button>
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${dateViewMode === 'allTime' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600'}`}
+              >All Time</button>
             </div>
-            
-            {/* Month/Year selectors - only show in monthly mode */}
             {dateViewMode === 'monthly' && (
               <>
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  {months.map((month, idx) => (
-                    <option key={month} value={idx + 1}>
-                      {month}
-                    </option>
-                  ))}
+                <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  {months.map((month, idx) => <option key={month} value={idx + 1}>{month}</option>)}
                 </select>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  {[2024, 2025, 2026].map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
+                <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  {[2024, 2025, 2026].map((year) => <option key={year} value={year}>{year}</option>)}
                 </select>
               </>
             )}
-            
-            <button 
+            <button
               onClick={handleCreateCampaign}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center gap-2"
             >
-              <Plus className="w-4 h-4 inline mr-2" />
+              <Plus className="w-4 h-4" />
               New Campaign
             </button>
           </div>
         </div>
 
-        {/* Campaign Type Tabs - Always show tabs */}
-        <div className="bg-white rounded-lg shadow p-1">
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => setCampaignTypeFilter('all')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                campaignTypeFilter === 'all'
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4" />
-              <span>All Campaigns</span>
-            </button>
-            <button
-              onClick={() => setCampaignTypeFilter('lead_generation')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                campaignTypeFilter === 'lead_generation'
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <Database className="w-4 h-4" />
-              <span className="hidden sm:inline">Lead Generation</span>
-              <span className="sm:hidden">Gen</span>
-            </button>
-            <button
-              onClick={() => setCampaignTypeFilter('outreach')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                campaignTypeFilter === 'outreach'
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <Mail className="w-4 h-4" />
-              <span className="hidden sm:inline">Outreach</span>
-              <span className="sm:hidden">Out</span>
-            </button>
-            <button
-              onClick={() => setCampaignTypeFilter('fully_automated')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md text-sm font-medium transition-colors ${
-                campaignTypeFilter === 'fully_automated'
-                  ? 'bg-primary-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              <Zap className="w-4 h-4" />
-              <span className="hidden sm:inline">Fully Automated</span>
-              <span className="sm:hidden">Auto</span>
-            </button>
+        {/* ── Smart Stat Strip ───────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Type filter pills */}
+          <button
+            onClick={() => setCampaignTypeFilter('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              campaignTypeFilter === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>All</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${campaignTypeFilter === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'}`}>
+              {dateFilteredCampaigns.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setCampaignTypeFilter(campaignTypeFilter === 'lead_generation' ? 'all' : 'lead_generation')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              campaignTypeFilter === 'lead_generation' ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-700 border-gray-200 hover:border-purple-300'
+            }`}
+          >
+            <Database className="w-4 h-4" />
+            <span>Lead Gen</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${campaignTypeFilter === 'lead_generation' ? 'bg-white/20 text-white' : 'bg-purple-50 text-purple-600'}`}>
+              {dateFilteredCampaigns.filter(c => (c.campaignType || 'outreach') === 'lead_generation').length}
+            </span>
+          </button>
+          <button
+            onClick={() => setCampaignTypeFilter(campaignTypeFilter === 'outreach' ? 'all' : 'outreach')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              campaignTypeFilter === 'outreach' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            <span>Outreach</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${campaignTypeFilter === 'outreach' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
+              {dateFilteredCampaigns.filter(c => (c.campaignType || 'outreach') === 'outreach').length}
+            </span>
+          </button>
+          <button
+            onClick={() => setCampaignTypeFilter(campaignTypeFilter === 'fully_automated' ? 'all' : 'fully_automated')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              campaignTypeFilter === 'fully_automated' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-700 border-gray-200 hover:border-orange-300'
+            }`}
+          >
+            <Zap className="w-4 h-4" />
+            <span>Automated</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${campaignTypeFilter === 'fully_automated' ? 'bg-white/20 text-white' : 'bg-orange-50 text-orange-600'}`}>
+              {dateFilteredCampaigns.filter(c => c.campaignType === 'fully_automated').length}
+            </span>
+          </button>
+
+          <div className="w-px h-6 bg-gray-200 mx-1" />
+
+          {/* Aggregate stats as read-only pills */}
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-full text-xs text-gray-600">
+            <Users className="w-3.5 h-3.5 text-blue-500" />
+            <span className="font-semibold text-gray-800">{totalStats.leads}</span> leads
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-full text-xs text-gray-600">
+            <Send className="w-3.5 h-3.5 text-green-500" />
+            <span className="font-semibold text-gray-800">{totalStats.emails}</span> sent
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-full text-xs text-gray-600">
+            <Eye className="w-3.5 h-3.5 text-purple-500" />
+            <span className="font-semibold text-gray-800">{totalStats.emails > 0 ? Math.round((totalStats.opens / totalStats.emails) * 100) : 0}%</span> open
+          </div>
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-full text-xs text-gray-600">
+            <MousePointer className="w-3.5 h-3.5 text-orange-500" />
+            <span className="font-semibold text-gray-800">{totalStats.emails > 0 ? Math.round((totalStats.clicks / totalStats.emails) * 100) : 0}%</span> CTR
           </div>
         </div>
 
-        {/* Overview Stats */}
+        {/* ── Unified Toolbar ────────────────────────────────────────────────── */}
         {campaigns.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Leads</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalStats.leads}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {campaigns.filter(c => c.status === 'active').length} active campaigns
-                  </p>
-                </div>
-                <Users className="w-8 h-8 text-blue-500" />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Emails Sent</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalStats.emails}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {totalStats.emails > 0 ? Math.round((totalStats.opens / totalStats.emails) * 100) : 0}% open rate
-                  </p>
-                </div>
-                <Send className="w-8 h-8 text-green-500" />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Emails Opened</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalStats.opens}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {totalStats.opens > 0 ? Math.round((totalStats.clicks / totalStats.opens) * 100) : 0}% clicked
-                  </p>
-                </div>
-                <Eye className="w-8 h-8 text-purple-500" />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Link Clicks</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalStats.clicks}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {totalStats.emails > 0 ? Math.round((totalStats.clicks / totalStats.emails) * 100) : 0}% CTR
-                  </p>
-                </div>
-                <MousePointer className="w-8 h-8 text-orange-500" />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Search and Filter */}
-        {campaigns.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-4 space-y-4">
-            <div className="flex items-center gap-4">
-              {/* Search Bar */}
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search campaigns by name, industry..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 flex items-center gap-3 flex-wrap">
+            {/* Search */}
+            <div className="flex-1 relative min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search campaigns…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-gray-50"
+              />
             </div>
 
-            {/* Status Filter and Bulk Actions */}
-            <div className="flex items-center justify-between gap-4">
-              {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 mr-2">Status:</span>
-                {['all', 'active', 'paused', 'draft', 'completed'].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                      statusFilter === status
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </button>
-                ))}
-              </div>
+            {/* Status filter */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              {['all', 'active', 'paused', 'draft', 'completed'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    statusFilter === status ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
 
-              {/* Bulk Actions */}
+            {/* Bulk action controls */}
+            <div className="flex items-center gap-2 ml-auto">
               {filteredCampaigns.length > 0 && (
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleSelectAll}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                      selectedCampaigns.size === filteredCampaigns.length
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <Check className="w-4 h-4 inline mr-1" />
-                    {selectedCampaigns.size === filteredCampaigns.length ? 'Deselect All' : 'Select All'}
+                <button
+                  onClick={handleSelectAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  {selectedCampaigns.size === filteredCampaigns.length && filteredCampaigns.length > 0 ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+              {selectedCampaigns.size > 0 && (
+                <>
+                  <span className="text-xs text-gray-500">{selectedCampaigns.size} selected</span>
+                  <button onClick={handleBulkStart} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700">
+                    <Play className="w-3.5 h-3.5" /> Start
                   </button>
-                  
-                  {selectedCampaigns.size > 0 && (
-                    <>
-                      <span className="text-sm text-gray-600">
-                        {selectedCampaigns.size} selected
-                      </span>
-                      <button
-                        onClick={handleBulkStart}
-                        className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-1"
-                      >
-                        <Play className="w-4 h-4" />
-                        Start
-                      </button>
-                      <button
-                        onClick={handleBulkPause}
-                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1"
-                      >
-                        <Pause className="w-4 h-4" />
-                        Pause
-                      </button>
-                      <button
-                        onClick={handleBulkDelete}
-                        className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 flex items-center gap-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
+                  <button onClick={handleBulkPause} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    <Pause className="w-3.5 h-3.5" /> Pause
+                  </button>
+                  <button onClick={handleBulkDelete} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -828,709 +739,230 @@ function Campaigns() {
 
         {/* Campaign List */}
         {loading ? (
-          <div className="bg-white rounded-lg shadow p-8 text-center">
-            <p className="text-gray-600">Loading campaigns...</p>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+            <p className="text-gray-500 text-sm">Loading campaigns…</p>
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="flex flex-col items-center justify-center h-96 text-center">
-              <Mail className="w-16 h-16 text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No campaigns yet</h3>
-              <p className="text-gray-600 mb-6">Create your first email campaign to start reaching out to leads</p>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex flex-col items-center justify-center h-72 text-center px-6">
+              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
+                <Mail className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-1">No campaigns yet</h3>
+              <p className="text-sm text-gray-500 mb-5 max-w-xs">Create your first campaign to start generating leads and reaching out</p>
               <button
                 onClick={handleCreateCampaign}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center gap-2"
               >
-                <Plus className="w-4 h-4 inline mr-2" />
+                <Plus className="w-4 h-4" />
                 Create Your First Campaign
               </button>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filteredCampaigns.length === 0 ? (
-              <div className="col-span-full">
-                {/* Tab-Specific Empty States */}
-                {campaignTypeFilter === 'lead_generation' ? (
-                  <div className="bg-gradient-to-br from-purple-50 to-white rounded-lg shadow-lg p-12 text-center border-2 border-purple-100">
-                    <Database className="w-20 h-20 text-purple-500 mx-auto mb-6" />
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Lead Generation Campaigns</h3>
-                    <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-                      Lead generation campaigns automatically discover and collect leads from sources like Apollo.io and Google Places.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                      <button
-                        onClick={handleCreateCampaign}
-                        className="px-6 py-3 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 flex items-center gap-2"
-                      >
-                        <Plus className="w-5 h-5" />
-                        Create Lead Gen Campaign
-                      </button>
-                      <button
-                        onClick={() => window.location.href = '/leads'}
-                        className="px-6 py-3 text-sm font-medium text-purple-600 bg-white border-2 border-purple-600 rounded-lg hover:bg-purple-50 flex items-center gap-2"
-                      >
-                        <Database className="w-5 h-5" />
-                        Go to Leads Page
-                      </button>
-                    </div>
-                  </div>
-                ) : campaignTypeFilter === 'outreach' ? (
-                  <div className="bg-gradient-to-br from-blue-50 to-white rounded-lg shadow-lg p-12 text-center border-2 border-blue-100">
-                    <Mail className="w-20 h-20 text-blue-500 mx-auto mb-6" />
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Outreach Campaigns</h3>
-                    <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-                      Outreach campaigns send personalized email sequences to your existing leads or batches. Perfect for manual lead lists or targeted outreach.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                      <button
-                        onClick={handleCreateCampaign}
-                        className="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                      >
-                        <Plus className="w-5 h-5" />
-                        Create Outreach Campaign
-                      </button>
-                      <button
-                        onClick={() => window.location.href = '/leads'}
-                        className="px-6 py-3 text-sm font-medium text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 flex items-center gap-2"
-                      >
-                        <Users className="w-5 h-5" />
-                        Go to Leads Page
-                      </button>
-                    </div>
-                  </div>
-                ) : campaignTypeFilter === 'fully_automated' ? (
-                  <div className="bg-gradient-to-br from-orange-50 to-white rounded-lg shadow-lg p-12 text-center border-2 border-orange-100">
-                    <Zap className="w-20 h-20 text-orange-500 mx-auto mb-6" />
-                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Fully Automated Campaigns</h3>
-                    <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-                      Fully automated campaigns combine lead generation and outreach into one hands-free workflow. Set it up once and let it run continuously.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                      <button
-                        onClick={handleCreateCampaign}
-                        className="px-6 py-3 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 flex items-center gap-2"
-                      >
-                        <Zap className="w-5 h-5" />
-                        Create Automated Campaign
-                      </button>
-                      {/* <a
-                        href="https://docs.example.com/automated-campaigns"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-6 py-3 text-sm font-medium text-orange-600 bg-white border-2 border-orange-600 rounded-lg hover:bg-orange-50 flex items-center gap-2"
-                      >
-                        <Eye className="w-5 h-5" />
-                        Learn More
-                      </a> */}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-white rounded-lg shadow p-8 text-center">
-                    <p className="text-gray-600">No campaigns match your search criteria</p>
-                  </div>
-                )}
+              <div className="col-span-full bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center">
+                <p className="text-sm text-gray-500">No campaigns match your filters</p>
               </div>
             ) : (
-              <>
-              {/* Quick Action Card - Show when viewing specific campaign type tabs */}
-              {campaignTypeFilter === 'lead_generation' && (
-                <div className="col-span-full">
-                  <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                          <Database className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-lg mb-1">Create New Lead Generation Campaign</h3>
-                          <p className="text-purple-100 text-sm">Set up automated lead discovery from Apollo.io or Google Places</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleCreateCampaign}
-                        className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
-                      >
-                        <Plus className="w-4 h-4" />
-                        New Campaign
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {campaignTypeFilter === 'outreach' && (
-                <div className="col-span-full">
-                  <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                          <Mail className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-lg mb-1">Create New Outreach Campaign</h3>
-                          <p className="text-blue-100 text-sm">Send personalized email sequences to your leads or batches</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleCreateCampaign}
-                        className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
-                      >
-                        <Plus className="w-4 h-4" />
-                        New Campaign
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {campaignTypeFilter === 'fully_automated' && (
-                <div className="col-span-full">
-                  <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                          <Zap className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-lg mb-1">Create Automated Campaign</h3>
-                          <p className="text-orange-100 text-sm">Set up continuous lead generation + outreach on autopilot</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleCreateCampaign}
-                        className="px-4 py-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50 font-medium text-sm flex items-center gap-2 whitespace-nowrap"
-                      >
-                        <Plus className="w-4 h-4" />
-                        New Automated Campaign
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {filteredCampaigns.map((campaign) => {
+              filteredCampaigns.map((campaign) => {
                 const campaignType = campaign.campaignType || 'outreach';
 
-                // Lead Generation Campaign Card
-                if (campaignType === 'lead_generation') {
-                  return (
-                    <div
-                      key={campaign.id}
-                      onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                      className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
-                        selectedCampaigns.has(campaign.id) ? 'ring-2 ring-purple-500' : ''
-                      }`}
-                    >
-                      <div className="p-4 lg:p-6 flex-1">
-                        {/* Header with Checkbox */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={selectedCampaigns.has(campaign.id)}
-                              onChange={(e) => {
-                                e.stopPropagation()
-                                handleSelectCampaign(campaign.id)
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-purple-600">
-                                {campaign.name}
-                              </h3>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                                  campaign.status === 'running' ? 'bg-green-100 text-green-800' :
-                                  campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                                  campaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
-                                  campaign.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                                  campaign.status === 'completed' ? 'bg-gray-100 text-gray-800' :
-                                  'bg-red-100 text-red-800'
-                                }`}>
-                                  {campaign.status}
-                                </span>
-                                {campaign.isRecurring && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 rounded">
-                                    <RefreshCw className="w-3 h-3" />
-                                    {campaign.recurringInterval === 'daily' ? 'Daily' :
-                                     campaign.recurringInterval === 'every_2_days' ? 'Every 2 Days' :
-                                     campaign.recurringInterval === 'every_3_days' ? 'Every 3 Days' :
-                                     campaign.recurringInterval === 'weekly' ? 'Weekly' :
-                                     campaign.recurringInterval === 'monthly' ? 'Monthly' : 'Recurring'}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                const typeConfig = {
+                  lead_generation: { label: 'Lead Gen', icon: <Database className="w-3.5 h-3.5" />, badge: 'bg-purple-100 text-purple-700', border: 'border-l-purple-500', accent: 'text-purple-700', accentBg: 'bg-purple-50', actionColor: 'bg-purple-600 hover:bg-purple-700' },
+                  outreach:        { label: 'Outreach', icon: <Mail className="w-3.5 h-3.5" />,     badge: 'bg-blue-100 text-blue-700',   border: 'border-l-blue-500',   accent: 'text-blue-700',   accentBg: 'bg-blue-50',   actionColor: 'bg-blue-600 hover:bg-blue-700'   },
+                  fully_automated: { label: 'Automated', icon: <Zap className="w-3.5 h-3.5" />,    badge: 'bg-orange-100 text-orange-700', border: 'border-l-orange-500', accent: 'text-orange-700', accentBg: 'bg-orange-50', actionColor: 'bg-orange-600 hover:bg-orange-700' },
+                }[campaignType] ?? { label: 'Outreach', icon: <Mail className="w-3.5 h-3.5" />, badge: 'bg-blue-100 text-blue-700', border: 'border-l-blue-500', accent: 'text-blue-700', accentBg: 'bg-blue-50', actionColor: 'bg-blue-600 hover:bg-blue-700' };
 
-                        {/* Campaign Details */}
-                        <div className="space-y-2 text-sm mb-4">
-                          {campaign.industry && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Industry:</span>
-                              <span className="font-medium text-gray-900">{campaign.industry}</span>
-                            </div>
-                          )}
-                          {campaign.city && campaign.country && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Location:</span>
-                              <span className="font-medium text-gray-900">{campaign.city}, {campaign.country}</span>
-                            </div>
-                          )}
-                          {campaign.leadSources && campaign.leadSources.length > 0 && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Sources:</span>
-                              <span className="font-medium text-gray-900">{campaign.leadSources.length} source{campaign.leadSources.length !== 1 ? 's' : ''}</span>
-                            </div>
-                          )}
-                          {campaign.maxResultsPerRun && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Max per run:</span>
-                              <span className="font-medium text-gray-900">{campaign.maxResultsPerRun} leads</span>
-                            </div>
-                          )}
-                        </div>
+                const isActive = campaign.status === 'running' || campaign.status === 'active';
 
-                        {/* Stats */}
-                        <div className="pt-3 border-t grid grid-cols-2 gap-3 mb-4">
-                          <div className="text-center bg-purple-50 rounded-lg p-3">
-                            <div className="text-2xl font-bold text-purple-700">{campaign.leadsGenerated || 0}</div>
-                            <div className="text-xs text-gray-600">Leads Generated</div>
-                          </div>
-                          <div className="text-center bg-purple-50 rounded-lg p-3">
-                            <div className="text-2xl font-bold text-purple-700">{campaign.batchesCreated || 0}</div>
-                            <div className="text-xs text-gray-600">Batches Created</div>
-                          </div>
-                        </div>
+                const statusBadge = (() => {
+                  if (campaign.status === 'running' || campaign.status === 'active') return 'bg-green-100 text-green-800';
+                  if (campaign.status === 'paused') return 'bg-yellow-100 text-yellow-800';
+                  if (campaign.status === 'scheduled') return 'bg-blue-100 text-blue-800';
+                  if (campaign.status === 'completed') return 'bg-gray-100 text-gray-700';
+                  return 'bg-gray-100 text-gray-700';
+                })();
 
-                        {/* Next/Last Run */}
-                        {campaign.isRecurring && campaign.nextRunAt && campaign.status === 'running' && (
-                          <div className="flex items-center gap-2 text-sm text-gray-700 bg-blue-50 p-3 rounded-lg mb-2">
-                            <Calendar className="w-4 h-4 text-blue-600" />
-                            <span>Next run: {new Date(campaign.nextRunAt).toLocaleString()}</span>
-                          </div>
-                        )}
+                const statusDot = (() => {
+                  if (campaign.status === 'running' || campaign.status === 'active') return 'bg-green-500';
+                  if (campaign.status === 'paused') return 'bg-yellow-500';
+                  if (campaign.status === 'scheduled') return 'bg-blue-500';
+                  return 'bg-gray-400';
+                })();
 
-                        {campaign.lastRunAt && (
-                          <div className="text-xs text-gray-600 mb-2">
-                            Last run: {new Date(campaign.lastRunAt).toLocaleString()}
-                          </div>
-                        )}
-                      </div>
+                // Funnel stats for outreach / automated
+                const sent = campaign.emailsSent || 0;
+                const opened = campaign.emailsOpened || 0;
+                const clicked = campaign.emailsClicked || 0;
+                const replied = campaign.emailsReplied || campaign.responsesReceived || 0;
+                const openPct = sent > 0 ? Math.round((opened / sent) * 100) : 0;
+                const clickPct = sent > 0 ? Math.round((clicked / sent) * 100) : 0;
+                const replyPct = sent > 0 ? Math.round((replied / sent) * 100) : 0;
 
-                      {/* Card Footer with Actions */}
-                      <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between gap-2">
-                        <div className="text-xs text-gray-500">
-                          Created {new Date(campaign.createdAt).toLocaleDateString()}
-                        </div>
-                        <div className="flex gap-2">
-                          {/* Show appropriate button based on campaign status */}
-                          {(campaign.status === 'running' || campaign.status === 'active') ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePauseCampaign(campaign.id);
-                              }}
-                              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
-                            >
-                              <Pause className="w-3 h-3" />
-                              Pause
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleStartCampaign(campaign.id, campaign.campaignType);
-                              }}
-                              className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-700 flex items-center gap-1"
-                            >
-                              <Play className="w-3 h-3" />
-                              {campaign.status === 'paused' ? 'Resume' : 'Start'}
-                            </button>
-                          )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.location.href = `/campaigns/${campaign.id}`;
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
-                          >
-                            <Settings className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCampaign(campaign.id);
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Fully Automated Campaign Card
-                if (campaignType === 'fully_automated') {
-                  return (
-                    <div
-                      key={campaign.id}
-                      onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                      className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
-                        selectedCampaigns.has(campaign.id) ? 'ring-2 ring-orange-500' : ''
-                      }`}
-                    >
-                      <div className="p-4 lg:p-6 flex-1">
-                        {/* Header with Checkbox */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={selectedCampaigns.has(campaign.id)}
-                              onChange={(e) => {
-                                e.stopPropagation()
-                                handleSelectCampaign(campaign.id)
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="mt-1 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500 cursor-pointer"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-orange-600">
-                                {campaign.name}
-                              </h3>
-                              <div className="flex items-center gap-2">
-                                <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                                  campaign.status === 'running' ? 'bg-green-100 text-green-800' :
-                                  campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {campaign.status}
-                                </span>
-                              </div>
-                              {campaign.industry && (
-                                <p className="text-sm text-gray-600 mt-1">
-                                  {campaign.industry} • {
-                                    campaign.recurringInterval === 'daily' ? 'Daily' :
-                                    campaign.recurringInterval === 'every_2_days' ? 'Every 2 Days' :
-                                    campaign.recurringInterval === 'every_3_days' ? 'Every 3 Days' :
-                                    campaign.recurringInterval === 'weekly' ? 'Weekly' :
-                                    campaign.recurringInterval === 'monthly' ? 'Monthly' : 'Recurring'
-                                  }
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Configuration Summary */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mb-4">
-                          <div className="flex items-start gap-2 bg-orange-50 p-3 rounded-lg">
-                            <Database className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <div className="font-medium text-gray-900">Lead Generation</div>
-                              <div className="text-xs text-gray-600">
-                                {campaign.maxResultsPerRun || 0} leads from {(campaign.leadSources || []).length} source{(campaign.leadSources || []).length !== 1 ? 's' : ''}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-start gap-2 bg-orange-50 p-3 rounded-lg">
-                            <Mail className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                            <div>
-                              <div className="font-medium text-gray-900">Outreach</div>
-                              <div className="text-xs text-gray-600">
-                                {campaign.outreachDelayDays === 0 ? 'Immediate' : `${campaign.outreachDelayDays || 0} days delay`}
-                                <br />
-                                {campaign.useWorkflow ? `Workflow: ${campaign.workflowName || 'Unknown'}` : `Template: ${campaign.templateName || 'Unknown'}`}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div className="grid grid-cols-3 gap-2 pt-3 border-t mb-4">
-                          <div className="text-center bg-orange-50 rounded-lg p-3">
-                            <div className="text-xl font-bold text-orange-700">{campaign.totalRunsCompleted || 0}</div>
-                            <div className="text-xs text-gray-600">Runs</div>
-                          </div>
-                          <div className="text-center bg-orange-50 rounded-lg p-3">
-                            <div className="text-xl font-bold text-orange-700">{campaign.totalLeadsGenerated || 0}</div>
-                            <div className="text-xs text-gray-600">Leads</div>
-                          </div>
-                          <div className="text-center bg-orange-50 rounded-lg p-3">
-                            <div className="text-xl font-bold text-orange-700">{campaign.emailsSent || 0}</div>
-                            <div className="text-xs text-gray-600">Emails</div>
-                          </div>
-                        </div>
-
-                        {/* Next Run */}
-                        {campaign.status === 'running' && campaign.nextRunAt && (
-                          <div className="flex items-center gap-2 bg-blue-50 p-3 rounded-lg text-sm mb-2">
-                            <Calendar className="w-4 h-4 text-blue-600" />
-                            <span className="text-gray-700">Next run: {new Date(campaign.nextRunAt).toLocaleString()}</span>
-                          </div>
-                        )}
-
-                        {/* End Date */}
-                        {campaign.endDate && (
-                          <div className="text-xs text-gray-600">
-                            Ends: {new Date(campaign.endDate).toLocaleDateString()}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Card Footer with Actions */}
-                      <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between gap-2">
-                        <div className="text-xs text-gray-500">
-                          Created {new Date(campaign.createdAt).toLocaleDateString()}
-                        </div>
-                        <div className="flex gap-2">
-                          {(campaign.status === 'running' || campaign.status === 'active') ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handlePauseCampaign(campaign.id);
-                              }}
-                              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
-                            >
-                              <Pause className="w-3 h-3" />
-                              Pause
-                            </button>
-                          ) : (campaign.status === 'paused' || campaign.status === 'draft') ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleStartCampaign(campaign.id, campaign.campaignType);
-                              }}
-                              className="px-3 py-1.5 text-xs font-medium text-white bg-orange-600 rounded hover:bg-orange-700 flex items-center gap-1"
-                            >
-                              <Play className="w-3 h-3" />
-                              {campaign.status === 'paused' ? 'Resume' : 'Start'}
-                            </button>
-                          ) : null}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.location.href = `/campaigns/${campaign.id}`;
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
-                          >
-                            <BarChart3 className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCampaign(campaign.id);
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // Outreach Campaign Card (default/fallback)
                 return (
                   <div
                     key={campaign.id}
                     onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                    className={`bg-white rounded-lg shadow hover:shadow-xl transition-all flex flex-col cursor-pointer ${
-                      selectedCampaigns.has(campaign.id) ? 'ring-2 ring-blue-500' : ''
+                    className={`bg-white rounded-xl border-2 shadow-sm hover:shadow-md transition-all flex flex-col cursor-pointer border-l-4 ${typeConfig.border} ${
+                      selectedCampaigns.has(campaign.id) ? 'border-t-primary-400 border-r-primary-400 border-b-primary-400' : 'border-t-gray-200 border-r-gray-200 border-b-gray-200'
                     }`}
                   >
-                    <div className="p-4 lg:p-6 flex-1">
-                      {/* Header with Checkbox */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-start gap-2 lg:gap-3 flex-1 min-w-0">
-                          <input
-                            type="checkbox"
-                            checked={selectedCampaigns.has(campaign.id)}
-                            onChange={(e) => {
-                              e.stopPropagation()
-                              handleSelectCampaign(campaign.id)
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-semibold text-gray-900 truncate mb-2 hover:text-blue-600">
-                              {campaign.name}
-                            </h3>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-                                campaign.status === 'running' ? 'bg-green-100 text-green-800' :
-                                campaign.status === 'paused' ? 'bg-yellow-100 text-yellow-800' :
-                                campaign.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
-                                campaign.status === 'draft' ? 'bg-gray-100 text-gray-800' :
-                                campaign.status === 'completed' ? 'bg-gray-100 text-gray-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                                {campaign.status}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-gray-600 flex-wrap">
-                              <span className="flex items-center gap-1">
-                                {campaign.useWorkflow ? (
-                                  <>
-                                    <RefreshCw className="w-4 h-4" />
-                                    Workflow: {campaign.workflowName || 'Unknown'}
-                                    {campaign.currentWorkflowStep && (
-                                      <span className="ml-1">(Step {campaign.currentWorkflowStep})</span>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Mail className="w-4 h-4" />
-                                    Template: {campaign.templateName || 'Unknown'}
-                                  </>
-                                )}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Users className="w-4 h-4" />
-                                {campaign.totalLeadsTargeted || campaign.leadsGenerated || 0} leads
-                              </span>
-                            </div>
-                            {campaign.batchNames && campaign.batchNames.length > 0 && (
-                              <div
-                                onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                                className="text-xs text-gray-600 mt-1"
-                              >
-                                Batches: {campaign.batchNames.join(', ')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                    {/* Card body */}
+                    <div className="p-5 flex-1 space-y-3">
+                      {/* Top row: checkbox + type badge + status */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedCampaigns.has(campaign.id)}
+                          onChange={(e) => { e.stopPropagation(); handleSelectCampaign(campaign.id); }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0"
+                        />
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${typeConfig.badge}`}>
+                          {typeConfig.icon}
+                          {typeConfig.label}
+                        </span>
+                        {campaign.isRecurring && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                            <RefreshCw className="w-3 h-3" />
+                            {campaign.recurringInterval === 'daily' ? 'Daily' :
+                             campaign.recurringInterval === 'every_2_days' ? '2-day' :
+                             campaign.recurringInterval === 'weekly' ? 'Weekly' : 'Recurring'}
+                          </span>
+                        )}
+                        <span className={`ml-auto inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${statusBadge}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusDot}`} />
+                          {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+                        </span>
                       </div>
 
-                      {/* Progress Bar */}
-                      {campaign.status === 'running' && campaign.emailsScheduledCount && (
-                        <div
-                          onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                          className="space-y-1 mb-4"
-                        >
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Progress</span>
-                            <span className="font-medium text-gray-900">
-                              {campaign.emailsSent || 0} / {campaign.emailsScheduledCount || 0} emails sent
-                              ({campaign.emailsScheduledCount ? Math.round(((campaign.emailsSent || 0) / campaign.emailsScheduledCount) * 100) : 0}%)
-                            </span>
+                      {/* Campaign name */}
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900 leading-snug line-clamp-1 hover:text-primary-700">
+                          {campaign.name}
+                        </h3>
+                        {campaign.industry && (
+                          <p className="text-xs text-gray-500 mt-0.5">{campaign.industry}</p>
+                        )}
+                      </div>
+
+                      {/* Lead Gen stats */}
+                      {campaignType === 'lead_generation' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className={`rounded-lg p-2.5 text-center ${typeConfig.accentBg}`}>
+                            <div className={`text-xl font-bold ${typeConfig.accent}`}>{campaign.leadsGenerated || 0}</div>
+                            <div className="text-[10px] text-gray-500">Leads Generated</div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full transition-all"
-                              style={{ width: `${campaign.emailsScheduledCount ? Math.min(((campaign.emailsSent || 0) / campaign.emailsScheduledCount) * 100, 100) : 0}%` }}
-                            ></div>
+                          <div className={`rounded-lg p-2.5 text-center ${typeConfig.accentBg}`}>
+                            <div className={`text-xl font-bold ${typeConfig.accent}`}>{campaign.batchesCreated || 0}</div>
+                            <div className="text-[10px] text-gray-500">Batches</div>
                           </div>
                         </div>
                       )}
 
-                      {/* Email Stats */}
-                      <div
-                        onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                        className="grid grid-cols-4 gap-2 mb-4"
-                      >
-                        <div className="text-center bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
-                            <Mail className="w-3 h-3" />
+                      {/* Automated stats */}
+                      {campaignType === 'fully_automated' && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className={`rounded-lg p-2.5 text-center ${typeConfig.accentBg}`}>
+                            <div className={`text-lg font-bold ${typeConfig.accent}`}>{campaign.totalRunsCompleted || 0}</div>
+                            <div className="text-[10px] text-gray-500">Runs</div>
                           </div>
-                          <div className="text-lg font-bold text-gray-900">{campaign.emailsSent || 0}</div>
-                          <div className="text-xs text-gray-600">Sent</div>
-                        </div>
-                        <div className="text-center bg-green-50 rounded-lg p-3">
-                          <div className="flex items-center justify-center gap-1 text-green-600 mb-1">
-                            <Eye className="w-3 h-3" />
+                          <div className={`rounded-lg p-2.5 text-center ${typeConfig.accentBg}`}>
+                            <div className={`text-lg font-bold ${typeConfig.accent}`}>{campaign.totalLeadsGenerated || 0}</div>
+                            <div className="text-[10px] text-gray-500">Leads</div>
                           </div>
-                          <div className="text-lg font-bold text-green-700">{campaign.emailsOpened || 0}</div>
-                          <div className="text-xs text-green-600">
-                            {campaign.emailsSent ? Math.round(((campaign.emailsOpened || 0) / campaign.emailsSent) * 100) : 0}%
+                          <div className={`rounded-lg p-2.5 text-center ${typeConfig.accentBg}`}>
+                            <div className={`text-lg font-bold ${typeConfig.accent}`}>{sent}</div>
+                            <div className="text-[10px] text-gray-500">Emails</div>
                           </div>
                         </div>
-                        <div className="text-center bg-blue-50 rounded-lg p-3">
-                          <div className="flex items-center justify-center gap-1 text-blue-600 mb-1">
-                            <MousePointerClick className="w-3 h-3" />
-                          </div>
-                          <div className="text-lg font-bold text-blue-700">{campaign.emailsClicked || 0}</div>
-                          <div className="text-xs text-blue-600">Clicks</div>
-                        </div>
-                        <div className="text-center bg-purple-50 rounded-lg p-3">
-                          <div className="flex items-center justify-center gap-1 text-purple-600 mb-1">
-                            <Reply className="w-3 h-3" />
-                          </div>
-                          <div className="text-lg font-bold text-purple-700">{campaign.emailsReplied || campaign.responsesReceived || 0}</div>
-                          <div className="text-xs text-purple-600">Replies</div>
-                        </div>
-                      </div>
+                      )}
 
-                      {/* Timing Info */}
-                      <div
-                        onClick={() => window.location.href = `/campaigns/${campaign.id}`}
-                        className="text-xs text-gray-600 space-y-1"
-                      >
-                        {campaign.status === 'scheduled' && campaign.scheduledStartAt && (
-                          <div className="bg-blue-50 p-2 rounded">
-                            Scheduled for: {new Date(campaign.scheduledStartAt).toLocaleString()}
+                      {/* Outreach / Automated funnel mini-bar */}
+                      {(campaignType === 'outreach' || campaignType === 'fully_automated') && sent > 0 && (
+                        <div className="pt-2 border-t border-gray-100 space-y-1.5">
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                            <span className="w-10">Sent</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                              <div className="bg-gray-400 h-1.5 rounded-full" style={{ width: '100%' }} />
+                            </div>
+                            <span className="w-6 text-right font-medium text-gray-700">{sent}</span>
                           </div>
-                        )}
-                        {campaign.actualStartedAt && (
-                          <div>Started: {new Date(campaign.actualStartedAt).toLocaleString()}</div>
-                        )}
-                        {campaign.completedAt && (
-                          <div>Completed: {new Date(campaign.completedAt).toLocaleString()}</div>
-                        )}
-                      </div>
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                            <span className="w-10">Opened</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                              <div className="bg-green-400 h-1.5 rounded-full" style={{ width: `${openPct}%` }} />
+                            </div>
+                            <span className="w-6 text-right font-medium text-gray-700">{openPct}%</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                            <span className="w-10">Clicked</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                              <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${clickPct}%` }} />
+                            </div>
+                            <span className="w-6 text-right font-medium text-gray-700">{clickPct}%</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                            <span className="w-10">Replied</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                              <div className="bg-purple-400 h-1.5 rounded-full" style={{ width: `${replyPct}%` }} />
+                            </div>
+                            <span className="w-6 text-right font-medium text-gray-700">{replyPct}%</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Outreach info line */}
+                      {campaignType === 'outreach' && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                          {campaign.useWorkflow ? <RefreshCw className="w-3.5 h-3.5" /> : <Mail className="w-3.5 h-3.5" />}
+                          <span className="truncate">{campaign.useWorkflow ? campaign.workflowName || 'Workflow' : campaign.templateName || 'Template'}</span>
+                          <span className="ml-auto flex-shrink-0 flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5" />
+                            {campaign.totalLeadsTargeted || campaign.leadsGenerated || 0}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Next run */}
+                      {campaign.nextRunAt && isActive && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500 bg-blue-50 rounded-lg px-2.5 py-1.5">
+                          <Calendar className="w-3 h-3 text-blue-500" />
+                          Next run: {new Date(campaign.nextRunAt).toLocaleString()}
+                        </div>
+                      )}
                     </div>
 
-                    {/* Card Footer with Actions */}
-                    <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between gap-2">
-                      <div className="text-xs text-gray-500">
-                        Created {new Date(campaign.createdAt).toLocaleDateString()}
-                      </div>
-                      <div className="flex gap-2">
-                        {(campaign.status === 'running' || campaign.status === 'active') ? (
+                    {/* Card footer */}
+                    <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 rounded-b-xl flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-gray-400">{new Date(campaign.createdAt).toLocaleDateString()}</span>
+                      <div className="flex items-center gap-1.5">
+                        {isActive ? (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePauseCampaign(campaign.id);
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                            onClick={(e) => { e.stopPropagation(); handlePauseCampaign(campaign.id); }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
                           >
-                            <Pause className="w-3 h-3" />
-                            Pause
+                            <Pause className="w-3 h-3" /> Pause
                           </button>
                         ) : (campaign.status === 'paused' || campaign.status === 'draft' || campaign.status === 'scheduled') ? (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStartCampaign(campaign.id, campaign.campaignType);
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 flex items-center gap-1"
+                            onClick={(e) => { e.stopPropagation(); handleStartCampaign(campaign.id, campaign.campaignType); }}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white rounded-lg ${typeConfig.actionColor}`}
                           >
-                            <Play className="w-3 h-3" />
-                            {campaign.status === 'paused' ? 'Resume' : 'Start'}
+                            <Play className="w-3 h-3" /> {campaign.status === 'paused' ? 'Resume' : 'Start'}
                           </button>
                         ) : null}
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.location.href = `/campaigns/${campaign.id}`;
-                          }}
-                          className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+                          onClick={(e) => { e.stopPropagation(); window.location.href = `/campaigns/${campaign.id}`; }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
                         >
                           <BarChart3 className="w-3 h-3" />
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCampaign(campaign.id);
-                          }}
-                          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCampaign(campaign.id); }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-100 rounded-lg hover:bg-red-50"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -1538,12 +970,10 @@ function Campaigns() {
                     </div>
                   </div>
                 );
-              })}
-              </>
+              })
             )}
           </div>
         )}
-
         {/* Campaign Creation Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -2066,6 +1496,91 @@ function Campaigns() {
               setShowAutomatedForm(false)
             }}
           />
+        )}
+
+        {/* Campaign Type Picker Modal */}
+        {showTypePickerModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden">
+              <div className="flex items-center justify-between px-8 pt-8 pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Create a Campaign</h2>
+                  <p className="text-gray-500 mt-1 text-sm">Choose the type of campaign you want to run</p>
+                </div>
+                <button
+                  onClick={() => setShowTypePickerModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="px-8 pb-8 grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => {
+                    setShowTypePickerModal(false)
+                    setCampaignTypeFilter('lead_generation')
+                    setShowLeadGenForm(true)
+                  }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-purple-300 hover:bg-purple-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-purple-200 transition-colors">
+                    <Database className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">Lead Generation</h3>
+                      <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-purple-500 transition-colors flex-shrink-0" />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Auto-discover leads from Apollo.io, Google Places, and more.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTypePickerModal(false)
+                    setCampaignTypeFilter('outreach')
+                    setShowOutreachForm(true)
+                  }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+                    <Mail className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">Outreach</h3>
+                      <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Send personalized email sequences to your existing leads and contact lists.
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTypePickerModal(false)
+                    setCampaignTypeFilter('fully_automated')
+                    setShowAutomatedForm(true)
+                  }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-orange-300 hover:bg-orange-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-orange-200 transition-colors">
+                    <Zap className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">Fully Automated</h3>
+                      <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-orange-500 transition-colors flex-shrink-0" />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Lead generation + outreach combined. Set up once, runs on autopilot.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </Layout>

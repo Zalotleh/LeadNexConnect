@@ -38,6 +38,7 @@ import testingRoutes from './routes/testing.routes';
 import templatesRoutes from './routes/templates.routes';
 import customVariablesRoutes from './routes/custom-variables.routes';
 import configRoutes from './routes/config.routes';
+import senderProfileRoutes from './routes/sender-profile.routes';
 
 // Load environment variables
 dotenv.config();
@@ -114,6 +115,7 @@ app.use('/api/workflows', authMiddleware, workflowsRoutes);
 app.use('/api/testing', authMiddleware, testingRoutes);
 app.use('/api/templates', authMiddleware, templatesRoutes);
 app.use('/api/custom-variables', authMiddleware, customVariablesRoutes);
+app.use('/api/sender-profile', authMiddleware, senderProfileRoutes);
 app.use('/api/config', authMiddleware, requireAdmin, configRoutes); // Admin-only: API/SMTP configuration
 
 // 404 handler

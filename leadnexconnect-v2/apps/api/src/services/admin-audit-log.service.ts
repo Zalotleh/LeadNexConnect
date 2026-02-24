@@ -1,5 +1,5 @@
 import { db, auditLog, users } from '@leadnex/database';
-import { eq, desc, and, gte, lte, or, ilike } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, or, ilike, count } from 'drizzle-orm';
 
 interface GetAuditLogsParams {
   page?: number;
@@ -143,22 +143,22 @@ class AdminAuditLogService {
     const logsByAction = await db
       .select({
         action: auditLog.action,
-        count: auditLog.id,
+        count: count(auditLog.id),
       })
       .from(auditLog)
       .groupBy(auditLog.action)
-      .orderBy(desc(auditLog.id))
+      .orderBy(desc(count(auditLog.id)))
       .limit(10);
 
     // Get logs by entity (top 10)
     const logsByEntity = await db
       .select({
         entity: auditLog.entity,
-        count: auditLog.id,
+        count: count(auditLog.id),
       })
       .from(auditLog)
       .groupBy(auditLog.entity)
-      .orderBy(desc(auditLog.id))
+      .orderBy(desc(count(auditLog.id)))
       .limit(10);
 
     // Get logs by user (top 10)
@@ -167,12 +167,12 @@ class AdminAuditLogService {
         userId: auditLog.userId,
         userEmail: users.email,
         userName: users.firstName,
-        count: auditLog.id,
+        count: count(auditLog.id),
       })
       .from(auditLog)
       .leftJoin(users, eq(auditLog.userId, users.id))
       .groupBy(auditLog.userId, users.email, users.firstName)
-      .orderBy(desc(auditLog.id))
+      .orderBy(desc(count(auditLog.id)))
       .limit(10);
 
     // Get recent activity (last 24 hours)

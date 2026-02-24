@@ -144,6 +144,9 @@ export class SettingsService {
         // Email Settings
         emailsPerHour: await this.get('emailsPerHour', 50, userId),
         dailyEmailLimit: await this.get('dailyEmailLimit', 500, userId),
+
+        // Email Signature
+        emailSignature: await this.get('emailSignature', '', userId),
       };
 
       return settingsData;

@@ -6,6 +6,7 @@ import { eq, desc, and, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
 import { emailSenderService } from '../services/outreach/email-sender.service';
+import { settingsService } from '../services/settings.service';
 
 export class EmailsController {
   /**
@@ -272,8 +273,10 @@ export class EmailsController {
       const email = await db.select().from(emails).where(eq(emails.id, id)).limit(1);
 
       if (!email[0]) {
-        // Redirect to a default URL if email not found
-        return res.redirect(url as string || 'https://www.booknexsolutions.com');
+        // Redirect to a default URL if email not found (use company website from settings)
+        const companyProfile = await settingsService.get('company_profile', null).catch(() => null) as any;
+        const fallbackUrl = (url as string) || companyProfile?.websiteUrl || '/';
+        return res.redirect(fallbackUrl);
       }
 
       // Track every click (increment clickCount)
@@ -331,13 +334,13 @@ export class EmailsController {
       }
 
       // Redirect to the actual URL
-      res.redirect(url as string || 'https://www.booknexsolutions.com');
+      res.redirect(url as string || '/');
     } catch (error: any) {
       logger.error('[EmailsController] Error tracking click', {
         error: error.message,
       });
       // Redirect even on error
-      res.redirect((req.query.url as string) || 'https://www.booknexsolutions.com');
+      res.redirect((req.query.url as string) || '/');
     }
   }
 }

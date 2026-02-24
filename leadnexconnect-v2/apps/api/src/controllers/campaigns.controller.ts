@@ -10,7 +10,9 @@ import { enrichmentPipelineService } from '../services/crm/enrichment-pipeline.s
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
 import { emailQueueService } from '../services/outreach/email-queue.service';
 import { campaignEmailSchedulerService } from '../services/campaign/campaign-email-scheduler.service';
-import { campaignEmailSenderService } from '../services/campaign/campaign-email-sender.service';
+import { campaignEmailSenderService } from '../services/campaign/campaign-email-sender.service'
+import { settingsService } from '../services/settings.service';
+import { variableResolverService, ResolverContext } from '../services/variable-resolver.service';
 
 export class CampaignsController {
   // In-memory lock to prevent duplicate campaign executions
@@ -1251,6 +1253,9 @@ export class CampaignsController {
 
     let totalEmailsQueued = 0;
 
+    // Pre-load resolver context once (sender profile + company profile + custom vars)
+    const resolverCtx = await variableResolverService.buildContext(campaign.userId);
+
     // Process each lead
     for (const lead of campaignLeadsList) {
       if (!lead.email) {
@@ -1292,8 +1297,8 @@ export class CampaignsController {
           }
 
           // Replace template variables
-          const subject = this.replaceTemplateVariables(step.subject || '', lead);
-          const bodyText = this.replaceTemplateVariables(step.body || '', lead);
+          const subject = variableResolverService.resolve(step.subject || '', resolverCtx, lead);
+          const bodyText = variableResolverService.resolve(step.body || '', resolverCtx, lead);
 
           // Calculate cumulative delay from campaign start
           // First step sends immediately (cumulativeDelayMinutes = 0)
@@ -1435,6 +1440,9 @@ export class CampaignsController {
     const template = templateResults[0];
     let emailsQueued = 0;
 
+    // Pre-load resolver context once (sender profile + company profile + custom vars)
+    const resolverCtx = await variableResolverService.buildContext(campaign.userId);
+
     // Determine the base time for scheduling
     const baseTime = campaign.startDate ? new Date(campaign.startDate).getTime() : Date.now();
     const now = Date.now();
@@ -1477,11 +1485,11 @@ export class CampaignsController {
         }
 
         // Replace template variables with lead data
-        const subject = this.replaceTemplateVariables(template.subject, lead);
-        const bodyText = this.replaceTemplateVariables(template.bodyText, lead);
+        const subject = variableResolverService.resolve(template.subject, resolverCtx, lead);
+        const bodyText = variableResolverService.resolve(template.bodyText, resolverCtx, lead);
         // Let email sender service handle HTML conversion
         const bodyHtml = template.bodyHtml 
-          ? this.replaceTemplateVariables(template.bodyHtml, lead)
+          ? variableResolverService.resolve(template.bodyHtml, resolverCtx, lead)
           : undefined;
 
         // Queue email for sending - schedule if campaign has future start date
@@ -1554,56 +1562,24 @@ export class CampaignsController {
   }
 
   /**
-   * Replace template variables with lead data
+   * Replace template variables with lead data.
+   * @deprecated Use variableResolverService.resolve() with a pre-built context instead.
+   * Kept as a thin sync wrapper for any legacy call sites that haven't been migrated.
    */
-  private replaceTemplateVariables(text: string, lead: any): string {
-    // BookNex signature HTML with logo and professional design
-    const signature = `
-<div style="margin: 0; padding: 0; margin-top: 20px;">
-<table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; border-collapse: collapse;">
-  <tr>
-    <td style="padding-right: 15px; vertical-align: top; border-right: 2px solid #2563eb;">
-      <img src="https://booknexsolutions.com/wp-content/uploads/2025/08/Logo-Png-Clean-1.png" alt="BookNex Solutions" width="120" style="display: block; margin: 0; padding: 0;">
-    </td>
-    <td style="padding-left: 15px; vertical-align: top;">
-      <strong style="font-size: 16px; color: #1e293b;">BookNex Solutions</strong><br>
-      <span style="font-size: 12px; color: #64748b;">Smart Booking Management</span><br><br>
-      <a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none; font-size: 13px;">🌐 www.booknexsolutions.com</a><br>
-      <a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none; font-size: 13px;">✉️ support@booknexsolutions.com</a><br>
-      <a href="https://www.linkedin.com/company/booknex-solutions/" style="color: #2563eb; text-decoration: none; font-size: 13px;">💼 Connect on LinkedIn</a>
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2" style="padding-top: 12px;">
-      <span style="font-size: 11px; color: #94a3b8;">Streamline your bookings • Reduce no-shows • Grow your business</span>
-    </td>
-  </tr>
-</table>
-</div>
-    `.trim();
-
-    return text
-      // Lead variables
-      .replace(/\{\{companyName\}\}/g, lead.companyName || 'your company')
-      .replace(/\{\{contactName\}\}/g, lead.contactName || 'there')
-      .replace(/\{\{email\}\}/g, lead.email || '')
-      .replace(/\{\{website\}\}/g, lead.website || '')
-      .replace(/\{\{industry\}\}/g, lead.industry || '')
-      .replace(/\{\{city\}\}/g, lead.city || '')
-      .replace(/\{\{country\}\}/g, lead.country || '')
-      .replace(/\{\{jobTitle\}\}/g, lead.jobTitle || '')
-      .replace(/\{\{companySize\}\}/g, lead.companySize || '')
-      // BookNex company info
-      .replace(/\{\{BookNex\}\}/g, '<a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none;">www.booknexsolutions.com</a>')
-      .replace(/\{\{ourCompanyName\}\}/g, 'BookNex Solutions')
-      .replace(/\{\{ourEmail\}\}/g, '<a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none;">support@booknexsolutions.com</a>')
-      // BookNex links (as clickable text)
-      .replace(/\{\{featuresLink\}\}/g, '<a href="https://booknexsolutions.com/features/" style="color: #2563eb; text-decoration: underline;">View Our Features</a>')
-      .replace(/\{\{howToStartLink\}\}/g, '<a href="https://booknexsolutions.com/how-to-start/" style="color: #2563eb; text-decoration: underline;">How To Get Started</a>')
-      .replace(/\{\{pricingLink\}\}/g, '<a href="https://booknexsolutions.com/pricing/" style="color: #2563eb; text-decoration: underline;">View Pricing Plans</a>')
-      .replace(/\{\{signUpLink\}\}/g, '<a href="https://booknexsolutions.com/sign-up/" style="color: #2563eb; text-decoration: underline;">Sign Up Now</a>')
-      // Signature
-      .replace(/\{\{signature\}\}/g, signature);
+  private replaceTemplateVariables(text: string, lead: any, _userSignature?: string): string {
+    // Build a minimal sync context — no DB data (use the async path for real sends)
+    const minimalCtx = {
+      senderName: '',
+      senderEmail: '',
+      signatureHtml: _userSignature || '',
+      company: {
+        companyName: '', productName: '', productDescription: '',
+        websiteUrl: '', signUpLink: '', featuresLink: '',
+        pricingLink: '', demoLink: '', integrationsLink: '', supportEmail: '',
+      },
+      customVars: {},
+    };
+    return variableResolverService.resolve(text, minimalCtx, lead);
   }
 
   /**

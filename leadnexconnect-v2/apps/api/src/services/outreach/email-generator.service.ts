@@ -58,7 +58,7 @@ export class EmailGeneratorService {
       });
 
       // Build context for Claude
-      const prompt = this.buildAIPrompt(params);
+      const prompt = await this.buildAIPrompt(params);
 
       // Call Claude API
       const message = await anthropic.messages.create({
@@ -75,8 +75,12 @@ export class EmailGeneratorService {
       // Extract response
       const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
 
+      // Load product name for fallback subject (if Claude response can't be parsed)
+      const cpRaw = await settingsService.get('company_profile', null).catch(() => null) as any;
+      const resolvedProductName = cpRaw?.productName || 'our platform';
+
       // Parse the response (expected format: SUBJECT: ... \n\n BODY: ...)
-      const parsed = this.parseAIResponse(responseText);
+      const parsed = this.parseAIResponse(responseText, resolvedProductName);
 
       logger.info('[EmailGenerator] AI email generated successfully', {
         subjectLength: parsed.subject.length,
@@ -174,12 +178,22 @@ export class EmailGeneratorService {
   }
 
   /**
-   * Build the AI prompt for Claude
+   * Build the AI prompt for Claude — uses company_profile from settings to avoid hardcoded brand names.
    */
-  private buildAIPrompt(params: GenerateEmailParams & {
+  private async buildAIPrompt(params: GenerateEmailParams & {
     jobTitle?: string;
     website?: string;
-  }): string {
+  }): Promise<string> {
+    // Load company profile so the prompt reflects the actual product — not BookNex
+    const companyProfileRaw = await settingsService.get('company_profile', null).catch(() => null) as any;
+    const productName    = companyProfileRaw?.productName        || 'our platform';
+    const productDesc    = companyProfileRaw?.productDescription || 'an all-in-one business management platform';
+    const companyName    = companyProfileRaw?.companyName        || 'our company';
+    const signUpLink     = companyProfileRaw?.signUpLink         ? `{{signUpLink}}` : `{{signUpLink}}`;
+    const featuresLink   = companyProfileRaw?.featuresLink       ? `{{featuresLink}}` : `{{featuresLink}}`;
+    const pricingLink    = companyProfileRaw?.pricingLink        ? `{{pricingLink}}` : `{{pricingLink}}`;
+    const demoLink       = companyProfileRaw?.demoLink           ? `{{demoLink}}` : `{{demoLink}}`;
+    const websiteLink    = companyProfileRaw?.websiteUrl         ? `{{websiteLink}}` : `{{websiteLink}}`;
     const isFollowUp = params.followUpStage === 'follow_up_1' || params.followUpStage === 'follow_up_2';
     const isSecondFollowUp = params.followUpStage === 'follow_up_2';
     
@@ -296,129 +310,101 @@ export class EmailGeneratorService {
     // Join pain points as a comma-separated string for the prompt
     const painPoint = painPointsArray.join(', ');
 
-    return `You are a professional B2B sales email writer for BookNex, a comprehensive booking and CRM platform.
+    return `You are a professional B2B sales email writer for ${companyName}, a ${productDesc}.
 
 Task: Write a ${isFollowUp ? (isSecondFollowUp ? 'second follow-up' : 'first follow-up') : 'initial cold outreach'} email to a ${params.industry} business.
 
-Target Business Details:
-- Company Name: ${params.companyName}
-- Contact Name: ${params.contactName || 'the business owner'}
-${params.jobTitle ? `- Job Title: ${params.jobTitle}` : ''}
+Target context (use ONLY as background — DO NOT hardcode these values; use the {{variables}} below instead):
 - Industry: ${params.industry}
 - Location: ${params.city ? `${params.city}, ` : ''}${params.country || ''}
-${params.website ? `- Website: ${params.website}` : ''}
+${params.jobTitle ? `- Job Title: ${params.jobTitle}` : ''}
+- Email type: ${isFollowUp ? (isSecondFollowUp ? 'Second follow-up' : 'First follow-up') : 'Initial outreach'}
 
-Email Context: ${isFollowUp ? (isSecondFollowUp ? 'This is a SECOND follow-up email. Be more direct and create urgency.' : 'This is a FOLLOW-UP email (first reminder). Reference the previous email briefly.') : 'This is an INITIAL outreach email.'}
-
-Product: BookNex - All-in-one booking and CRM platform
+Product: ${productName} — ${productDesc}
 Industry Pain Point: ${painPoint}
 
-${params.additionalInstructions ? `
-🎯 ADDITIONAL CUSTOM INSTRUCTIONS (IMPORTANT - Follow these carefully):
+${params.additionalInstructions ? `🎯 ADDITIONAL CUSTOM INSTRUCTIONS (IMPORTANT - follow these carefully):
 ${params.additionalInstructions}
 
-` : ''}BLACK FRIDAY SPECIAL OFFER (Active Now - Ends December 7, 2024):
-- Offer Code: BOOKNEX100
-- Discount: 50% off first year
-- Deadline: December 7, 2024
-- This is a time-sensitive opportunity
+` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  MANDATORY VARIABLES — You MUST use ALL of the following in the email body, written EXACTLY as shown with double curly braces. The system replaces them at send time — never write the actual name or URL in their place.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Requirements:
-1. Subject line: Catchy, personalized, 40-50 characters max
-2. Email body: Professional but conversational tone - write like a helpful peer, not a salesperson
-3. Keep it concise and scannable (150-200 words maximum)
-4. Mention the industry-specific pain point naturally
-5. Highlight the BLACK FRIDAY offer prominently with urgency (ends December 7)
-6. Include the offer code BOOKNEX100 clearly
-7. ${isFollowUp ? 'Reference the previous email briefly, add new value or perspective' : 'Start with a relevant hook related to their role/industry'}
-8. DO NOT use placeholder text or brackets - use actual information provided
-9. DO NOT mention statistics or success metrics unless you have verified data
-10. DO NOT use generic phrases like "I hope this email finds you well"
-11. Use short, punchy sentences - avoid long paragraphs
+PERSONALIZATION (required — must appear in the body):
+  {{contactName}}     → recipient's first name — use in the opening greeting
+  {{companyName}}     → the RECIPIENT's company name — use at least once in the body
+  {{ourCompanyName}}  → YOUR company name (the sender) — use when introducing your product
 
-CRITICAL - Call-to-Action Links (use these exact variables):
-- {{signUpLink}} - For signing up to BookNex (PRIMARY CTA)
-- {{featuresLink}} - To explore specific features
-- {{pricingLink}} - To see pricing and plans
-- {{integrationsLink}} - To view integrations
-- {{demoLink}} - To book a demo
-- {{websiteLink}} - General website link
+CTA LINKS (use AT LEAST 3 as clickable <a href="{{variable}}"> tags):
+  {{signUpLink}}      → "Start your free trial" or "Sign up free" (primary CTA)
+  {{featuresLink}}    → "See how it works" or "Explore features"
+  {{demoLink}}        → "Book a quick demo" or "Book a demo"
+  {{pricingLink}}     → "View pricing" (optional 4th CTA)
+  {{websiteLink}}     → general company website link
+${params.website ? `  {{website}}         → recipient's own website (reference it naturally)` : ''}
 
-CRITICAL - Signature Variable:
-- End with {{signature}} - this will be replaced with the sender's signature
+SIGNATURE (required — must be the very last element):
+  {{signature}}       → sender's full signature block
 
-${isFollowUp ? `
-FOLLOW-UP SPECIFIC:
-- Acknowledge previous message briefly ("Following up on my last email...")
-- Provide a NEW angle or additional value (e.g., mention a specific feature, share a quick win, reference the Black Friday deadline)
-- Use a softer CTA like "Would you like to see a quick demo?" or "Want to grab this offer before December 7?"
-- Reinforce urgency with the Black Friday deadline
-- Keep it shorter and more casual than initial email
-${isSecondFollowUp ? '- Be more direct - this is the final follow-up' : ''}
-` : `
-INITIAL EMAIL SPECIFIC:
-- Hook: Start with their role or industry challenge
-- Pain Point: Reference the specific pain point for their industry
-- Solution: Briefly introduce BookNex as the solution (all-in-one booking & CRM)
-- Black Friday Offer: Highlight 50% off + BOOKNEX100 code + December 7 deadline
-- CTAs: Include 2-3 actionable CTAs:
-  * Primary: "Sign up now with {{signUpLink}} using code BOOKNEX100"
-  * Secondary: "Explore features at {{featuresLink}}" or "See pricing at {{pricingLink}}"
-  * Tertiary: "Book a quick demo at {{demoLink}}"
-- Make the Black Friday offer feel urgent and valuable
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Writing requirements:
+1. Subject line: 40-50 characters, catchy, reference the industry or {{companyName}}
+2. Tone: professional but conversational — like a helpful peer, not a salesperson
+3. Length: 150-200 words maximum, short punchy sentences
+4. Naturally mention the industry pain point: "${painPointsArray[0]}"
+5. ${isFollowUp ? 'Briefly reference the previous email, then add a new angle or value' : 'Open with a hook relevant to their industry challenge'}
+6. NEVER write any company name as literal text — use {{ourCompanyName}} for your own company, {{companyName}} for the recipient's company
+7. NEVER write real URLs — only the {{link variables}} listed above, always inside <a href="{{variable}}"> tags
+8. Avoid: statistics/metrics you cannot verify, "I hope this email finds you well", long paragraphs
+
+${isFollowUp ? `FOLLOW-UP RULES:
+- Start with a short reference: "Following up on my previous email..."
+- Add a new angle (feature highlight, quick win, etc.)
+- Softer CTA: "Would you like to see a quick demo?" → <a href="{{demoLink}}">Book a demo</a>
+- Keep it shorter and more casual than an initial email
+${isSecondFollowUp ? '- Be more direct — this is the final follow-up' : ''}
+` : `INITIAL EMAIL RULES:
+- Hook: open with {{companyName}}'s challenge in the ${params.industry} space
+- Bridge: one sentence introducing ${productName} (use {{ourCompanyName}} — NEVER write the name literally) as the solution
+- CTAs: MUST include all 3 of these links using the EXACT variable syntax:
+    <a href="{{signUpLink}}">Start your free trial</a> &nbsp;|&nbsp;
+    <a href="{{featuresLink}}">See how it works</a> &nbsp;|&nbsp;
+    <a href="{{demoLink}}">Book a quick demo</a>
 `}
-
-Example Structure for Initial Email:
-Hi [Name],
-
-[Role/industry-specific hook mentioning pain point]
-
-[One sentence about BookNex solution]
-
-🎉 Black Friday Special - 50% off your first year with code BOOKNEX100 (ends December 7)
-
-[Brief value proposition with specific benefit]
-
-[2-3 CTAs using link variables]
-
-{{signature}}
-
-Format your response EXACTLY as:
-SUBJECT: [your subject line]
+Format your response EXACTLY as (no extra text outside these two sections):
+SUBJECT: [subject line]
 
 BODY:
-[your email body in HTML format - must end with {{signature}}]
+[HTML email body]
 
-CRITICAL HTML FORMATTING RULES:
-1. Use proper HTML structure with email-compatible tags
-2. Use <p> tags for paragraphs (not <div>)
-3. Use <strong> for bold text
-4. Use <a href="VARIABLE"> for links (e.g., <a href="{{signUpLink}}">Sign up now</a>)
-5. Use <ul> and <li> for bullet lists if needed
-6. Keep HTML simple and email-client compatible
-7. Variables like {{signUpLink}}, {{signature}} must remain as-is (will be replaced by backend)
-8. Use inline styles sparingly, prefer clean semantic HTML
+HTML RULES:
+- <p> for paragraphs, <strong> for bold, <a href="{{variable}}"> for all links
+- Every CTA must be a real clickable <a> tag — no plain text URLs
+- All {{variables}} stay as-is with double curly braces
+- End the body with <p>{{signature}}</p> as the very last line
+- Keep HTML simple and email-client safe (no <div>, no inline styles)
 
-HTML Example Structure:
+EXAMPLE of correct output structure:
+SUBJECT: Fixing ${params.industry} challenges for {{companyName}}
+
+BODY:
 <p>Hi {{contactName}},</p>
-<p>[Role/industry-specific hook mentioning pain point]</p>
-<p>[One sentence about BookNex solution]</p>
-<p><strong>🎉 Black Friday Special</strong> - 50% off your first year with code <strong>BOOKNEX100</strong> (ends December 7)</p>
-<p>[Brief value proposition with specific benefit]</p>
+<p>Managing ${painPointsArray[0]} at {{companyName}} is a real drain — and it doesn't have to be.</p>
+<p>{{ourCompanyName}} is ${productDesc} built for ${params.industry} businesses. It handles the heavy lifting so you can focus on what matters.</p>
 <p>
-  <a href="{{signUpLink}}">Sign up now</a> | 
-  <a href="{{featuresLink}}">Explore features</a> | 
-  <a href="{{demoLink}}">Book a demo</a>
+  <a href="{{signUpLink}}">Start your free trial</a> &nbsp;|&nbsp;
+  <a href="{{featuresLink}}">See how it works</a> &nbsp;|&nbsp;
+  <a href="{{demoLink}}">Book a quick demo</a>
 </p>
-<p>{{signature}}</p>
-
-Do not include any other text, markdown formatting, or additional formatting outside the SUBJECT and BODY sections.`;
+<p>Worth a look?</p>
+<p>{{signature}}</p>`;
   }
 
   /**
    * Parse AI response into subject and body (now handles HTML)
    */
-  private parseAIResponse(response: string): {
+  private parseAIResponse(response: string, fallbackProductName = 'our platform'): {
     subject: string;
     bodyText: string;
   } {
@@ -440,7 +426,7 @@ Do not include any other text, markdown formatting, or additional formatting out
 
     // Fallback if parsing fails
     if (!subject) {
-      subject = 'Transform your business with BookNex';
+      subject = `Transform your business with ${fallbackProductName}`;
     }
 
     if (bodyLines.length === 0) {

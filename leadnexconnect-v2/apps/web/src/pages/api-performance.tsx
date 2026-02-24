@@ -1,9 +1,13 @@
+// @ts-nocheck
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { apiPerformanceAPI } from '@/services/api'
-import { Activity, TrendingUp, DollarSign, Award, Zap, Users, Database, AlertCircle, BarChart3 } from 'lucide-react'
+import {
+  Activity, TrendingUp, DollarSign, Award, Users, Database,
+  AlertCircle, BarChart3, Zap,
+} from 'lucide-react'
 
 interface APIMetrics {
   leadsGenerated: number
@@ -22,673 +26,529 @@ interface APIPerformanceData {
   [key: string]: APIMetrics
 }
 
-// Skeleton Components
-const CardSkeleton = () => (
-  <div className="bg-white rounded-lg shadow p-6 animate-pulse">
-    <div className="flex items-center justify-between">
-      <div className="flex-1 space-y-3">
-        <div className="h-4 bg-gray-200 rounded w-32"></div>
-        <div className="h-8 bg-gray-200 rounded w-20"></div>
-      </div>
-      <div className="bg-gray-200 rounded-full p-3 w-12 h-12"></div>
+const months = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+// ── Skeletons ─────────────────────────────────────────────────────────────────
+const CardSkel = () => (
+  <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 animate-pulse">
+    <div className="flex items-start justify-between mb-3">
+      <div className="h-4 bg-gray-200 rounded w-36" />
+      <div className="w-11 h-11 bg-gray-200 rounded-full" />
     </div>
+    <div className="h-9 bg-gray-200 rounded w-24 mb-2" />
+    <div className="h-3 bg-gray-200 rounded w-32 mb-4" />
+    <div className="h-1.5 bg-gray-100 rounded-full" />
   </div>
 )
 
-const TableRowSkeleton = () => (
+const TableRowSkel = () => (
   <tr className="animate-pulse">
-    <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
-    <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-12"></div></td>
-    <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
-    <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-32"></div></td>
-    <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-20"></div></td>
-    <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24"></div></td>
+    {[36, 16, 24, 28, 20, 24, 16].map((w, i) => (
+      <td key={i} className="px-5 py-4">
+        <div className={`h-4 bg-gray-200 rounded w-${w}`} />
+      </td>
+    ))}
   </tr>
 )
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const SOURCE_COLORS: Record<string, { dot: string; badge: string }> = {
+  apollo:          { dot: 'bg-blue-500',   badge: 'bg-blue-50 text-blue-700 border-blue-200'   },
+  hunter:          { dot: 'bg-green-500',  badge: 'bg-green-50 text-green-700 border-green-200' },
+  google_places:   { dot: 'bg-red-500',    badge: 'bg-red-50 text-red-700 border-red-200'       },
+  peopledatalabs:  { dot: 'bg-purple-500', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
+  manual_import:   { dot: 'bg-orange-500', badge: 'bg-orange-50 text-orange-700 border-orange-200' },
+}
+
+const SOURCE_NAMES: Record<string, string> = {
+  apollo:         'Apollo',
+  hunter:         'Hunter',
+  google_places:  'Google Places',
+  peopledatalabs: 'PeopleDataLabs',
+  manual_import:  'Imported Leads',
+}
+
+const getSourceColor = (s: string) => SOURCE_COLORS[s] || { dot: 'bg-gray-400', badge: 'bg-gray-100 text-gray-700 border-gray-200' }
+const getSourceName  = (s: string) => SOURCE_NAMES[s] || s
+
+const quotaBg  = (p: number) => p >= 90 ? 'bg-red-500'    : p >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+const quotaBadge = (p: number) => p >= 90
+  ? 'bg-red-50 text-red-700 border border-red-200'
+  : p >= 70
+  ? 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+  : 'bg-green-50 text-green-700 border border-green-200'
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 function APIPerformance() {
   const [viewMode, setViewMode] = useState<'monthly' | 'allTime'>('allTime')
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedYear, setSelectedYear]   = useState(new Date().getFullYear())
 
-  const { data: performanceData, isLoading: reportLoading, error: reportError } = useQuery({
+  const { data: performanceData, isLoading: reportLoading } = useQuery({
     queryKey: ['api-performance-report', viewMode, selectedMonth, selectedYear],
     queryFn: async () => {
-      if (viewMode === 'allTime') {
-        const response = await apiPerformanceAPI.getMonthlyReport({
-          month: selectedMonth,
-          year: selectedYear,
-          allTime: true,
-        })
-        return response.data.data?.performance || {}
-      } else {
-        const response = await apiPerformanceAPI.getMonthlyReport({
-          month: selectedMonth,
-          year: selectedYear,
-        })
-        return response.data.data?.performance || {}
-      }
+      const params = viewMode === 'allTime'
+        ? { month: selectedMonth, year: selectedYear, allTime: true }
+        : { month: selectedMonth, year: selectedYear }
+      const response = await apiPerformanceAPI.getMonthlyReport(params)
+      return response.data.data?.performance || {}
     },
     staleTime: 30000,
     refetchOnWindowFocus: false,
   })
 
-  const { data: roiSummary, isLoading: roiLoading } = useQuery({
-    queryKey: ['roi-summary'],
-    queryFn: async () => {
-      const { data } = await apiPerformanceAPI.getROISummary()
-      return data.data
-    },
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
-  })
+  // Build sources array
+  const sources = performanceData
+    ? Object.entries(performanceData as APIPerformanceData).map(([apiSource, metrics]) => ({ apiSource, ...(metrics as APIMetrics) }))
+    : []
 
-  // Convert object to array and calculate totals
-  const sources = performanceData ? Object.entries(performanceData).map(([apiSource, metrics]) => {
-    const data = metrics as APIMetrics;
-    return {
-      apiSource,
-      ...data
-    };
-  }) : []
-
-  const totalLeads = sources.reduce((sum, s) => sum + (s.leadsGenerated || 0), 0)
-  const totalCalls = sources.reduce((sum, s) => sum + (s.apiCallsUsed || 0), 0)
-  const avgQuality = sources.length > 0 
-    ? Math.round(sources.reduce((sum, s) => sum + (s.avgLeadScore || 0), 0) / sources.length)
+  const totalLeads     = sources.reduce((s, r) => s + (r.leadsGenerated || 0), 0)
+  const totalCalls     = sources.reduce((s, r) => s + (r.apiCallsUsed   || 0), 0)
+  const totalDemos     = sources.reduce((s, r) => s + (r.demosBooked    || 0), 0)
+  const totalTrials    = sources.reduce((s, r) => s + (r.trialsStarted  || 0), 0)
+  const totalCustomers = sources.reduce((s, r) => s + (r.customersConverted || 0), 0)
+  const avgQuality     = sources.length > 0
+    ? Math.round(sources.reduce((s, r) => s + (r.avgLeadScore || 0), 0) / sources.length)
     : 0
-  const totalDemos = sources.reduce((sum, s) => sum + (s.demosBooked || 0), 0)
-  const totalTrials = sources.reduce((sum, s) => sum + (s.trialsStarted || 0), 0)
-  const totalCustomers = sources.reduce((sum, s) => sum + (s.customersConverted || 0), 0)
   const avgCostPerLead = sources.length > 0
-    ? sources.reduce((sum, s) => sum + (s.costPerLead || 0), 0) / sources.length
+    ? sources.reduce((s, r) => s + (r.costPerLead || 0), 0) / sources.length
     : 0
 
-  const getSourceColor = (source: string) => {
-    const colors: Record<string, string> = {
-      apollo: 'bg-blue-500',
-      hunter: 'bg-green-500',
-      google_places: 'bg-red-500',
-      peopledatalabs: 'bg-purple-500',
-      manual_import: 'bg-orange-500',
-    }
-    return colors[source] || 'bg-gray-500'
-  }
+  const apiSources = sources.filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0)
 
-  const getSourceDisplayName = (source: string) => {
-    const names: Record<string, string> = {
-      apollo: 'Apollo',
-      hunter: 'Hunter',
-      google_places: 'Google Places',
-      peopledatalabs: 'PeopleDataLabs',
-      manual_import: 'Imported Leads',
-    }
-    return names[source] || source
-  }
+  const bestValue = [...apiSources]
+    .map(s => ({ ...s, valueScore: ((s.avgLeadScore / 100) * (s.hotLeadsPercent / 100) * 100) / (s.costPerLead || 1) }))
+    .sort((a, b) => b.valueScore - a.valueScore)[0]
+  const highestQuality = [...apiSources].sort((a, b) => b.avgLeadScore   - a.avgLeadScore)[0]
+  const cheapest       = [...apiSources].filter(s => s.costPerLead > 0).sort((a, b) => a.costPerLead - b.costPerLead)[0]
+  const mostProductive = [...apiSources].sort((a, b) => b.leadsGenerated - a.leadsGenerated)[0]
 
-  const getQuotaColor = (percentage: number) => {
-    if (percentage >= 90) return 'text-red-600 bg-red-100'
-    if (percentage >= 70) return 'text-yellow-600 bg-yellow-100'
-    return 'text-green-600 bg-green-100'
-  }
-
-  const getQuotaBarColor = (percentage: number) => {
-    if (percentage >= 90) return 'bg-red-500'
-    if (percentage >= 70) return 'bg-yellow-500'
-    return 'bg-green-500'
-  }
-
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ]
+  // Smart tips
+  const tips: { icon: string; text: string }[] = []
+  const underutilized = apiSources.filter(s => s.quotaPercent < 50)
+  if (underutilized.length > 0) tips.push({ icon: '📊', text: `You're using less than 50% of your quota on ${underutilized.map(s => getSourceName(s.apiSource)).join(', ')}. Scale up campaigns before buying new credits.` })
+  const highQualityLow = apiSources.filter(s => s.avgLeadScore >= 80 && s.quotaPercent < 60)
+  if (highQualityLow.length > 0) tips.push({ icon: '🎯', text: `${highQualityLow.map(s => getSourceName(s.apiSource)).join(', ')} delivers high-quality leads and has available quota. Great opportunity to increase ROI.` })
+  const nearLimit = apiSources.filter(s => s.quotaPercent >= 80)
+  if (nearLimit.length > 0) tips.push({ icon: '⚠️', text: `${nearLimit.map(s => getSourceName(s.apiSource)).join(', ')} approaching quota limit. Consider upgrading if performance is good.` })
+  const sorted = [...apiSources].sort((a, b) => a.costPerLead - b.costPerLead)
+  if (sorted.length >= 2 && sorted[0].costPerLead < sorted[sorted.length - 1].costPerLead * 0.5)
+    tips.push({ icon: '💰', text: `${getSourceName(sorted[0].apiSource)} costs ${((1 - sorted[0].costPerLead / sorted[sorted.length - 1].costPerLead) * 100).toFixed(0)}% less per lead than ${getSourceName(sorted[sorted.length - 1].apiSource)}. Consider reallocating budget.` })
+  if (tips.length === 0) tips.push({ icon: '✅', text: 'Your API usage is well-balanced. Continue monitoring performance and adjust based on campaign results.' })
 
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Header */}
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">API Performance</h1>
-            <p className="text-gray-600 mt-2">Track API usage, costs, and lead quality metrics</p>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <Activity className="w-7 h-7 text-primary-600" />
+              API Performance
+            </h1>
+            <p className="text-gray-500 mt-1 text-sm">Track API usage, lead quality, and cost efficiency across sources.</p>
           </div>
-          <div className="flex items-center space-x-4">
-            {/* View Mode Toggle */}
-            <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('monthly')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'monthly'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setViewMode('allTime')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  viewMode === 'allTime'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                All Time
-              </button>
+
+          {/* Time filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+              {(['allTime', 'monthly'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    viewMode === mode ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {mode === 'allTime' ? 'All Time' : 'Monthly'}
+                </button>
+              ))}
             </div>
-            
-            {/* Month/Year selectors - only show in monthly mode */}
             {viewMode === 'monthly' && (
-              <>
+              <div className="flex items-center gap-2">
                 <select
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  onChange={e => setSelectedMonth(Number(e.target.value))}
+                  className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
-                  {months.map((month, idx) => (
-                    <option key={month} value={idx + 1}>
-                      {month}
-                    </option>
-                  ))}
+                  {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                 </select>
                 <select
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  onChange={e => setSelectedYear(Number(e.target.value))}
+                  className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
-                  {[2024, 2025, 2026].map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
+                  {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
-              </>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {reportLoading ? (
+        {/* ── Summary KPI Cards ────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {reportLoading ? [1,2,3,4].map(i => <CardSkel key={i} />) : (
             <>
-              <CardSkeleton />
-              <CardSkeleton />
-              <CardSkeleton />
-              <CardSkeleton />
-            </>
-          ) : (
-            <>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Leads Generated</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{totalLeads}</p>
-                    <p className="text-xs text-gray-500 mt-1">From {sources.length} sources</p>
+              {/* Total Leads */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <p className="text-sm font-medium text-gray-500">Total Leads Generated</p>
+                  <div className="w-11 h-11 bg-blue-50 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-blue-600" />
                   </div>
-                  <div className="bg-blue-50 rounded-full p-3">
-                    <Users className="w-6 h-6 text-blue-600" />
-                  </div>
+                </div>
+                <p className="text-4xl font-bold text-gray-900 tabular-nums">{totalLeads}</p>
+                <p className="text-xs text-gray-400 mt-1.5 mb-4">From {sources.length} source{sources.length !== 1 ? 's' : ''}</p>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full" style={{ width: totalLeads > 0 ? '100%' : '0%' }} />
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">API Calls Used</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{totalCalls}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {totalLeads > 0 ? `${(totalCalls / totalLeads).toFixed(1)} calls/lead` : 'No leads yet'}
-                    </p>
+              {/* API Calls */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <p className="text-sm font-medium text-gray-500">API Calls Used</p>
+                  <div className="w-11 h-11 bg-green-50 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Database className="w-5 h-5 text-green-600" />
                   </div>
-                  <div className="bg-green-50 rounded-full p-3">
-                    <Database className="w-6 h-6 text-green-600" />
-                  </div>
+                </div>
+                <p className="text-4xl font-bold text-gray-900 tabular-nums">{totalCalls}</p>
+                <p className="text-xs text-gray-400 mt-1.5 mb-4">
+                  {totalLeads > 0 ? `${(totalCalls / totalLeads).toFixed(1)} calls per lead` : 'No leads yet'}
+                </p>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-green-500 rounded-full" style={{ width: totalCalls > 0 ? '100%' : '0%' }} />
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Average Quality</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{avgQuality}<span className="text-xl">/100</span></p>
-                    <p className="text-xs text-gray-500 mt-1">Across all sources</p>
+              {/* Avg Quality */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <p className="text-sm font-medium text-gray-500">Average Quality</p>
+                  <div className="w-11 h-11 bg-purple-50 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Award className="w-5 h-5 text-purple-600" />
                   </div>
-                  <div className="bg-purple-50 rounded-full p-3">
-                    <Award className="w-6 h-6 text-purple-600" />
-                  </div>
+                </div>
+                <p className="text-4xl font-bold text-purple-600 tabular-nums">
+                  {avgQuality}<span className="text-xl text-gray-300 font-normal">/100</span>
+                </p>
+                <p className="text-xs text-gray-400 mt-1.5 mb-4">Across all sources</p>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${avgQuality}%` }} />
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Avg Cost Per Lead</p>
-                    {avgCostPerLead > 0 ? (
-                      <>
-                        <p className="text-3xl font-bold text-gray-900 mt-2">${avgCostPerLead.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500 mt-1">Total: ${(avgCostPerLead * totalLeads).toFixed(2)}</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-3xl font-bold text-green-600 mt-2">Free</p>
-                        <p className="text-xs text-gray-500 mt-1">No API costs configured</p>
-                      </>
-                    )}
+              {/* Avg Cost */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <p className="text-sm font-medium text-gray-500">Avg Cost Per Lead</p>
+                  <div className="w-11 h-11 bg-yellow-50 rounded-full flex items-center justify-center flex-shrink-0">
+                    <DollarSign className="w-5 h-5 text-yellow-600" />
                   </div>
-                  <div className="bg-yellow-50 rounded-full p-3">
-                    <DollarSign className="w-6 h-6 text-yellow-600" />
-                  </div>
+                </div>
+                {avgCostPerLead > 0 ? (
+                  <>
+                    <p className="text-4xl font-bold text-gray-900 tabular-nums">${avgCostPerLead.toFixed(2)}</p>
+                    <p className="text-xs text-gray-400 mt-1.5 mb-4">Total: ${(avgCostPerLead * totalLeads).toFixed(2)}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-4xl font-bold text-green-600">Free</p>
+                    <p className="text-xs text-gray-400 mt-1.5 mb-4">No API costs configured</p>
+                  </>
+                )}
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-yellow-400 rounded-full w-full" />
                 </div>
               </div>
             </>
           )}
         </div>
 
-        {/* API Source Comparison & Recommendations */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">API Source Comparison & Investment Guide</h2>
+        {/* ── Insights ─────────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-5">API Source Comparison &amp; Investment Guide</h2>
+
           {reportLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            <div className="flex items-center justify-center py-10">
+              <div className="w-7 h-7 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
             </div>
           ) : sources.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No API data available yet. Start generating leads to see API performance metrics.
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+              <BarChart3 className="w-12 h-12 mb-3 text-gray-300" />
+              <p className="text-sm font-medium text-gray-500">No API data available yet</p>
+              <p className="text-xs mt-1">Start generating leads to see performance metrics.</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* Best Overall Value */}
-              <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
-                <div className="flex items-start gap-3">
-                  <Award className="w-6 h-6 text-green-600 mt-1 flex-shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-green-900 mb-1">🏆 Best Overall Value</h3>
-                    {(() => {
-                      // Calculate value score: (quality * hot_leads%) / cost
-                      const bestValue = [...sources]
-                        .filter(s => s.apiSource !== 'manual_import')
-                        .map(s => ({
-                          ...s,
-                          valueScore: s.leadsGenerated > 0 
-                            ? ((s.avgLeadScore / 100) * (s.hotLeadsPercent / 100) * 100) / (s.costPerLead || 1)
-                            : 0
-                        }))
-                        .sort((a, b) => b.valueScore - a.valueScore)[0]
-                      
-                      return bestValue ? (
-                        <div>
-                          <p className="text-green-800 font-medium text-lg">{getSourceDisplayName(bestValue.apiSource)}</p>
-                          <p className="text-sm text-green-700 mt-1">
-                            Quality: {bestValue.avgLeadScore}/100 • {bestValue.hotLeadsPercent}% Hot Leads • ${bestValue.costPerLead.toFixed(2)}/lead
-                          </p>
-                          <p className="text-xs text-green-600 mt-2">
-                            💡 Best balance of lead quality and cost. Recommended for most campaigns.
-                          </p>
-                        </div>
-                      ) : <p className="text-green-700">No data available</p>
-                    })()}
+            <div className="space-y-5">
+
+              {/* Best Overall Value — hero card */}
+              {bestValue && (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-5 flex items-start gap-4">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Award className="w-5 h-5 text-green-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-0.5">🏆 Best Overall Value</p>
+                    <p className="text-lg font-bold text-green-900">{getSourceName(bestValue.apiSource)}</p>
+                    <p className="text-sm text-green-700 mt-1">
+                      Quality: {bestValue.avgLeadScore}/100 &nbsp;·&nbsp; {bestValue.hotLeadsPercent}% hot leads &nbsp;·&nbsp; ${bestValue.costPerLead.toFixed(2)}/lead
+                    </p>
+                    <p className="text-xs text-green-600 mt-2">
+                      💡 Best balance of lead quality and cost. Recommended for most campaigns.
+                    </p>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Comparison Grid */}
+              {/* Spotlight grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Highest Quality */}
-                <div className="border border-purple-200 bg-purple-50 p-4 rounded-lg">
+                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <Award className="w-5 h-5 text-purple-600" />
-                    <h4 className="font-semibold text-purple-900">Highest Quality</h4>
+                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                      <Award className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Highest Quality</p>
                   </div>
-                  {(() => {
-                    const highest = [...sources]
-                      .filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0)
-                      .sort((a, b) => b.avgLeadScore - a.avgLeadScore)[0]
-                    return highest ? (
-                      <div>
-                        <p className="text-purple-800 font-medium">{getSourceDisplayName(highest.apiSource)}</p>
-                        <p className="text-2xl font-bold text-purple-900 mt-1">{highest.avgLeadScore}/100</p>
-                        <p className="text-xs text-purple-600 mt-2">
-                          {highest.hotLeadsPercent}% hot leads • ${highest.costPerLead.toFixed(2)}/lead
-                        </p>
-                      </div>
-                    ) : <p className="text-purple-700 text-sm">No data</p>
-                  })()}
+                  {highestQuality ? (
+                    <>
+                      <p className="font-semibold text-purple-900">{getSourceName(highestQuality.apiSource)}</p>
+                      <p className="text-2xl font-bold text-purple-800 mt-1 tabular-nums">{highestQuality.avgLeadScore}/100</p>
+                      <p className="text-xs text-purple-600 mt-2">{highestQuality.hotLeadsPercent}% hot leads · ${highestQuality.costPerLead.toFixed(2)}/lead</p>
+                    </>
+                  ) : <p className="text-sm text-purple-500 mt-2">No data</p>}
                 </div>
 
                 {/* Most Cost Effective */}
-                <div className="border border-blue-200 bg-blue-50 p-4 rounded-lg">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <DollarSign className="w-5 h-5 text-blue-600" />
-                    <h4 className="font-semibold text-blue-900">Most Cost Effective</h4>
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <DollarSign className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Most Cost Effective</p>
                   </div>
-                  {(() => {
-                    const cheapest = [...sources]
-                      .filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0 && s.costPerLead > 0)
-                      .sort((a, b) => a.costPerLead - b.costPerLead)[0]
-                    return cheapest ? (
-                      <div>
-                        <p className="text-blue-800 font-medium">{getSourceDisplayName(cheapest.apiSource)}</p>
-                        <p className="text-2xl font-bold text-blue-900 mt-1">${cheapest.costPerLead.toFixed(2)}</p>
-                        <p className="text-xs text-blue-600 mt-2">
-                          per lead • Quality: {cheapest.avgLeadScore}/100
-                        </p>
-                      </div>
-                    ) : <p className="text-blue-700 text-sm">No data</p>
-                  })()}
+                  {cheapest ? (
+                    <>
+                      <p className="font-semibold text-blue-900">{getSourceName(cheapest.apiSource)}</p>
+                      <p className="text-2xl font-bold text-blue-800 mt-1 tabular-nums">${cheapest.costPerLead.toFixed(2)}</p>
+                      <p className="text-xs text-blue-600 mt-2">per lead · Quality: {cheapest.avgLeadScore}/100</p>
+                    </>
+                  ) : <p className="text-sm text-blue-500 mt-2">No paid sources yet</p>}
                 </div>
 
-                {/* Most Used */}
-                <div className="border border-orange-200 bg-orange-50 p-4 rounded-lg">
+                {/* Most Productive */}
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-5 h-5 text-orange-600" />
-                    <h4 className="font-semibold text-orange-900">Most Productive</h4>
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Most Productive</p>
                   </div>
-                  {(() => {
-                    const mostUsed = [...sources]
-                      .filter(s => s.apiSource !== 'manual_import')
-                      .sort((a, b) => b.leadsGenerated - a.leadsGenerated)[0]
-                    return mostUsed ? (
-                      <div>
-                        <p className="text-orange-800 font-medium">{getSourceDisplayName(mostUsed.apiSource)}</p>
-                        <p className="text-2xl font-bold text-orange-900 mt-1">{mostUsed.leadsGenerated}</p>
-                        <p className="text-xs text-orange-600 mt-2">
-                          leads generated • {mostUsed.apiCallsUsed} API calls
-                        </p>
-                      </div>
-                    ) : <p className="text-orange-700 text-sm">No data</p>
-                  })()}
+                  {mostProductive ? (
+                    <>
+                      <p className="font-semibold text-orange-900">{getSourceName(mostProductive.apiSource)}</p>
+                      <p className="text-2xl font-bold text-orange-800 mt-1 tabular-nums">{mostProductive.leadsGenerated}</p>
+                      <p className="text-xs text-orange-600 mt-2">leads generated · {mostProductive.apiCallsUsed} API calls</p>
+                    </>
+                  ) : <p className="text-sm text-orange-500 mt-2">No data</p>}
                 </div>
               </div>
 
-              {/* ROI Analysis */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Database className="w-5 h-5 text-gray-600" />
-                  ROI & Efficiency Analysis
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {sources
-                    .filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0)
-                    .map(source => {
-                      const roi = source.customersConverted > 0 
-                        ? (source.customersConverted * 1000) / (source.costPerLead * source.leadsGenerated) // Assuming $1000 customer value
-                        : 0
-                      const efficiency = source.apiCallsUsed > 0 
-                        ? (source.leadsGenerated / source.apiCallsUsed * 100)
-                        : 0
-                      
+              {/* ROI / Efficiency rows */}
+              {apiSources.length > 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Database className="w-4 h-4 text-gray-500" /> ROI &amp; Efficiency Analysis
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {apiSources.map(s => {
+                      const efficiency = s.apiCallsUsed > 0 ? (s.leadsGenerated / s.apiCallsUsed * 100) : 0
                       return (
-                        <div key={source.apiSource} className="flex items-center justify-between p-3 bg-white rounded border">
+                        <div key={s.apiSource} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3">
                           <div>
-                            <p className="font-medium text-gray-900">{getSourceDisplayName(source.apiSource)}</p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              {source.leadsGenerated} leads • {source.customersConverted} customers
-                            </p>
+                            <p className="text-sm font-medium text-gray-900">{getSourceName(s.apiSource)}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{s.leadsGenerated} leads · {s.customersConverted} customers</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {efficiency.toFixed(0)}% efficiency
-                            </p>
-                            <p className="text-xs text-gray-600">
-                              {(source.leadsGenerated / source.apiCallsUsed).toFixed(1)} leads/call
-                            </p>
+                            <p className="text-sm font-bold text-gray-900 tabular-nums">{efficiency.toFixed(0)}%</p>
+                            <p className="text-xs text-gray-400">{s.apiCallsUsed > 0 ? (s.leadsGenerated / s.apiCallsUsed).toFixed(2) : 0} leads/call</p>
                           </div>
                         </div>
                       )
                     })}
+                  </div>
+                </div>
+              )}
+
+              {/* Smart tips */}
+              <div className="bg-white border border-primary-200 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-primary-500" /> Smart Investment Tips
+                </h4>
+                <div className="space-y-2">
+                  {tips.map((tip, i) => (
+                    <div key={i} className="flex items-start gap-2.5 text-sm text-gray-700">
+                      <span className="text-base flex-shrink-0 leading-5">{tip.icon}</span>
+                      <p>{tip.text}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Investment Recommendations */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  💡 Smart Investment Tips
-                </h4>
-                <div className="space-y-2 text-sm">
-                  {(() => {
-                    const apiSources = sources.filter(s => s.apiSource !== 'manual_import' && s.leadsGenerated > 0)
-                    const tips = []
-                    
-                    // Check for underutilized quota
-                    const underutilized = apiSources.filter(s => s.quotaPercent < 50)
-                    if (underutilized.length > 0) {
-                      tips.push({
-                        icon: '📊',
-                        text: `You're using less than 50% of your quota on ${underutilized.map(s => getSourceDisplayName(s.apiSource)).join(', ')}. Consider scaling up campaigns before buying new credits.`
-                      })
-                    }
-                    
-                    // Check for high-quality low-usage
-                    const highQualityLowUsage = apiSources.filter(s => s.avgLeadScore >= 80 && s.quotaPercent < 60)
-                    if (highQualityLowUsage.length > 0) {
-                      tips.push({
-                        icon: '🎯',
-                        text: `${highQualityLowUsage.map(s => getSourceDisplayName(s.apiSource)).join(', ')} delivers high-quality leads and has available quota. Great opportunity to increase ROI.`
-                      })
-                    }
-                    
-                    // Check for near quota limit
-                    const nearLimit = apiSources.filter(s => s.quotaPercent >= 80)
-                    if (nearLimit.length > 0) {
-                      tips.push({
-                        icon: '⚠️',
-                        text: `${nearLimit.map(s => getSourceDisplayName(s.apiSource)).join(', ')} approaching quota limit. Consider upgrading plan if performance is good.`
-                      })
-                    }
-                    
-                    // Cost efficiency tip
-                    const sorted = [...apiSources].sort((a, b) => a.costPerLead - b.costPerLead)
-                    if (sorted.length >= 2 && sorted[0].costPerLead < sorted[sorted.length - 1].costPerLead * 0.5) {
-                      tips.push({
-                        icon: '💰',
-                        text: `${getSourceDisplayName(sorted[0].apiSource)} costs ${((1 - sorted[0].costPerLead / sorted[sorted.length - 1].costPerLead) * 100).toFixed(0)}% less per lead than ${getSourceDisplayName(sorted[sorted.length - 1].apiSource)}. Consider reallocating budget.`
-                      })
-                    }
-                    
-                    if (tips.length === 0) {
-                      tips.push({
-                        icon: '✅',
-                        text: 'Your API usage is well-balanced. Continue monitoring performance and adjust based on campaign results.'
-                      })
-                    }
-                    
-                    return tips.map((tip, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-gray-700">
-                        <span className="text-lg flex-shrink-0">{tip.icon}</span>
-                        <p>{tip.text}</p>
-                      </div>
-                    ))
-                  })()}
-                </div>
-              </div>
             </div>
           )}
         </div>
-        {/* Source Performance Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">Source Performance Breakdown</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Detailed metrics for {months[selectedMonth - 1]} {selectedYear}
+
+        {/* ── Source Performance Table ──────────────────────────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-base font-semibold text-gray-900">Source Performance Breakdown</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {viewMode === 'allTime' ? 'All time' : `${months[selectedMonth - 1]} ${selectedYear}`}
             </p>
           </div>
 
           {reportLoading ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Leads</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">API Calls</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quota</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quality</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conversions</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost/Lead</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  <TableRowSkeleton />
-                  <TableRowSkeleton />
-                  <TableRowSkeleton />
-                </tbody>
-              </table>
-            </div>
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  {['Source', 'Leads', 'API Calls', 'Quota', 'Quality', 'Conversions', 'Cost/Lead'].map(h => (
+                    <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                <TableRowSkel /><TableRowSkel /><TableRowSkel />
+              </tbody>
+            </table>
           ) : sources.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <BarChart3 className="w-16 h-16 text-gray-300 mb-4" />
-              <p className="text-gray-500 font-medium">No API usage data for this period</p>
-              <p className="text-sm text-gray-400 mt-2">Start generating leads to see performance metrics</p>
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <BarChart3 className="w-12 h-12 mb-3 text-gray-300" />
+              <p className="text-sm font-medium text-gray-500">No API usage data for this period</p>
+              <p className="text-xs mt-1">Start generating leads to see performance metrics.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Source
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Leads Generated
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      API Calls Used
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quota Usage
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Avg Quality
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Conversions
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cost Per Lead
-                    </th>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['Source', 'Leads Generated', 'API Calls', 'Quota', 'Avg Quality', 'Conversions', 'Cost / Lead'].map(h => (
+                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {sources.map((source) => (
-                    <tr key={source.apiSource} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`w-3 h-3 rounded-full ${getSourceColor(source.apiSource)} mr-3`}></div>
-                          <span className="text-sm font-medium text-gray-900">
-                            {getSourceDisplayName(source.apiSource)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-gray-900">{source.leadsGenerated}</div>
-                        <div className="text-xs text-gray-500">
-                          {source.hotLeadsPercent}% hot leads
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {source.apiSource === 'manual_import' ? (
-                          <div className="text-sm text-gray-400 italic">N/A - Imported</div>
-                        ) : (
-                          <>
-                            <div className="font-medium text-gray-900">{source.apiCallsUsed}</div>
-                            <div className="text-xs text-gray-500">
-                              / {source.apiCallsLimit} limit
+                <tbody className="divide-y divide-gray-100">
+                  {sources.map(s => {
+                    const sc = getSourceColor(s.apiSource)
+                    return (
+                      <tr key={s.apiSource} className="hover:bg-gray-50 transition-colors">
+
+                        {/* Source */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sc.dot}`} />
+                            <span className="font-medium text-gray-900">{getSourceName(s.apiSource)}</span>
+                          </div>
+                        </td>
+
+                        {/* Leads */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <p className="font-bold text-gray-900 tabular-nums">{s.leadsGenerated}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{s.hotLeadsPercent}% hot</p>
+                        </td>
+
+                        {/* API Calls */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          {s.apiSource === 'manual_import' ? (
+                            <span className="text-xs text-gray-400 italic">N/A – Imported</span>
+                          ) : (
+                            <>
+                              <p className="font-medium text-gray-900 tabular-nums">{s.apiCallsUsed}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">/ {s.apiCallsLimit} limit</p>
+                            </>
+                          )}
+                        </td>
+
+                        {/* Quota */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          {s.apiSource === 'manual_import' ? (
+                            <span className="text-xs text-gray-400 italic">N/A</span>
+                          ) : (
+                            <div className="space-y-1.5">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${quotaBadge(s.quotaPercent)}`}>
+                                {s.quotaPercent}%
+                              </span>
+                              <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${quotaBg(s.quotaPercent)}`} style={{ width: `${Math.min(s.quotaPercent, 100)}%` }} />
+                              </div>
                             </div>
-                          </>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {source.apiSource === 'manual_import' ? (
-                          <span className="text-sm text-gray-400 italic">N/A</span>
-                        ) : (
-                          <div className="flex items-center space-x-2">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-semibold ${getQuotaColor(
-                                source.quotaPercent
-                              )}`}
-                            >
-                              {source.quotaPercent}%
-                            </span>
-                            <div className="w-20 bg-gray-200 rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full ${getQuotaBarColor(source.quotaPercent)}`}
-                                style={{ width: `${Math.min(source.quotaPercent, 100)}%` }}
-                              ></div>
+                          )}
+                        </td>
+
+                        {/* Quality */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900 tabular-nums text-xs">{s.avgLeadScore}/100</span>
+                            <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className="h-full bg-primary-500 rounded-full" style={{ width: `${s.avgLeadScore}%` }} />
                             </div>
                           </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className="text-sm font-medium text-gray-900 mr-2">
-                            {source.avgLeadScore}/100
-                          </span>
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-primary-600 h-2 rounded-full"
-                              style={{ width: `${source.avgLeadScore}%` }}
-                            ></div>
+                        </td>
+
+                        {/* Conversions */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <div className="space-y-0.5 text-xs">
+                            <div className="flex gap-1 text-gray-600"><span>Demos:</span><span className="font-medium text-gray-900">{s.demosBooked}</span></div>
+                            <div className="flex gap-1 text-gray-600"><span>Trials:</span><span className="font-medium text-gray-900">{s.trialsStarted}</span></div>
+                            <div className="flex gap-1 text-gray-600"><span>Customers:</span><span className="font-medium text-green-600">{s.customersConverted}</span></div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-1">
-                            <span className="text-gray-500">Demos:</span>
-                            <span className="font-medium text-gray-900">{source.demosBooked}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <span className="text-gray-500">Trials:</span>
-                            <span className="font-medium text-gray-900">{source.trialsStarted}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <span className="text-gray-500">Customers:</span>
-                            <span className="font-medium text-green-600">{source.customersConverted}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {source.apiSource === 'manual_import' ? (
-                          <div>
-                            <div className="text-sm font-bold text-green-600">Free</div>
-                            <div className="text-xs text-gray-500 italic">Imported</div>
-                          </div>
-                        ) : source.costPerLead > 0 ? (
-                          <>
-                            <div className="text-lg font-bold text-gray-900">
-                              ${source.costPerLead.toFixed(2)}
+                        </td>
+
+                        {/* Cost/Lead */}
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          {s.apiSource === 'manual_import' ? (
+                            <div>
+                              <p className="font-bold text-green-600">Free</p>
+                              <p className="text-xs text-gray-400 italic">Imported</p>
                             </div>
-                            <div className="text-xs text-gray-500">
-                              Total: ${(source.costPerLead * source.leadsGenerated).toFixed(2)}
+                          ) : s.costPerLead > 0 ? (
+                            <div>
+                              <p className="font-bold text-gray-900 tabular-nums">${s.costPerLead.toFixed(2)}</p>
+                              <p className="text-xs text-gray-400">Total: ${(s.costPerLead * s.leadsGenerated).toFixed(2)}</p>
                             </div>
-                          </>
-                        ) : (
-                          <div>
-                            <div className="text-sm font-bold text-green-600">Free</div>
-                            <div className="text-xs text-gray-500 italic">No cost set</div>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          ) : (
+                            <div>
+                              <p className="font-bold text-green-600">Free</p>
+                              <p className="text-xs text-gray-400 italic">No cost set</p>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
-                <tfoot className="bg-gray-50 border-t-2 border-gray-200">
-                  <tr>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900">TOTAL</td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900">{totalLeads}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900">{totalCalls}</td>
-                    <td className="px-6 py-4"></td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900">{avgQuality}/100</td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm space-y-1">
-                        <div className="font-medium">{totalDemos} demos</div>
-                        <div className="font-medium">{totalTrials} trials</div>
-                        <div className="font-medium text-green-600">{totalCustomers} customers</div>
+
+                {/* Totals footer */}
+                <tfoot>
+                  <tr className="bg-gray-50 border-t-2 border-gray-200 font-semibold">
+                    <td className="px-5 py-3.5 text-xs uppercase tracking-wide text-gray-500">Total / Avg</td>
+                    <td className="px-5 py-3.5 text-gray-900 tabular-nums">{totalLeads}</td>
+                    <td className="px-5 py-3.5 text-gray-900 tabular-nums">{totalCalls}</td>
+                    <td className="px-5 py-3.5" />
+                    <td className="px-5 py-3.5 text-gray-900">{avgQuality}/100</td>
+                    <td className="px-5 py-3.5">
+                      <div className="space-y-0.5 text-xs">
+                        <div className="text-gray-700">{totalDemos} demos</div>
+                        <div className="text-gray-700">{totalTrials} trials</div>
+                        <div className="text-green-600">{totalCustomers} customers</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-lg font-bold text-gray-900">
-                      ${avgCostPerLead.toFixed(2)}
-                    </td>
+                    <td className="px-5 py-3.5 text-gray-900 tabular-nums">${avgCostPerLead.toFixed(2)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -696,29 +556,26 @@ function APIPerformance() {
           )}
         </div>
 
-        {/* Quota Warnings */}
+        {/* ── Quota Warnings ───────────────────────────────────────────────── */}
         {sources.some(s => s.quotaPercent >= 80) && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <AlertCircle className="h-5 w-5 text-yellow-400" />
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-yellow-800">Quota Warnings</h3>
-                <div className="mt-2 text-sm text-yellow-700">
-                  <ul className="list-disc list-inside space-y-1">
-                    {sources.filter(s => s.quotaPercent >= 80).map(source => (
-                      <li key={source.apiSource}>
-                        <span className="font-medium">{getSourceDisplayName(source.apiSource)}</span> is at{' '}
-                        <span className="font-bold">{source.quotaPercent}%</span> quota usage
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="w-9 h-9 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <AlertCircle className="w-5 h-5 text-yellow-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-yellow-800 mb-1.5">Quota Warnings</h3>
+              <ul className="space-y-1">
+                {sources.filter(s => s.quotaPercent >= 80).map(s => (
+                  <li key={s.apiSource} className="text-sm text-yellow-700 flex items-center gap-1.5">
+                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${s.quotaPercent >= 90 ? 'bg-red-500' : 'bg-yellow-500'}`} />
+                    <span><strong>{getSourceName(s.apiSource)}</strong> is at <strong>{s.quotaPercent}%</strong> quota usage</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         )}
+
       </div>
     </Layout>
   )

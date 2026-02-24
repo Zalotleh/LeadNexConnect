@@ -5,34 +5,39 @@ interface EmailVariable {
   key: string
   label: string
   value: string
-  category: 'lead' | 'company' | 'link'
+  category: 'lead' | 'sender' | 'company' | 'link'
 }
 
 export const EMAIL_VARIABLES: EmailVariable[] = [
-  // Lead Variables
-  { key: 'companyName', label: 'Company Name', value: '{{companyName}}', category: 'lead' },
-  { key: 'contactName', label: 'Contact Name', value: '{{contactName}}', category: 'lead' },
-  { key: 'email', label: 'Email', value: '{{email}}', category: 'lead' },
-  { key: 'website', label: 'Website', value: '{{website}}', category: 'lead' },
-  { key: 'industry', label: 'Industry', value: '{{industry}}', category: 'lead' },
-  { key: 'city', label: 'City', value: '{{city}}', category: 'lead' },
-  { key: 'country', label: 'Country', value: '{{country}}', category: 'lead' },
-  { key: 'jobTitle', label: 'Job Title', value: '{{jobTitle}}', category: 'lead' },
-  { key: 'companySize', label: 'Company Size', value: '{{companySize}}', category: 'lead' },
-  
-  // BookNex Company Info (as variables)
-  { key: 'ourWebsite', label: 'Our Website', value: '{{ourWebsite}}', category: 'company' },
-  { key: 'ourCompanyName', label: 'Our Company Name', value: '{{ourCompanyName}}', category: 'company' },
-  { key: 'ourEmail', label: 'Our Email', value: '{{ourEmail}}', category: 'company' },
-  
-  // BookNex Links (as variables with descriptive names)
-  { key: 'featuresLink', label: 'Features Page Link', value: '{{featuresLink}}', category: 'link' },
-  { key: 'howToStartLink', label: 'How To Start Link', value: '{{howToStartLink}}', category: 'link' },
-  { key: 'pricingLink', label: 'Pricing Plans Link', value: '{{pricingLink}}', category: 'link' },
-  { key: 'signUpLink', label: 'Sign Up Page Link', value: '{{signUpLink}}', category: 'link' },
-  
-  // Signature
-  { key: 'signature', label: 'Email Signature', value: '{{signature}}', category: 'company' },
+  // Lead — resolved from the lead record
+  { key: 'companyName',  label: 'Company Name',  value: '{{companyName}}',  category: 'lead' },
+  { key: 'contactName',  label: 'Contact Name',  value: '{{contactName}}',  category: 'lead' },
+  { key: 'email',        label: 'Email',         value: '{{email}}',        category: 'lead' },
+  { key: 'website',      label: 'Website',       value: '{{website}}',      category: 'lead' },
+  { key: 'industry',     label: 'Industry',      value: '{{industry}}',     category: 'lead' },
+  { key: 'city',         label: 'City',          value: '{{city}}',         category: 'lead' },
+  { key: 'country',      label: 'Country',       value: '{{country}}',      category: 'lead' },
+  { key: 'jobTitle',     label: 'Job Title',     value: '{{jobTitle}}',     category: 'lead' },
+  { key: 'companySize',  label: 'Company Size',  value: '{{companySize}}',  category: 'lead' },
+
+  // Sender — resolved from Sender Settings page
+  { key: 'sender_name',  label: 'Sender Name',   value: '{{sender_name}}',  category: 'sender' },
+  { key: 'sender_email', label: 'Sender Email',  value: '{{sender_email}}', category: 'sender' },
+  { key: 'signature',    label: 'Email Signature', value: '{{signature}}',  category: 'sender' },
+
+  // Company — resolved from Company Profile page
+  { key: 'ourCompanyName', label: 'Company Name',  value: '{{ourCompanyName}}', category: 'company' },
+  { key: 'product_name',   label: 'Product Name',  value: '{{product_name}}',   category: 'company' },
+  { key: 'ourWebsite',     label: 'Website URL',   value: '{{ourWebsite}}',     category: 'company' },
+  { key: 'support_email',  label: 'Support Email', value: '{{support_email}}',  category: 'company' },
+
+  // Links — resolved from Company Profile page (rendered as <a> tags when sent)
+  { key: 'signUpLink',       label: 'Sign Up Link',       value: '{{signUpLink}}',       category: 'link' },
+  { key: 'featuresLink',     label: 'Features Link',      value: '{{featuresLink}}',     category: 'link' },
+  { key: 'pricingLink',      label: 'Pricing Link',       value: '{{pricingLink}}',      category: 'link' },
+  { key: 'demoLink',         label: 'Demo Link',          value: '{{demoLink}}',         category: 'link' },
+  { key: 'integrationsLink', label: 'Integrations Link',  value: '{{integrationsLink}}', category: 'link' },
+  { key: 'websiteLink',      label: 'Website Link',       value: '{{websiteLink}}',      category: 'link' },
 ]
 
 interface EmailEditorProps {
@@ -85,9 +90,10 @@ export default function EmailEditor({
   }
 
   const groupedVariables = {
-    lead: EMAIL_VARIABLES.filter(v => v.category === 'lead'),
+    lead:    EMAIL_VARIABLES.filter(v => v.category === 'lead'),
+    sender:  EMAIL_VARIABLES.filter(v => v.category === 'sender'),
     company: EMAIL_VARIABLES.filter(v => v.category === 'company'),
-    link: EMAIL_VARIABLES.filter(v => v.category === 'link'),
+    link:    EMAIL_VARIABLES.filter(v => v.category === 'link'),
   }
 
   return (
@@ -152,10 +158,37 @@ export default function EmailEditor({
                   ))}
                 </div>
 
+                {/* Sender */}
+                <div className="p-2 border-t">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Sender Identity
+                  </div>
+                  {groupedVariables.sender.map((variable) => (
+                    <button
+                      key={variable.key}
+                      type="button"
+                      onClick={() => insertVariable(variable)}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors group"
+                    >
+                      <div className="flex-1 text-left">
+                        <div className="font-medium">{variable.label}</div>
+                        <div className="text-xs text-gray-500 font-mono">{variable.value}</div>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); copyVariable(variable) }}
+                        className="ml-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-opacity"
+                        title="Copy variable"
+                      >
+                        {copiedVar === variable.key ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                      </button>
+                    </button>
+                  ))}
+                </div>
+
                 {/* Company Info */}
                 <div className="p-2 border-t">
                   <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Our Company Info
+                    Company Profile
                   </div>
                   {groupedVariables.company.map((variable) => (
                     <button
@@ -169,27 +202,20 @@ export default function EmailEditor({
                         <div className="text-xs text-gray-500 font-mono">{variable.value}</div>
                       </div>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          copyVariable(variable)
-                        }}
+                        onClick={(e) => { e.stopPropagation(); copyVariable(variable) }}
                         className="ml-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-opacity"
                         title="Copy variable"
                       >
-                        {copiedVar === variable.key ? (
-                          <Check className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <Copy className="w-4 h-4 text-gray-400" />
-                        )}
+                        {copiedVar === variable.key ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-400" />}
                       </button>
                     </button>
                   ))}
                 </div>
 
-                {/* BookNex Links */}
+                {/* Company Links */}
                 <div className="p-2 border-t">
                   <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    BookNex Links
+                    Company Links
                   </div>
                   {groupedVariables.link.map((variable) => (
                     <button
@@ -203,18 +229,11 @@ export default function EmailEditor({
                         <div className="text-xs text-gray-500 font-mono">{variable.value}</div>
                       </div>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          copyVariable(variable)
-                        }}
+                        onClick={(e) => { e.stopPropagation(); copyVariable(variable) }}
                         className="ml-2 p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-opacity"
                         title="Copy variable"
                       >
-                        {copiedVar === variable.key ? (
-                          <Check className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <Copy className="w-4 h-4 text-gray-400" />
-                        )}
+                        {copiedVar === variable.key ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4 text-gray-400" />}
                       </button>
                     </button>
                   ))}
@@ -222,7 +241,7 @@ export default function EmailEditor({
 
                 <div className="p-3 border-t bg-gray-50">
                   <p className="text-xs text-gray-600">
-                    💡 <strong>Tip:</strong> Variables like {'{{ourWebsite}}'} will be replaced with actual values when sent
+                    💡 <strong>Tip:</strong> Link variables like <code>{'{{signUpLink}}'}</code> become clickable <code>&lt;a&gt;</code> tags when the email is sent.
                   </p>
                 </div>
               </div>

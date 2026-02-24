@@ -8,7 +8,7 @@ import ProgressDialog from '@/components/ProgressDialog'
 import ResultDialog from '@/components/ResultDialog'
 import leadsService, { Lead } from '@/services/leads.service'
 import { aiAPI, campaignsAPI, leadsAPI } from '@/services/api'
-import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, Flame, Thermometer, Snowflake, TrendingUp } from 'lucide-react'
+import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, Flame, Thermometer, Snowflake, TrendingUp, X, ChevronRight, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
@@ -91,6 +91,7 @@ function Leads() {
   const [showBatchAnalyticsModal, setShowBatchAnalyticsModal] = useState(false)
   const [selectedBatchForAnalytics, setSelectedBatchForAnalytics] = useState<any>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showAddLeadsModal, setShowAddLeadsModal] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importForm, setImportForm] = useState({
     batchName: '',
@@ -856,613 +857,306 @@ function Leads() {
 
   return (
     <Layout>
-      <div className="space-y-6 max-w-full overflow-x-hidden">
-        {/* Header with Date Filter */}
+      <div className="space-y-5 max-w-full overflow-x-hidden">
+
+        {/* ── Header ─────────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Leads Management</h1>
-            <p className="text-gray-600 mt-2">Manage and track your leads and batches</p>
+            <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
+            <p className="text-gray-500 mt-1 text-sm">Manage, generate and track all your leads</p>
           </div>
-          <div className="flex items-center space-x-4">
-            {/* View Mode Toggle */}
-            <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setDateViewMode('monthly')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  dateViewMode === 'monthly'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Monthly
-              </button>
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${dateViewMode === 'monthly' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600'}`}
+              >Monthly</button>
               <button
                 onClick={() => setDateViewMode('allTime')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  dateViewMode === 'allTime'
-                    ? 'bg-white text-primary-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                All Time
-              </button>
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${dateViewMode === 'allTime' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600'}`}
+              >All Time</button>
             </div>
-            
-            {/* Month/Year selectors - only show in monthly mode */}
             {dateViewMode === 'monthly' && (
               <>
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  {months.map((month, idx) => (
-                    <option key={month} value={idx + 1}>
-                      {month}
-                    </option>
-                  ))}
+                <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  {months.map((month, idx) => <option key={month} value={idx + 1}>{month}</option>)}
                 </select>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  {[2024, 2025, 2026].map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
+                <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+                  {[2024, 2025, 2026].map((year) => <option key={year} value={year}>{year}</option>)}
                 </select>
               </>
             )}
-          </div>
-        </div>
-
-        {/* View Mode Tabs */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
-              <button
-                onClick={() => {
-                  setViewMode('table')
-                  setSelectedLeads(new Set())
-                  setStatusFilter('all')
-                  setTierFilter('all')
-                }}
-                className={`px-8 py-4 border-b-2 font-medium text-base ${
-                  viewMode === 'table'
-                    ? 'border-primary-500 text-primary-600 bg-primary-50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <List className="w-5 h-5 inline mr-2" />
-                Leads View
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('batches')
-                  setSelectedLeads(new Set())
-                  setActiveTab('all')
-                  setStatusFilter('all')
-                }}
-                className={`px-8 py-4 border-b-2 font-medium text-base ${
-                  viewMode === 'batches'
-                    ? 'border-primary-500 text-primary-600 bg-primary-50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Package className="w-5 h-5 inline mr-2" />
-                Batch View
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        {/* Action Buttons - Different for each view */}
-        <div className="flex items-center justify-end space-x-3">
-          {generating && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <Loader className="w-4 h-4 text-blue-600 animate-spin" />
-              <span className="text-sm text-blue-700 font-medium">Generating leads...</span>
-            </div>
-          )}
-          {viewMode === 'table' ? (
-            <>
-              <button 
-                onClick={() => setShowCreateLeadModal(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-              >
-                <Plus className="w-4 h-4 inline mr-2" />
-                Create Lead
-              </button>
-              <button 
-                onClick={() => setShowGenerateModal(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-              >
-                <Zap className="w-4 h-4 inline mr-2" />
-                Generate Leads Batch
-              </button>
-              <button 
-                onClick={handleImport}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <Upload className="w-4 h-4 inline mr-2" />
-                Import CSV
-              </button>
-              <button 
-                onClick={handleExport}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <Download className="w-4 h-4 inline mr-2" />
-                Export Leads
-              </button>
-            </>
-          ) : (
-            <>
-              <button 
-                onClick={() => setShowGenerateModal(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-              >
-                <Zap className="w-4 h-4 inline mr-2" />
-                Generate Leads
-              </button>
-              <button 
-                onClick={handleImport}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <Upload className="w-4 h-4 inline mr-2" />
-                Import CSV
-              </button>
-              <button 
-                onClick={handleExport}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <Download className="w-4 h-4 inline mr-2" />
-                Export Batches
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* Stats Cards - Different for each view */}
-        {viewMode === 'table' ? (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-            <div 
-              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => setTierFilter('all')}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Leads</p>
-                  <p className="text-2xl font-bold text-gray-900">{allLeads.length}</p>
-                </div>
-                <Users className="w-8 h-8 text-blue-500" />
-              </div>
-            </div>
-            <div 
-              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => setTierFilter(tierFilter === 'hot' ? 'all' : 'hot')}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Hot Leads</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {dateFilteredLeads.filter((l: any) => {
-                      const score = l.qualityScore || l.score || 0
-                      // Apply active tab filter
-                      if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
-                      if (activeTab === 'generated' && l.sourceType !== 'automated') return false
-                      return score >= 80
-                    }).length}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Score 80+</p>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                  <Flame className="w-5 h-5 text-red-600" />
-                </div>
-              </div>
-            </div>
-            <div 
-              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => setTierFilter(tierFilter === 'warm' ? 'all' : 'warm')}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Warm Leads</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {dateFilteredLeads.filter((l: any) => {
-                      const score = l.qualityScore || l.score || 0
-                      // Apply active tab filter
-                      if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
-                      if (activeTab === 'generated' && l.sourceType !== 'automated') return false
-                      return score >= 60 && score < 80
-                    }).length}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Score 60-79</p>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                  <Thermometer className="w-5 h-5 text-yellow-600" />
-                </div>
-              </div>
-            </div>
-            <div 
-              className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => setTierFilter(tierFilter === 'cold' ? 'all' : 'cold')}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Cold Leads</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {dateFilteredLeads.filter((l: any) => {
-                      const score = l.qualityScore || l.score || 0
-                      // Apply active tab filter
-                      if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
-                      if (activeTab === 'generated' && l.sourceType !== 'automated') return false
-                      return score < 60
-                    }).length}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">Score &lt;60</p>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Snowflake className="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Batch View - First row: General Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Batches</p>
-                    <p className="text-2xl font-bold text-gray-900">{batches.length}</p>
-                  </div>
-                  <Package className="w-8 h-8 text-blue-500" />
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Leads in Batches</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0)}
-                    </p>
-                  </div>
-                  <Users className="w-8 h-8 text-green-500" />
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Avg Leads per Batch</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {batches.length > 0 ? Math.round(batches.reduce((sum: number, batch: any) => sum + (batch.leadCount || 0), 0) / batches.length) : 0}
-                    </p>
-                  </div>
-                  <TrendingUp className="w-8 h-8 text-purple-500" />
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Active Campaigns</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {batches.reduce((sum: number, batch: any) => sum + (batch.activeCampaignCount || 0), 0)}
-                    </p>
-                  </div>
-                  <Zap className="w-8 h-8 text-orange-500" />
-                </div>
-              </div>
-            </div>
-            
-            {/* Batch View - Second row: Lead Quality Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div 
-                className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setTierFilter(tierFilter === 'hot' ? 'all' : 'hot')}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Hot Leads</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {dateFilteredLeads.filter((l: any) => {
-                        const score = l.qualityScore || l.score || 0
-                        // Apply active tab filter for batches
-                        if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
-                        if (activeTab === 'generated' && l.sourceType !== 'automated') return false
-                        return score >= 80
-                      }).length}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Score 80+</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                    <Flame className="w-5 h-5 text-red-600" />
-                  </div>
-                </div>
-              </div>
-              <div 
-                className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setTierFilter(tierFilter === 'warm' ? 'all' : 'warm')}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Warm Leads</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {dateFilteredLeads.filter((l: any) => {
-                        const score = l.qualityScore || l.score || 0
-                        // Apply active tab filter for batches
-                        if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
-                        if (activeTab === 'generated' && l.sourceType !== 'automated') return false
-                        return score >= 60 && score < 80
-                      }).length}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Score 60-79</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
-                    <Thermometer className="w-5 h-5 text-yellow-600" />
-                  </div>
-                </div>
-              </div>
-              <div 
-                className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setTierFilter(tierFilter === 'cold' ? 'all' : 'cold')}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Cold Leads</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {dateFilteredLeads.filter((l: any) => {
-                        const score = l.qualityScore || l.score || 0
-                        // Apply active tab filter for batches
-                        if (activeTab === 'imported' && l.sourceType !== 'manual_import') return false
-                        if (activeTab === 'generated' && l.sourceType !== 'automated') return false
-                        return score < 60
-                      }).length}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Score &lt;60</p>
-                  </div>
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Snowflake className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Category Tabs - Different for each view */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
-              <button
-                onClick={() => { setActiveTab('all'); setSelectedLeads(new Set()) }}
-                className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                  activeTab === 'all'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {viewMode === 'table' ? 'All Leads' : 'All Batches'}
-                <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
-                  {viewMode === 'table' ? allLeads.length : allBatches.length}
-                </span>
-              </button>
-              <button
-                onClick={() => { setActiveTab('imported'); setSelectedLeads(new Set()) }}
-                className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                  activeTab === 'imported'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Upload className="w-4 h-4 inline mr-2" />
-                Imported
-                <span className="ml-2 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">
-                  {viewMode === 'table' 
-                    ? allLeads.filter((l: any) => l.sourceType === 'manual_import').length
-                    : allBatches.filter((b: any) => !b.importSettings?.sources).length
-                  }
-                </span>
-              </button>
-              <button
-                onClick={() => { setActiveTab('generated'); setSelectedLeads(new Set()) }}
-                className={`px-6 py-3 border-b-2 font-medium text-sm ${
-                  activeTab === 'generated'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Zap className="w-4 h-4 inline mr-2" />
-                Generated
-                <span className="ml-2 px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">
-                  {viewMode === 'table'
-                    ? allLeads.filter((l: any) => l.sourceType === 'automated' || (!l.sourceType && l.source !== 'manual')).length
-                    : allBatches.filter((b: any) => b.importSettings?.sources && Array.isArray(b.importSettings.sources)).length
-                  }
-                </span>
-              </button>
-            </nav>
-          </div>
-        </div>
-
-        {/* Bulk Actions Bar */}
-        {selectedLeads.size > 0 && (
-          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-primary-900">
-                {selectedLeads.size} lead{selectedLeads.size !== 1 ? 's' : ''} selected
-              </span>
-              <button
-                onClick={() => setSelectedLeads(new Set())}
-                className="text-sm text-primary-600 hover:text-primary-800"
-              >
-                Clear selection
-              </button>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={handleCreateCampaignFromSelected}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-              >
-                <Plus className="w-4 h-4 inline mr-2" />
-                Create Campaign from Selected
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-4 space-y-4">
-          {/* Search Bar and Advanced Filters Toggle */}
-          <div className="flex items-center gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder={viewMode === 'table' ? "Search by company name, email, or contact..." : "Search batches by name or industry..."}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
             <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
-                showAdvancedFilters
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-              }`}
+              onClick={() => setShowAddLeadsModal(true)}
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center gap-2 transition-all"
             >
-              <Filter className="w-4 h-4" />
-              Advanced Filters
+              <Plus className="w-4 h-4" />
+              Add Leads
+            </button>
+          </div>
+        </div>
+
+        {/* ── Smart Stat Strip ───────────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setTierFilter('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              tierFilter === 'all'
+                ? 'bg-gray-800 text-white border-gray-800'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>All</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${tierFilter === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'}`}>
+              {allLeads.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setTierFilter(tierFilter === 'hot' ? 'all' : 'hot')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              tierFilter === 'hot'
+                ? 'bg-red-500 text-white border-red-500'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'
+            }`}
+          >
+            <Flame className="w-4 h-4" />
+            <span>Hot</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${tierFilter === 'hot' ? 'bg-white/20 text-white' : 'bg-red-50 text-red-600'}`}>
+              {dateFilteredLeads.filter((l: any) => (l.qualityScore || l.score || 0) >= 80).length}
+            </span>
+          </button>
+          <button
+            onClick={() => setTierFilter(tierFilter === 'warm' ? 'all' : 'warm')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              tierFilter === 'warm'
+                ? 'bg-yellow-500 text-white border-yellow-500'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-yellow-300'
+            }`}
+          >
+            <Thermometer className="w-4 h-4" />
+            <span>Warm</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${tierFilter === 'warm' ? 'bg-white/20 text-white' : 'bg-yellow-50 text-yellow-600'}`}>
+              {dateFilteredLeads.filter((l: any) => { const s = l.qualityScore || l.score || 0; return s >= 60 && s < 80 }).length}
+            </span>
+          </button>
+          <button
+            onClick={() => setTierFilter(tierFilter === 'cold' ? 'all' : 'cold')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              tierFilter === 'cold'
+                ? 'bg-blue-500 text-white border-blue-500'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            <Snowflake className="w-4 h-4" />
+            <span>Cold</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${tierFilter === 'cold' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
+              {dateFilteredLeads.filter((l: any) => (l.qualityScore || l.score || 0) < 60).length}
+            </span>
+          </button>
+          <div className="w-px h-6 bg-gray-200 mx-1" />
+          <button
+            onClick={() => setViewMode('batches')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
+              viewMode === 'batches'
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-primary-300'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            <span>Batches</span>
+            <span className={`ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${viewMode === 'batches' ? 'bg-white/20 text-white' : 'bg-primary-50 text-primary-600'}`}>
+              {allBatches.length}
+            </span>
+          </button>
+          {viewMode === 'batches' && (
+            <button
+              onClick={() => { setViewMode('table'); setTierFilter('all') }}
+              className="flex items-center gap-1 px-3 py-2 text-xs text-gray-500 hover:text-gray-700"
+            >
+              <X className="w-3 h-3" />
+              Back to leads
+            </button>
+          )}
+
+          {/* Spacer + Export */}
+          <div className="ml-auto">
+            <button
+              onClick={handleExport}
+              className="px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+          </div>
+        </div>
+
+        {/* ── Unified Toolbar ────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 flex items-center gap-3 flex-wrap">
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => { setViewMode('table'); setSelectedLeads(new Set()); setStatusFilter('all'); setTierFilter('all') }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'table' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              <List className="w-3.5 h-3.5" />
+              List
+            </button>
+            <button
+              onClick={() => { setViewMode('batches'); setSelectedLeads(new Set()); setActiveTab('all'); setStatusFilter('all') }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${viewMode === 'batches' ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+            >
+              <Package className="w-3.5 h-3.5" />
+              Batches
             </button>
           </div>
 
-          {/* Status Filter Buttons - Only show for Leads View */}
+          {/* Source Tabs */}
+          <div className="flex items-center gap-1">
+            {(['all', 'imported', 'generated'] as const).map(tab => (
+              <button
+                key={tab}
+                onClick={() => { setActiveTab(tab); setSelectedLeads(new Set()) }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  activeTab === tab ? 'bg-primary-100 text-primary-700' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {tab === 'all' ? 'All Sources' : tab === 'imported' ? '📋 Imported' : '⚡ Generated'}
+                <span className="ml-1.5 text-[10px] opacity-70">
+                  {tab === 'all'
+                    ? allLeads.length
+                    : tab === 'imported'
+                    ? allLeads.filter((l: any) => l.sourceType === 'manual_import').length
+                    : allLeads.filter((l: any) => l.sourceType === 'automated' || (!l.sourceType && l.source !== 'manual')).length}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Divider */}
+          <div className="w-px h-5 bg-gray-200" />
+
+          {/* Search */}
+          <div className="flex-1 relative min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder={viewMode === 'table' ? 'Search company, email, contact…' : 'Search batches…'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Advanced Filters Toggle */}
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              showAdvancedFilters ? 'bg-primary-100 text-primary-700' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            Filters
+          </button>
+
+          {/* Status filter - table view only */}
           {viewMode === 'table' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 mr-2">Status:</span>
-              {['all', 'new', 'contacted', 'responded', 'interested', 'converted'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                    statusFilter === status
-                      ? 'bg-primary-600 text-white'
-                      : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                  }`}
-                >
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+            >
+              {['all', 'new', 'contacted', 'responded', 'interested', 'converted'].map(s => (
+                <option key={s} value={s}>{s === 'all' ? 'All Statuses' : s.charAt(0).toUpperCase() + s.slice(1)}</option>
               ))}
-            </div>
-          )}
-
-          {/* Advanced Filters Panel */}
-          {showAdvancedFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Industry
-                </label>
-                <select
-                  value={filters.industry}
-                  onChange={(e) => setFilters({ ...filters, industry: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="all">All Industries</option>
-                  {INDUSTRIES.map((industry) => (
-                    <option key={industry.value} value={industry.value}>{industry.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Lead Source
-                </label>
-                <select
-                  value={filters.source}
-                  onChange={(e) => setFilters({ ...filters, source: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="all">All Sources</option>
-                  <option value="apollo">Apollo.io</option>
-                  <option value="google_places">Google Places</option>
-                  <option value="peopledatalabs">People Data Labs</option>
-                  <option value="linkedin">LinkedIn</option>
-                  <option value="manual_import">Manual Import</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Min Score ({filters.minScore})
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={filters.minScore}
-                  onChange={(e) => setFilters({ ...filters, minScore: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Score ({filters.maxScore})
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={filters.maxScore}
-                  onChange={(e) => setFilters({ ...filters, maxScore: parseInt(e.target.value) })}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="md:col-span-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={filters.withoutContacts}
-                    onChange={(e) => setFilters({ ...filters, withoutContacts: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    Show only leads without email address
-                  </span>
-                </label>
-              </div>
-
-              <div className="md:col-span-4 flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setFilters({
-                      industry: 'all',
-                      minScore: 0,
-                      maxScore: 100,
-                      verificationStatus: 'all',
-                      source: 'all',
-                      withoutContacts: false,
-                    })
-                    setSearchQuery('')
-                    setStatusFilter('all')
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Reset Filters
-                </button>
-              </div>
-            </div>
+            </select>
           )}
         </div>
 
-        {/* Leads View - Table or Batches */}
+        {/* ── Advanced Filters Panel (collapsible) ──────────────────────────── */}
+        {showAdvancedFilters && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Industry</label>
+              <select
+                value={filters.industry}
+                onChange={(e) => setFilters({ ...filters, industry: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="all">All Industries</option>
+                {INDUSTRIES.map((industry) => <option key={industry.value} value={industry.value}>{industry.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Lead Source</label>
+              <select
+                value={filters.source}
+                onChange={(e) => setFilters({ ...filters, source: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="all">All Sources</option>
+                <option value="apollo">Apollo.io</option>
+                <option value="google_places">Google Places</option>
+                <option value="peopledatalabs">People Data Labs</option>
+                <option value="linkedin">LinkedIn</option>
+                <option value="manual_import">Manual Import</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Min Score ({filters.minScore})</label>
+              <input type="range" min="0" max="100" value={filters.minScore}
+                onChange={(e) => setFilters({ ...filters, minScore: parseInt(e.target.value) })}
+                className="w-full accent-primary-600" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Max Score ({filters.maxScore})</label>
+              <input type="range" min="0" max="100" value={filters.maxScore}
+                onChange={(e) => setFilters({ ...filters, maxScore: parseInt(e.target.value) })}
+                className="w-full accent-primary-600" />
+            </div>
+            <div className="md:col-span-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={filters.withoutContacts}
+                  onChange={(e) => setFilters({ ...filters, withoutContacts: e.target.checked })}
+                  className="w-4 h-4 text-primary-600 rounded" />
+                <span className="text-sm text-gray-700">Show only leads without email address</span>
+              </label>
+            </div>
+            <div className="flex items-end justify-end">
+              <button
+                onClick={() => { setFilters({ industry: 'all', minScore: 0, maxScore: 100, verificationStatus: 'all', source: 'all', withoutContacts: false }); setSearchQuery(''); setStatusFilter('all') }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >Reset All</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Bulk Actions Banner ────────────────────────────────────────────── */}
+        {selectedLeads.size > 0 && (
+          <div className="bg-primary-600 text-white rounded-xl px-5 py-3 flex items-center justify-between">
+            <span className="text-sm font-medium">{selectedLeads.size} lead{selectedLeads.size !== 1 ? 's' : ''} selected</span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setSelectedLeads(new Set())} className="text-sm text-primary-100 hover:text-white">Clear</button>
+              <button
+                onClick={handleCreateCampaignFromSelected}
+                className="px-4 py-1.5 text-sm font-medium bg-white text-primary-700 rounded-lg hover:bg-primary-50 flex items-center gap-2"
+              >
+                <Zap className="w-4 h-4" />
+                Create Campaign
+              </button>
+              <button
+                onClick={handleDeleteSelectedLeads}
+                className="px-4 py-1.5 text-sm font-medium bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
+              >
+                Delete Selected
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Main Content ──────────────────────────────────────────────────── */}
         {viewMode === 'table' ? (
           <LeadsTableView
             leads={leads}
@@ -1475,7 +1169,7 @@ function Leads() {
             onSelectLead={handleSelectLead}
             onViewLead={handleViewLead}
             onEditLead={handleEditLead}
-            onGenerateClick={() => setShowGenerateModal(true)}
+            onGenerateClick={() => setShowAddLeadsModal(true)}
             getStatusColor={getStatusColor}
             getTierBadge={getTierBadge}
             onDeleteSelected={handleDeleteSelectedLeads}
@@ -1492,18 +1186,76 @@ function Leads() {
             onSelectAllBatches={handleSelectAllBatches}
             onDeleteSelected={handleDeleteSelectedBatches}
             onBatchClick={(batchId) => router.push(`/batches/${batchId}`)}
-            onStartCampaign={(batch) => {
-              setSelectedBatchForCampaign(batch)
-              setShowBatchCampaignModal(true)
-            }}
-            onViewAnalytics={(batch) => {
-              setSelectedBatchForAnalytics(batch)
-              setShowBatchAnalyticsModal(true)
-            }}
+            onStartCampaign={(batch) => { setSelectedBatchForCampaign(batch); setShowBatchCampaignModal(true) }}
+            onViewAnalytics={(batch) => { setSelectedBatchForAnalytics(batch); setShowBatchAnalyticsModal(true) }}
           />
         )}
 
-        {/* Modals */}
+        {/* ── Add Leads Modal ───────────────────────────────────────────────── */}
+        {showAddLeadsModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+              <div className="flex items-center justify-between px-8 pt-8 pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Add Leads</h2>
+                  <p className="text-gray-500 mt-1 text-sm">How do you want to bring in new leads?</p>
+                </div>
+                <button onClick={() => setShowAddLeadsModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="px-8 pb-8 grid grid-cols-1 gap-3">
+                <button
+                  onClick={() => { setShowAddLeadsModal(false); setShowGenerateModal(true) }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-green-300 hover:bg-green-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-green-200 transition-colors">
+                    <Zap className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">Generate with AI</h3>
+                      <span className="text-xs font-medium px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Recommended</span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">Auto-discover leads from Apollo.io, Google Places, or People Data Labs.</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setShowAddLeadsModal(false); handleImport() }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
+                    <Upload className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">Import CSV</h3>
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">Upload a spreadsheet with existing contacts. We'll deduplicate automatically.</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setShowAddLeadsModal(false); setShowCreateLeadModal(true) }}
+                  className="flex items-center gap-5 p-5 rounded-xl border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-50 transition-all text-left group"
+                >
+                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-gray-200 transition-colors">
+                    <FileText className="w-6 h-6 text-gray-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-gray-900">Manual Entry</h3>
+                      <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">Add a single lead manually by filling in their details.</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modals ────────────────────────────────────────────────────────── */}
         <GenerateLeadsModal
           show={showGenerateModal}
           generateForm={generateForm}
@@ -1521,11 +1273,7 @@ function Leads() {
           importFile={importFile}
           importForm={importForm}
           isImporting={isImporting}
-          onClose={() => {
-            setShowImportDialog(false)
-            setImportFile(null)
-            setImportForm({ batchName: '', industry: 'Other', enrichEmail: true })
-          }}
+          onClose={() => { setShowImportDialog(false); setImportFile(null); setImportForm({ batchName: '', industry: 'Other', enrichEmail: true }) }}
           onFormChange={setImportForm}
           onSubmit={handleImportSubmit}
         />
@@ -1545,42 +1293,18 @@ function Leads() {
         <LeadModals
           showViewModal={showViewModal}
           selectedLead={selectedLead}
-          onCloseView={() => {
-            setShowViewModal(false)
-            setSelectedLead(null)
-          }}
-          onEditFromView={(lead) => {
-            setShowViewModal(false)
-            handleEditLead(lead)
-          }}
+          onCloseView={() => { setShowViewModal(false); setSelectedLead(null) }}
+          onEditFromView={(lead) => { setShowViewModal(false); handleEditLead(lead) }}
           getStatusColor={getStatusColor}
           showEditModal={showEditModal}
           editForm={editForm}
-          onCloseEdit={() => {
-            setShowEditModal(false)
-            setSelectedLead(null)
-            setEditForm({})
-          }}
+          onCloseEdit={() => { setShowEditModal(false); setSelectedLead(null); setEditForm({}) }}
           onEditFormChange={setEditForm}
           onSaveEdit={handleSaveEdit}
           showCreateModal={showCreateLeadModal}
           createForm={createLeadForm}
           isCreating={isCreatingLead}
-          onCloseCreate={() => {
-            setShowCreateLeadModal(false)
-            setCreateLeadForm({
-              companyName: '',
-              contactName: '',
-              email: '',
-              phone: '',
-              website: '',
-              industry: '',
-              city: '',
-              country: 'United States',
-              jobTitle: '',
-              companySize: '',
-            })
-          }}
+          onCloseCreate={() => { setShowCreateLeadModal(false); setCreateLeadForm({ companyName: '', contactName: '', email: '', phone: '', website: '', industry: '', city: '', country: 'United States', jobTitle: '', companySize: '' }) }}
           onCreateFormChange={(form) => setCreateLeadForm(form as any)}
           onCreateLead={handleCreateLead}
           industriesByCategory={industriesByCategory}
@@ -1589,75 +1313,19 @@ function Leads() {
         <BatchModals
           showAnalyticsModal={showBatchAnalyticsModal}
           selectedBatchForAnalytics={selectedBatchForAnalytics}
-          onCloseAnalytics={() => {
-            setShowBatchAnalyticsModal(false)
-            setSelectedBatchForAnalytics(null)
-          }}
+          onCloseAnalytics={() => { setShowBatchAnalyticsModal(false); setSelectedBatchForAnalytics(null) }}
           showCampaignModal={showBatchCampaignModal}
           selectedBatchForCampaign={selectedBatchForCampaign}
-          onCloseCampaign={() => {
-            setShowBatchCampaignModal(false)
-            setSelectedBatchForCampaign(null)
-          }}
-          onCreateCampaign={async (data: any) => {
-            await campaignsAPI.createCampaignFromBatch({
-              ...data,
-              batchId: String(data.batchId)
-            })
-          }}
+          onCloseCampaign={() => { setShowBatchCampaignModal(false); setSelectedBatchForCampaign(null) }}
+          onCreateCampaign={async (data: any) => { await campaignsAPI.createCampaignFromBatch({ ...data, batchId: String(data.batchId) }) }}
         />
 
-        {/* Delete Confirmation Dialog */}
-        <ConfirmDialog
-          isOpen={showDeleteConfirm}
-          onClose={() => {
-            setShowDeleteConfirm(false)
-            setLeadToDelete(null)
-          }}
-          onConfirm={confirmDelete}
-          title="Delete Lead"
-          message="Are you sure you want to delete this lead? This action cannot be undone."
-          confirmText="Delete"
-          isLoading={isDeleting}
-        />
+        <ConfirmDialog isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setLeadToDelete(null) }} onConfirm={confirmDelete} title="Delete Lead" message="Are you sure you want to delete this lead? This action cannot be undone." confirmText="Delete" isLoading={isDeleting} />
+        <ConfirmDialog isOpen={showDeleteBatchesConfirm} onClose={() => setShowDeleteBatchesConfirm(false)} onConfirm={confirmDeleteBatches} title="Delete Batches" message={`Are you sure you want to delete ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''}? This will also delete all leads within ${selectedBatches.size > 1 ? 'these batches' : 'this batch'}. This action cannot be undone.`} confirmText="Delete" isLoading={isDeleting} />
+        <ConfirmDialog isOpen={showDeleteLeadsConfirm} onClose={() => setShowDeleteLeadsConfirm(false)} onConfirm={confirmDeleteLeads} title="Delete Leads" message={`Are you sure you want to delete ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}? This action cannot be undone.`} confirmText="Delete" isLoading={isDeleting} />
 
-        <ConfirmDialog
-          isOpen={showDeleteBatchesConfirm}
-          onClose={() => setShowDeleteBatchesConfirm(false)}
-          onConfirm={confirmDeleteBatches}
-          title="Delete Batches"
-          message={`Are you sure you want to delete ${selectedBatches.size} batch${selectedBatches.size > 1 ? 'es' : ''}? This will also delete all leads within ${selectedBatches.size > 1 ? 'these batches' : 'this batch'}. This action cannot be undone.`}
-          confirmText="Delete"
-          isLoading={isDeleting}
-        />
-
-        <ConfirmDialog
-          isOpen={showDeleteLeadsConfirm}
-          onClose={() => setShowDeleteLeadsConfirm(false)}
-          onConfirm={confirmDeleteLeads}
-          title="Delete Leads"
-          message={`Are you sure you want to delete ${selectedLeads.size} lead${selectedLeads.size > 1 ? 's' : ''}? This action cannot be undone.`}
-          confirmText="Delete"
-          isLoading={isDeleting}
-        />
-
-        {/* Progress Dialog */}
-        <ProgressDialog
-          isOpen={showProgressDialog}
-          title={progressTitle}
-          message={progressMessage}
-          indeterminate={true}
-        />
-
-        {/* Result Dialog */}
-        <ResultDialog
-          isOpen={showResultDialog}
-          onClose={() => setShowResultDialog(false)}
-          title={resultData.title}
-          message={resultData.message}
-          variant={resultData.variant}
-          stats={resultData.stats}
-        />
+        <ProgressDialog isOpen={showProgressDialog} title={progressTitle} message={progressMessage} indeterminate={true} />
+        <ResultDialog isOpen={showResultDialog} onClose={() => setShowResultDialog(false)} title={resultData.title} message={resultData.message} variant={resultData.variant} stats={resultData.stats} />
       </div>
     </Layout>
   )

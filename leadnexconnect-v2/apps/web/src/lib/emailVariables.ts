@@ -7,7 +7,7 @@ export interface EmailVariable {
   key: string;
   label: string;
   value: string; // Template format: {{key}}
-  category: 'lead' | 'company' | 'link' | 'custom';
+  category: 'lead' | 'sender' | 'company' | 'link' | 'custom';
   description?: string;
   defaultValue?: string;
   isEditable?: boolean;
@@ -120,14 +120,34 @@ export class EmailVariableManager {
         isEditable: false,
       },
 
-      // Company Info
+      // Sender identity (from Sender Settings page)
+      {
+        key: 'sender_name',
+        label: 'Sender Name',
+        value: '{{sender_name}}',
+        category: 'sender',
+        description: 'Your sender display name',
+        defaultValue: '',
+        isEditable: false,
+      },
+      {
+        key: 'sender_email',
+        label: 'Sender Email',
+        value: '{{sender_email}}',
+        category: 'sender',
+        description: 'Your sender email address',
+        defaultValue: '',
+        isEditable: false,
+      },
+
+      // Company Info (from Company Profile page)
       {
         key: 'ourCompanyName',
         label: 'Our Company Name',
         value: '{{ourCompanyName}}',
         category: 'company',
-        description: 'Your company name (BookNex)',
-        defaultValue: 'BookNex Solutions',
+        description: 'Your company name',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -136,7 +156,7 @@ export class EmailVariableManager {
         value: '{{ourEmail}}',
         category: 'company',
         description: 'Your support email',
-        defaultValue: 'support@booknexsolutions.com',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -145,7 +165,7 @@ export class EmailVariableManager {
         value: '{{ourWebsite}}',
         category: 'company',
         description: 'Your website URL',
-        defaultValue: 'https://www.booknexsolutions.com',
+        defaultValue: '',
         isEditable: true,
       },
 
@@ -156,7 +176,7 @@ export class EmailVariableManager {
         value: '{{signUpLink}}',
         category: 'link',
         description: 'Link to signup page',
-        defaultValue: 'https://booknexsolutions.com/sign-up/',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -165,7 +185,7 @@ export class EmailVariableManager {
         value: '{{featuresLink}}',
         category: 'link',
         description: 'Link to features page',
-        defaultValue: 'https://booknexsolutions.com/features/',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -174,7 +194,7 @@ export class EmailVariableManager {
         value: '{{pricingLink}}',
         category: 'link',
         description: 'Link to pricing page',
-        defaultValue: 'https://booknexsolutions.com/pricing/',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -183,7 +203,7 @@ export class EmailVariableManager {
         value: '{{howToStartLink}}',
         category: 'link',
         description: 'Link to getting started guide',
-        defaultValue: 'https://booknexsolutions.com/how-to-start/',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -192,7 +212,7 @@ export class EmailVariableManager {
         value: '{{integrationsLink}}',
         category: 'link',
         description: 'Link to integrations page',
-        defaultValue: 'https://booknexsolutions.com/integrations/',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -201,7 +221,7 @@ export class EmailVariableManager {
         value: '{{demoLink}}',
         category: 'link',
         description: 'Link to book a demo',
-        defaultValue: 'https://booknexsolutions.com/demo/',
+        defaultValue: '',
         isEditable: true,
       },
       {
@@ -210,7 +230,7 @@ export class EmailVariableManager {
         value: '{{websiteLink}}',
         category: 'link',
         description: 'Main website link',
-        defaultValue: 'https://www.booknexsolutions.com',
+        defaultValue: '',
         isEditable: true,
       },
 
@@ -219,10 +239,10 @@ export class EmailVariableManager {
         key: 'signature',
         label: 'Email Signature',
         value: '{{signature}}',
-        category: 'company',
-        description: 'Professional email signature with logo',
+        category: 'sender',
+        description: 'Full HTML email signature block (set in Sender Settings)',
         defaultValue: '',
-        isEditable: true,
+        isEditable: false,
       },
     ];
 
@@ -362,10 +382,11 @@ export class EmailVariableManager {
    */
   getGroupedVariables(): Record<string, EmailVariable[]> {
     return {
-      lead: this.getByCategory('lead'),
+      lead:    this.getByCategory('lead'),
+      sender:  this.getByCategory('sender'),
       company: this.getByCategory('company'),
-      link: this.getByCategory('link'),
-      custom: this.getByCategory('custom'),
+      link:    this.getByCategory('link'),
+      custom:  this.getByCategory('custom'),
     };
   }
 }
