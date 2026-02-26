@@ -13,11 +13,11 @@ import { detectIntent } from '@/utils/detect-intent';
 import { ResolvedEntities } from '@/types/ai-conversation.types';
 import { toast } from 'react-hot-toast';
 import api from '@/services/api';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ArrowLeft, RotateCcw, Loader2 } from 'lucide-react';
 
 export default function AICreatePage() {
   const router = useRouter();
-  const { state, addMessage, updateEntities, setDraft, setLoading } = useConversationState();
+  const { state, addMessage, updateEntities, setDraft, setLoading, reset: resetConversation } = useConversationState();
   const { context, fetchContext, parseCampaign, generateWorkflow } = useAICampaignCreation();
   const { parseWorkflow } = useAIWorkflowCreation();
   const { parseLeadBatch } = useAILeadBatchCreation();
@@ -33,11 +33,31 @@ export default function AICreatePage() {
   }, []);
 
   const handleSendMessage = async (message: string) => {
-    addMessage('user', message);
+    console.log('[AI Create] handleSendMessage called with:', message);
+    
+    // Set loading FIRST so thinking animation shows immediately
+    console.log('[AI Create] Setting loading to true');
     setLoading(true);
+    addMessage('user', message);
+
+    // Track start time to ensure minimum loading display time
+    const startTime = Date.now();
+    const MIN_LOADING_TIME = 800; // milliseconds
 
     try {
-      const intent = detectIntent(message);
+      // Check if user is refining an existing draft
+      const isRefiningDraft = state.currentDraft !== null;
+      const refinementKeywords = ['change', 'modify', 'update', 'switch', 'use', 'make it', 'instead'];
+      const isRefinementRequest = refinementKeywords.some(kw => message.toLowerCase().includes(kw));
+      
+      let intent = detectIntent(message);
+      console.log('[AI Create] Detected intent:', intent, 'for message:', message);
+      
+      // If we have a draft and user seems to be refining, keep the current intent
+      if (isRefiningDraft && isRefinementRequest && state.currentIntent) {
+        intent = state.currentIntent;
+      }
+      
       const conversationMessages = state.messages.map(m => ({
         role: m.role,
         content: m.content,
@@ -47,7 +67,12 @@ export default function AICreatePage() {
       let result: any;
 
       if (intent === 'lead_batch') {
-        result = await parseLeadBatch.mutateAsync({ message });
+        console.log('[AI Create] Calling parseLeadBatch API...');
+        result = await parseLeadBatch.mutateAsync({ 
+          message,
+          currentDraft: state.currentDraft || undefined,
+        });
+        console.log('[AI Create] parseLeadBatch result:', result);
         if (result.success && result.draft) {
           const draft = result.draft;
           if (draft.status === 'needs_clarification') {
@@ -55,7 +80,11 @@ export default function AICreatePage() {
           } else if (draft.status === 'off_topic' || draft.status === 'policy_violation') {
             addMessage('assistant', draft.message);
           } else {
-            addMessage('assistant', `I've prepared a lead generation config for "${draft.name}". Review it on the right.`);
+            const isUpdate = isRefiningDraft && isRefinementRequest;
+            const responseMsg = isUpdate 
+              ? `Updated! I've changed the lead generation config. Review the changes on the right.`
+              : `I've prepared a lead generation config for "${draft.name}". Review it on the right.`;
+            addMessage('assistant', responseMsg);
             setDraft(draft, 'lead_batch');
             updateEntities({
               lastIndustry: draft.industry,
@@ -121,16 +150,53 @@ export default function AICreatePage() {
       }
     } catch (error: any) {
       console.error('Error parsing message:', error);
-      addMessage('assistant',
-        'Something went wrong on my end. Please try again, or create it manually if the issue persists.'
-      );
+      
+      // Extract user-friendly error message
+      let errorMsg = 'Something went wrong on my end. Please try again, or create it manually if the issue persists.';
+      
+      if (error.response?.data?.error?.message) {
+        const backendMsg = error.response.data.error.message;
+        // Check if it's a validation error (contains JSON-like structure)
+        if (backendMsg.includes('"received"') || backendMsg.includes('invalid_enum')) {
+          errorMsg = "I couldn't understand that request. Could you try rephrasing? For example: 'Find 50 dental clinics in Madrid' or 'Change the max results to 100'.";
+        } else {
+          // Use the backend message if it's not a technical validation error
+          errorMsg = backendMsg.length > 200 ? errorMsg : backendMsg;
+        }
+      }
+      
+      addMessage('assistant', errorMsg);
     } finally {
+      // Ensure minimum loading time for better UX (so user sees the thinking animation)
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = MIN_LOADING_TIME - elapsedTime;
+      
+      console.log('[AI Create] Elapsed time:', elapsedTime, 'ms, Remaining time:', remainingTime, 'ms');
+      
+      if (remainingTime > 0) {
+        // Wait for remaining time before hiding loading state
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+      
+      console.log('[AI Create] Setting loading to false');
       setLoading(false);
     }
   };
 
   const handleRemoveEntity = (key: keyof ResolvedEntities) => {
     updateEntities({ [key]: undefined });
+  };
+
+  const handleClearChat = () => {
+    if (confirm('Are you sure you want to clear the chat and start over?')) {
+      resetConversation();
+      setPendingCampaignDraft(null);
+      toast.success('Chat cleared');
+    }
+  };
+
+  const handleGoBack = () => {
+    router.back();
   };
 
   const handleCreateCampaign = async () => {
@@ -255,15 +321,35 @@ export default function AICreatePage() {
         {/* Header */}
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">AI Create</h1>
+                  <p className="text-sm text-gray-600">
+                    Tell me what you need in plain English — campaigns, workflows, or leads
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">AI Create</h1>
-                <p className="text-sm text-gray-600">
-                  Tell me what you need in plain English — campaigns, workflows, or leads
-                </p>
+              <div className="flex items-center gap-2">
+                {state.messages.length > 0 && (
+                  <button
+                    onClick={handleClearChat}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Clear Chat</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleGoBack}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back</span>
+                </button>
               </div>
             </div>
           </div>
@@ -310,7 +396,23 @@ export default function AICreatePage() {
                 />
               )}
 
-              {!state.currentDraft && state.messages.length > 0 && (
+              {!state.currentDraft && state.isLoading && (
+                <div className="bg-white rounded-xl border-2 border-primary-200 p-8 text-center shadow-lg animate-pulse">
+                  <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+                    <div>
+                      <p className="text-lg font-semibold text-gray-900 mb-1">
+                        Processing your request...
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Analyzing your input and preparing a draft
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!state.currentDraft && !state.isLoading && state.messages.length > 0 && (
                 <div className="bg-white rounded-xl border-2 border-dashed border-gray-300 p-8 text-center">
                   <Sparkles className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">

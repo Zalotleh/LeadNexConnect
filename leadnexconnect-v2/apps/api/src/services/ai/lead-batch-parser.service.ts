@@ -15,9 +15,14 @@ export class LeadBatchParserService {
    * Parse user message into lead batch generation config
    */
   async parseLeadBatch(request: AILeadBatchParseRequest): Promise<AILeadBatchDraft> {
-    const systemPrompt = this.buildSystemPrompt();
+    const systemPrompt = this.buildSystemPrompt(request.currentDraft);
     const safeMessage = request.message.slice(0, MAX_MESSAGE_LENGTH);
-    const userPrompt = `<user_request>${safeMessage}</user_request>`;
+    
+    // If we have a current draft, include it in the context
+    let userPrompt = `<user_request>${safeMessage}</user_request>`;
+    if (request.currentDraft) {
+      userPrompt = `<current_draft>${JSON.stringify(request.currentDraft, null, 2)}</current_draft>\n\n${userPrompt}`;
+    }
 
     try {
       const response = await anthropic.messages.create({
@@ -37,9 +42,34 @@ export class LeadBatchParserService {
         throw new Error('Unexpected response type from Claude API');
       }
 
-      // Extract JSON + Zod validation
+      // Extract JSON
       const rawJson = extractJSON(content.text);
-      const draft = leadBatchDraftSchema.parse(rawJson) as AILeadBatchDraft;
+      
+      // Check for special status responses (needs_clarification, off_topic, etc.)
+      if (rawJson && (rawJson.status === 'needs_clarification' || rawJson.status === 'off_topic' || rawJson.status === 'policy_violation')) {
+        // Return special status as-is, don't merge
+        return rawJson as AILeadBatchDraft;
+      }
+      
+      // If modifying existing draft, merge with current draft as fallback
+      let mergedJson = rawJson;
+      if (request.currentDraft && rawJson) {
+        // Preserve all existing fields, only override what AI explicitly changed
+        mergedJson = {
+          ...request.currentDraft,
+          ...rawJson,
+          // Ensure we don't lose required fields
+          name: rawJson.name || request.currentDraft.name,
+          source: rawJson.source || request.currentDraft.source,
+          industry: rawJson.industry || request.currentDraft.industry,
+          maxResults: rawJson.maxResults !== undefined ? rawJson.maxResults : request.currentDraft.maxResults,
+          enrichEmail: rawJson.enrichEmail !== undefined ? rawJson.enrichEmail : request.currentDraft.enrichEmail,
+          analyzeWebsite: rawJson.analyzeWebsite !== undefined ? rawJson.analyzeWebsite : request.currentDraft.analyzeWebsite,
+        };
+      }
+      
+      // Zod validation
+      const draft = leadBatchDraftSchema.parse(mergedJson) as AILeadBatchDraft;
       return draft;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -48,8 +78,31 @@ export class LeadBatchParserService {
     }
   }
 
-  private buildSystemPrompt(): string {
-    return `You are a lead generation config assistant for a B2B outreach platform.
+  private buildSystemPrompt(currentDraft?: any): string {
+    const refinementInstructions = currentDraft ? `
+
+**DRAFT MODIFICATION MODE:**
+The user already has a draft (provided in <current_draft> tags) and wants to modify it.
+
+**CRITICAL RULES:**
+1. START with the current draft as your base
+2. ONLY change the specific field(s) the user mentions
+3. KEEP all other fields exactly as they are
+4. Return the COMPLETE draft with ALL fields (not just changed ones)
+
+**Example:**
+Current draft: {"name": "Yoga Studios Barcelona", "source": "google_places", "industry": "fitness", "maxResults": 50}
+User says: "change source to apollo"
+You return: {"name": "Yoga Studios Barcelona", "source": "apollo", "industry": "fitness", "maxResults": 50, ...all other fields}
+
+Common modification patterns:
+- "change source to X", "use X instead" → only update source
+- "find X leads", "make it X", "X results" → only update maxResults  
+- "change location to X" → only update city/country
+- "different industry" → only update industry
+` : '';
+
+    return `You are a lead generation config assistant for a B2B outreach platform.${refinementInstructions}
 
 Extract lead generation parameters from the user's message and return a structured config.
 

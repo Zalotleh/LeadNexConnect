@@ -23,6 +23,8 @@ export default function ChatInterface({
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  console.log('[ChatInterface] Rendering with isLoading:', isLoading, 'messages count:', messages.length);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
@@ -91,28 +93,37 @@ export default function ChatInterface({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-2xl">
               <button
                 onClick={() => onSendMessage('Create an outreach campaign for spa salons in Madrid')}
-                className="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-all text-left"
+                className="p-4 border-2 border-primary-200 bg-gradient-to-br from-primary-50 to-blue-50 rounded-xl hover:border-primary-400 hover:shadow-md transition-all text-left group"
               >
-                <p className="text-sm font-medium text-gray-900 mb-1">Campaign Example</p>
-                <p className="text-xs text-gray-600">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">💆</span>
+                  <p className="text-sm font-semibold text-primary-700">Campaign Example</p>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
                   &quot;Create an outreach campaign for spa salons in Madrid&quot;
                 </p>
               </button>
               <button
                 onClick={() => onSendMessage('Write a 3-step email sequence for yoga studios')}
-                className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+                className="p-4 border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl hover:border-purple-400 hover:shadow-md transition-all text-left group"
               >
-                <p className="text-sm font-medium text-gray-900 mb-1">Workflow Example</p>
-                <p className="text-xs text-gray-600">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">✉️</span>
+                  <p className="text-sm font-semibold text-purple-700">Workflow Example</p>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
                   &quot;Write a 3-step email sequence for yoga studios&quot;
                 </p>
               </button>
               <button
                 onClick={() => onSendMessage('Find 50 dental clinics in Barcelona')}
-                className="p-4 border-2 border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all text-left"
+                className="p-4 border-2 border-green-200 bg-gradient-to-br from-green-50 to-teal-50 rounded-xl hover:border-green-400 hover:shadow-md transition-all text-left group"
               >
-                <p className="text-sm font-medium text-gray-900 mb-1">Lead Gen Example</p>
-                <p className="text-xs text-gray-600">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🔍</span>
+                  <p className="text-sm font-semibold text-green-700">Lead Gen Example</p>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">
                   &quot;Find 50 dental clinics in Barcelona&quot;
                 </p>
               </button>

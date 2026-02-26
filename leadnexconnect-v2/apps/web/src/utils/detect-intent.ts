@@ -16,6 +16,15 @@ const LEAD_GEN_KEYWORDS = [
   'get leads', 'find companies', 'find businesses', 'find clinics',
   'find salons', 'find gyms', 'find studios', 'lead batch',
   'create batch', 'import leads',
+  // numeric patterns: "find 50 X in Y", "get me 100 X"
+  'find 1', 'find 2', 'find 3', 'find 4', 'find 5',
+  'find 6', 'find 7', 'find 8', 'find 9',
+  'get me', 'locate', 'discover', 'list of',
+  'dentist', 'dental', 'clinic', 'salon', 'spa', 'gym', 'studio',
+  'restaurant', 'hotel', 'store', 'shop', 'agency', 'firm',
+  // source-related keywords for modifications
+  'apollo', 'google places', 'hunter', 'peopledatalabs',
+  'change source', 'use apollo', 'use google', 'switch to',
 ];
 
 /**

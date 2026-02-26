@@ -277,7 +277,7 @@ export class AICampaignsController {
   async parseLeadBatch(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
-      const { message } = req.body;
+      const { message, currentDraft } = req.body;
 
       if (!message || message.trim().length === 0) {
         return res.status(400).json({
@@ -296,7 +296,7 @@ export class AICampaignsController {
         });
       }
 
-      const draft = await this.leadBatchParser.parseLeadBatch({ message });
+      const draft = await this.leadBatchParser.parseLeadBatch({ message, currentDraft });
 
       return res.json({
         success: true,
@@ -305,9 +305,16 @@ export class AICampaignsController {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error('[AICampaigns] Error parsing lead batch:', msg);
+      
+      // Clean up validation errors for user-friendly display
+      let userMsg = msg;
+      if (msg.includes('invalid_enum_value') || msg.includes('"received"')) {
+        userMsg = 'I had trouble understanding that request. Please try rephrasing it.';
+      }
+      
       return res.status(500).json({
         success: false,
-        error: { message: msg },
+        error: { message: userMsg },
       });
     }
   }

@@ -1,13 +1,14 @@
 import React from 'react';
 import { AILeadBatchDraft } from '@/types/ai-conversation.types';
-import { Database, MapPin, Target, Zap, Lightbulb, CheckCircle } from 'lucide-react';
+import { Database, MapPin, Target, Zap, Lightbulb, CheckCircle, Loader2 } from 'lucide-react';
 
 interface LeadBatchDraftCardProps {
   draft: AILeadBatchDraft;
   onCreate: () => void;
+  isLoading?: boolean;
 }
 
-export default function LeadBatchDraftCard({ draft, onCreate }: LeadBatchDraftCardProps) {
+export default function LeadBatchDraftCard({ draft, onCreate, isLoading }: LeadBatchDraftCardProps) {
   return (
     <div className="bg-white border-2 border-green-200 rounded-xl p-6 shadow-lg">
       {/* Header */}
@@ -101,10 +102,20 @@ export default function LeadBatchDraftCard({ draft, onCreate }: LeadBatchDraftCa
       {/* Create button */}
       <button
         onClick={onCreate}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+        disabled={isLoading}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <Zap className="w-4 h-4" />
-        Generate Leads
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Generating...
+          </>
+        ) : (
+          <>
+            <Zap className="w-4 h-4" />
+            Generate Leads
+          </>
+        )}
       </button>
     </div>
   );

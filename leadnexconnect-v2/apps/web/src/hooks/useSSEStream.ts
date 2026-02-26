@@ -36,13 +36,15 @@ export function useSSEStream(options: UseSSEStreamOptions) {
     setIsStreaming(true);
 
     try {
-      const token = localStorage.getItem('token') || '';
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/ai-campaigns/stream`, {
+      // NEXT_PUBLIC_API_URL already ends with /api (e.g. http://localhost:4000/api)
+      // Auth uses httpOnly cookies — pass withCredentials via fetch credentials: 'include'
+      const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace(/\/api$/, '');
+      const response = await fetch(`${baseUrl}/api/ai-campaigns/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify(payload),
         signal: abortRef.current.signal,
       });

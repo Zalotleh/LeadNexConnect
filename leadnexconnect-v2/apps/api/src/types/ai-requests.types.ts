@@ -14,6 +14,7 @@ export interface AIWorkflowParseRequest {
 export interface AILeadBatchParseRequest {
   message: string;
   conversationHistory?: ConversationMessage[];
+  currentDraft?: any;
 }
 
 export interface ConversationMessage {

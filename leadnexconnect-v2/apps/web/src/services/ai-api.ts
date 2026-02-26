@@ -37,7 +37,7 @@ export const aiAPI = {
   },
 
   // Parse lead batch from message
-  parseLeadBatch: async (data: { message: string }) => {
+  parseLeadBatch: async (data: { message: string; currentDraft?: any }) => {
     const response = await api.post('/ai-campaigns/parse-lead-batch', data);
     return response.data;
   },

@@ -100,6 +100,14 @@ export class AIStreamService {
       // Stream ended — parse the JSON block
       if (inJson) {
         const rawJson = jsonBuffer.replace('</json>', '').trim();
+        
+        if (!rawJson || rawJson.length < 10) {
+          emit({ type: 'error', message: 'I had trouble generating a complete campaign draft. Could you be more specific? For example: "Create a campaign for dental clinics in London with 50 leads per day"' });
+          emit({ type: 'done' });
+          res.end();
+          return;
+        }
+        
         try {
           const parsed = extractJSON(rawJson);
           const validated = campaignDraftSchema.parse(parsed);
@@ -116,9 +124,20 @@ export class AIStreamService {
 
           emit({ type: 'draft_complete', draft: validated });
         } catch (parseError: unknown) {
-          const msg = parseError instanceof Error ? parseError.message : String(parseError);
-          emit({ type: 'error', message: `Failed to parse draft: ${msg}` });
+          let userFriendlyMsg = 'I had trouble creating the campaign draft. ';
+          
+          if (parseError instanceof Error && parseError.message.includes('Required')) {
+            userFriendlyMsg += 'Some required information was missing. Please be more specific - include the industry and location.';
+          } else {
+            userFriendlyMsg += 'Try rephrasing your request with more details.';
+          }
+          
+          console.error('[AIStream] Parse error:', parseError);
+          emit({ type: 'error', message: userFriendlyMsg });
         }
+      } else {
+        // No JSON block found at all
+        emit({ type: 'error', message: 'I didn\'t generate a proper campaign draft. Please try rephrasing your request.' });
       }
 
       emit({ type: 'done' });
@@ -178,13 +197,28 @@ Schedule: [schedule decision]
 Follow-ups: [decision]
 </thinking>
 <json>
-{ ...campaign draft JSON object matching the schema... }
+{
+  "name": "<campaign name - REQUIRED>",
+  "description": "<brief description>",
+  "campaignType": "fully_automated",
+  "industry": "<industry name>",
+  "targetCountries": ["<country>"],
+  "targetCities": ["<city>"],
+  "leadSources": ["google_places"],
+  "maxResultsPerRun": 50,
+  "leadsPerDay": 30,
+  "scheduleType": "daily",
+  "scheduleTime": "09:00",
+  "followUpEnabled": true,
+  "followUp1DelayDays": 3,
+  "followUp2DelayDays": 7,
+  "reasoning": "<your reasoning>",
+  "workflowId": null,
+  "suggestedWorkflowInstructions": "<prompt for email workflow>"
+}
 </json>
 
-The JSON schema is:
-{ name, description, campaignType, industry, targetCountries, targetCities, companySize, leadSources, maxResultsPerRun, batchIds, workflowId, useWorkflow, leadsPerDay, scheduleType, scheduleTime, startDate, isRecurring, recurringInterval, outreachDelayDays, followUpEnabled, followUp1DelayDays, followUp2DelayDays, reasoning, suggestedWorkflowInstructions }
-
-No text outside the two XML blocks. No markdown fences inside <json>.`;
+CRITICAL: The "name" field is REQUIRED and must be a non-empty string. Always include ALL fields shown above in your JSON response. No markdown code fences inside the <json> tags.`;
   }
 
   private buildUserPrompt(

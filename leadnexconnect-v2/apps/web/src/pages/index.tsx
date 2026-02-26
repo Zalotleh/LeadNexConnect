@@ -17,12 +17,33 @@ import { detectIntent } from '@/utils/detect-intent';
 import { ResolvedEntities } from '@/types/ai-conversation.types';
 import { toast } from 'react-hot-toast';
 import api from '@/services/api';
-import { Sparkles, Send, ArrowRight } from 'lucide-react';
+import { Sparkles, Send, X, Loader2 } from 'lucide-react';
 
 const QUICK_STARTS = [
-  { label: '💆 Campaign', message: 'Create an outreach campaign for spa salons in Madrid' },
-  { label: '✉ Workflow', message: 'Write a 3-step email sequence for dental clinics' },
-  { label: '🔍 Find leads', message: 'Find 50 yoga studios in Barcelona' },
+  {
+    emoji: '💆',
+    label: 'Campaign Example',
+    message: 'Create an outreach campaign for spa salons in Madrid',
+    preview: '"Create an outreach campaign for spa salons in Madrid"',
+    cardClass: 'border-primary-200 bg-gradient-to-br from-primary-50 to-blue-50 hover:border-primary-400',
+    labelClass: 'text-primary-700',
+  },
+  {
+    emoji: '✉️',
+    label: 'Workflow Example',
+    message: 'Write a 3-step email sequence for dental clinics',
+    preview: '"Write a 3-step email sequence for dental clinics"',
+    cardClass: 'border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 hover:border-purple-400',
+    labelClass: 'text-purple-700',
+  },
+  {
+    emoji: '🔍',
+    label: 'Lead Gen Example',
+    message: 'Find 50 yoga studios in Barcelona',
+    preview: '"Find 50 yoga studios in Barcelona"',
+    cardClass: 'border-green-200 bg-gradient-to-br from-green-50 to-teal-50 hover:border-green-400',
+    labelClass: 'text-green-700',
+  },
 ];
 
 export default function CommandCenterPage() {
@@ -36,7 +57,9 @@ export default function CommandCenterPage() {
   const [isSplit, setIsSplit] = useState(false);
   const [reasoningSteps, setReasoningSteps] = useState<string[]>([]);
   const [streamDone, setStreamDone] = useState(false);
+  const [isReasoningVisible, setIsReasoningVisible] = useState(true);
   const [pendingCampaignDraft, setPendingCampaignDraft] = useState<any>(null);
+  const [isGeneratingLeads, setIsGeneratingLeads] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { startStream, isStreaming } = useSSEStream({
@@ -101,6 +124,11 @@ export default function CommandCenterPage() {
     setIsSplit(true);
     setReasoningSteps([]);
     setStreamDone(false);
+    setIsReasoningVisible(true);
+
+    // Track start time to ensure minimum loading display time
+    const startTime = Date.now();
+    const MIN_LOADING_TIME = 800; // milliseconds
 
     const intent = detectIntent(msg);
     const historyForAPI = state.messages.map(m => ({
@@ -109,7 +137,7 @@ export default function CommandCenterPage() {
 
     if (intent === 'lead_batch') {
       try {
-        const result = await parseLeadBatch.mutateAsync({ message: msg });
+        const result = await parseLeadBatch.mutateAsync({ message: msg, currentDraft: state.currentDraft || undefined });
         if (result.success && result.draft) {
           const draft = result.draft;
           if (draft.status === 'needs_clarification') {
@@ -123,6 +151,14 @@ export default function CommandCenterPage() {
           }
         }
       } catch { addMessage('assistant', 'Failed to parse lead request. Try being more specific.'); }
+      
+      // Ensure minimum loading time
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = MIN_LOADING_TIME - elapsedTime;
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+      
       setLoading(false);
       return;
     }
@@ -146,6 +182,14 @@ export default function CommandCenterPage() {
           }
         }
       } catch { addMessage('assistant', 'Failed to generate workflow. Try being more specific.'); }
+      
+      // Ensure minimum loading time
+      const elapsedTime = Date.now() - startTime;
+      const remainingTime = MIN_LOADING_TIME - elapsedTime;
+      if (remainingTime > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingTime));
+      }
+      
       setLoading(false);
       return;
     }
@@ -201,6 +245,7 @@ export default function CommandCenterPage() {
 
   const handleCreateLeadBatch = async () => {
     if (!state.currentDraft) return;
+    setIsGeneratingLeads(true);
     try {
       const sourceMap: Record<string, string> = {
         apollo: '/scraping/apollo',
@@ -209,9 +254,22 @@ export default function CommandCenterPage() {
         hunter: '/scraping/hunter',
       };
       const endpoint = sourceMap[state.currentDraft.source] || '/scraping/google-places';
+      console.log('[handleCreateLeadBatch] Sending request to:', endpoint, state.currentDraft);
       const res = await api.post(endpoint, state.currentDraft);
-      if (res.data.success) { toast.success('Lead generation started!'); router.push('/leads'); }
-    } catch { toast.error('Failed to start lead generation'); }
+      console.log('[handleCreateLeadBatch] Response:', res.data);
+      if (res.data.success) {
+        toast.success('Lead generation started!');
+        router.push('/leads');
+      } else {
+        console.error('[handleCreateLeadBatch] API returned success=false:', res.data);
+        toast.error(res.data.error?.message || 'Failed to start lead generation');
+      }
+    } catch (error: any) {
+      console.error('[handleCreateLeadBatch] Error:', error);
+      toast.error(error.response?.data?.error?.message || 'Failed to start lead generation');
+    } finally {
+      setIsGeneratingLeads(false);
+    }
   };
 
   const handleGenerateWorkflow = async () => {
@@ -273,14 +331,18 @@ export default function CommandCenterPage() {
               </div>
             </form>
 
-            <div className="flex flex-wrap gap-3 mt-6 justify-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 w-full max-w-2xl">
               {QUICK_STARTS.map((qs) => (
                 <button
                   key={qs.label}
                   onClick={() => { sendMessage(qs.message); }}
-                  className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 transition-colors flex items-center gap-1.5"
+                  className={`p-4 border-2 ${qs.cardClass} rounded-xl hover:shadow-md transition-all text-left`}
                 >
-                  {qs.label} <ArrowRight className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">{qs.emoji}</span>
+                    <p className={`text-sm font-semibold ${qs.labelClass}`}>{qs.label}</p>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed">{qs.preview}</p>
                 </button>
               ))}
             </div>
@@ -324,11 +386,16 @@ export default function CommandCenterPage() {
                 {state.messages.map((msg, i) => (
                   <MessageBubble key={i} role={msg.role} content={msg.content} timestamp={msg.timestamp} />
                 ))}
-                {isStreaming && !streamDone && <ThinkingAnimation />}
+                {(state.isLoading || (isStreaming && !streamDone)) && <ThinkingAnimation />}
 
-                {reasoningSteps.length > 0 && (
+                {reasoningSteps.length > 0 && isReasoningVisible && (
                   <div className="ml-11">
-                    <ReasoningPanel steps={reasoningSteps} isStreaming={isStreaming} isDone={streamDone} />
+                    <ReasoningPanel
+                      steps={reasoningSteps}
+                      isStreaming={isStreaming}
+                      isDone={streamDone}
+                      onDismiss={() => setIsReasoningVisible(false)}
+                    />
                   </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -342,12 +409,12 @@ export default function CommandCenterPage() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Continue the conversation..."
-                    disabled={isStreaming}
+                    disabled={isStreaming || state.isLoading}
                     className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-50 text-sm"
                   />
                   <button
                     type="submit"
-                    disabled={!input.trim() || isStreaming}
+                    disabled={!input.trim() || isStreaming || state.isLoading}
                     className="px-5 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-40 transition-colors flex items-center gap-2 text-sm font-medium"
                   >
                     <Send className="w-4 h-4" />
@@ -357,16 +424,39 @@ export default function CommandCenterPage() {
             </div>
 
             {/* Right panel — live draft card */}
-            {hasDraft && (
+            {(hasDraft || state.isLoading) && (
               <div className="hidden lg:flex lg:w-[42%] flex-col overflow-y-auto bg-gray-50 px-5 py-5 space-y-4">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Live Draft</p>
-                  <button onClick={handleDismissDraft} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-                    Dismiss ✕
-                  </button>
+                  {hasDraft && (
+                    <button
+                      onClick={handleDismissDraft}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 bg-gray-200 hover:bg-red-100 hover:text-red-700 transition-colors"
+                      aria-label="Dismiss draft"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Dismiss
+                    </button>
+                  )}
                 </div>
 
-                {state.currentIntent === 'campaign' && (
+                {state.isLoading && !hasDraft && (
+                  <div className="bg-white rounded-xl border-2 border-primary-200 p-8 text-center shadow-lg animate-pulse">
+                    <div className="flex flex-col items-center gap-4">
+                      <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
+                      <div>
+                        <p className="text-lg font-semibold text-gray-900 mb-1">
+                          Processing your request...
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Analyzing your input and preparing a draft
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {hasDraft && state.currentIntent === 'campaign' && (
                   <CampaignDraftCard
                     draft={state.currentDraft}
                     workflows={context?.workflows || []}
@@ -376,11 +466,15 @@ export default function CommandCenterPage() {
                     isGeneratingWorkflow={generateWorkflow.isPending}
                   />
                 )}
-                {state.currentIntent === 'workflow' && (
+                {hasDraft && state.currentIntent === 'workflow' && (
                   <WorkflowDraftCard draft={state.currentDraft} onCreate={handleCreateWorkflow} />
                 )}
-                {state.currentIntent === 'lead_batch' && (
-                  <LeadBatchDraftCard draft={state.currentDraft} onCreate={handleCreateLeadBatch} />
+                {hasDraft && state.currentIntent === 'lead_batch' && (
+                  <LeadBatchDraftCard
+                    draft={state.currentDraft}
+                    onCreate={handleCreateLeadBatch}
+                    isLoading={isGeneratingLeads}
+                  />
                 )}
               </div>
             )}

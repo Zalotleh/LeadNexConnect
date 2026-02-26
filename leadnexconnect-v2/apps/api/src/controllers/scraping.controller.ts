@@ -172,7 +172,7 @@ export class ScrapingController {
         success: true,
         message: `Generated ${successful} leads from Google Places (${duplicates} duplicates skipped)`,
         data: {
-          total: placesLeads.length,
+          total: allPlacesLeads.length,
           saved: successful,
           duplicates,
         },
