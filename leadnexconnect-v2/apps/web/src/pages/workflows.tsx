@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -155,6 +156,12 @@ function Workflows() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/ai-create?type=workflow">
+              <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium">
+                <Sparkles className="w-4 h-4" />
+                Generate with AI
+              </button>
+            </Link>
             <button
               onClick={() => setShowWorkflowTypePicker(true)}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import ConfirmDialog from '@/components/ConfirmDialog'
@@ -6,7 +7,7 @@ import WorkflowSelector from '@/components/WorkflowSelector'
 import CreateLeadGenerationForm from '@/components/campaigns/CreateLeadGenerationForm'
 import CreateOutreachForm from '@/components/campaigns/CreateOutreachForm'
 import CreateFullyAutomatedForm from '@/components/campaigns/CreateFullyAutomatedForm'
-import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search, Database, Zap, MousePointerClick, Reply, RefreshCw, Calendar, BarChart3, Settings } from 'lucide-react'
+import { Plus, Play, Pause, Mail, X, ChevronLeft, ChevronRight, Check, Edit, Trash2, Eye, TrendingUp, Users, Send, MousePointer, Search, Database, Zap, MousePointerClick, Reply, RefreshCw, Calendar, BarChart3, Settings, Sparkles } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
@@ -595,6 +596,12 @@ function Campaigns() {
                 </select>
               </>
             )}
+            <Link href="/ai-create?type=campaign">
+              <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-600 to-indigo-600 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-medium">
+                <Sparkles className="w-4 h-4" />
+                Create with AI
+              </button>
+            </Link>
             <button
               onClick={handleCreateCampaign}
               className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center gap-2"

@@ -231,7 +231,7 @@ export default function Layout({ children }: LayoutProps) {
                   </span>
                 </Link>
 
-                {/* Content Dropdown */
+                {/* Content Dropdown */}
                 <div>
                   <button
                     onClick={() => setIsContentOpen(!isContentOpen)}

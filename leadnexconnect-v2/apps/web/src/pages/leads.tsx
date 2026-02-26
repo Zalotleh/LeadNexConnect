@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
@@ -8,7 +9,7 @@ import ProgressDialog from '@/components/ProgressDialog'
 import ResultDialog from '@/components/ResultDialog'
 import leadsService, { Lead } from '@/services/leads.service'
 import { aiAPI, campaignsAPI, leadsAPI } from '@/services/api'
-import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, Flame, Thermometer, Snowflake, TrendingUp, X, ChevronRight, FileText } from 'lucide-react'
+import { Plus, Filter, Download, Upload, Users, Zap, Search, Package, List, Flame, Thermometer, Snowflake, TrendingUp, X, ChevronRight, FileText, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/services/api'
 import { INDUSTRIES, getIndustriesByCategory, INDUSTRY_CATEGORIES, type IndustryOption } from '@leadnex/shared'
@@ -888,6 +889,12 @@ function Leads() {
                 </select>
               </>
             )}
+            <Link href="/ai-create?type=leads">
+              <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:opacity-90 transition-opacity text-sm font-semibold">
+                <Sparkles className="w-4 h-4" />
+                Generate with AI
+              </button>
+            </Link>
             <button
               onClick={() => setShowAddLeadsModal(true)}
               className="px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 flex items-center gap-2 transition-all"
