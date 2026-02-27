@@ -30,7 +30,8 @@ export default function Layout({ children }: LayoutProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const navigation = [
+  const userNavLinks = [
+    { name: 'AI Create', href: '/', icon: Sparkles, badge: 'New' },
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Leads', href: '/leads', icon: Users },
     { name: 'Campaigns', href: '/campaigns', icon: Mail },
@@ -70,11 +71,13 @@ export default function Layout({ children }: LayoutProps) {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 border-b px-4">
-            <h1 className="text-xl lg:text-2xl font-bold text-primary-600">LeadNexConnect</h1>
+            <Link href="/" className="text-xl lg:text-2xl font-bold text-primary-600 hover:text-primary-700 transition-colors">
+              LeadNexConnect
+            </Link>
             <button
               onClick={() => setIsMobileMenuOpen(false)}
               className="lg:hidden p-2 rounded-md hover:bg-gray-100"
-            >
+            >navbar
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -174,62 +177,30 @@ export default function Layout({ children }: LayoutProps) {
             ) : (
               <>
                 {/* User Navigation - Only for regular users */}
-                {/* Dashboard */}
-                <Link
-                  href="/dashboard"
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive('/dashboard')
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Home className="w-5 h-5 mr-3" />
-                  Dashboard
-                </Link>
-
-                {/* Leads */}
-                <Link
-                  href="/leads"
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive('/leads')
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Users className="w-5 h-5 mr-3" />
-                  Leads
-                </Link>
-
-                {/* Campaigns */}
-                <Link
-                  href="/campaigns"
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive('/campaigns')
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Mail className="w-5 h-5 mr-3" />
-                  Campaigns
-                </Link>
-
-                {/* AI Create */}
-                <Link
-                  href="/"
-                  className={`flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive('/')
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <Sparkles className="w-5 h-5 mr-3" />
-                    AI Create
-                  </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded-full">
-                    New
-                  </span>
-                </Link>
+                {userNavLinks.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center ${item.badge ? 'justify-between' : ''} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                        isActive(item.href)
+                          ? 'bg-primary-50 text-primary-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <Icon className="w-5 h-5 mr-3" />
+                        {item.name}
+                      </div>
+                      {item.badge && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded-full">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  )
+                })}
 
                 {/* Content Dropdown */}
                 <div>

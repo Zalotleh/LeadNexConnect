@@ -14,7 +14,14 @@ export const campaignDraftSchema = z.object({
   workflowId: z.string().nullable().optional(),
   useWorkflow: z.boolean().optional(),
   leadsPerDay: z.number().min(1).max(500).default(30),
-  scheduleType: z.enum(['manual', 'immediate', 'scheduled', 'daily', 'weekly']).default('daily'),
+  scheduleType: z.preprocess(
+    (val) => {
+      // Normalize AI-generated aliases to valid enum values
+      if (val === 'once' || val === 'one_time' || val === 'one-time') return 'immediate';
+      return val;
+    },
+    z.enum(['manual', 'immediate', 'scheduled', 'daily', 'weekly'])
+  ).default('daily'),
   scheduleTime: z.string().default('09:00'),
   startDate: z.string().optional(),
   isRecurring: z.boolean().default(false),

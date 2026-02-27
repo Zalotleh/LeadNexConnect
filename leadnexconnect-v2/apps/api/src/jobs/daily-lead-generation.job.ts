@@ -110,7 +110,7 @@ export class DailyLeadGenerationJob {
             }
 
             try {
-              await this.generateLeadsForCampaign(campaign);
+              await this.generateLeadsForCampaign(campaign, user.id);
             } catch (error: any) {
               logger.error('[DailyLeadGeneration] Error generating leads for campaign', {
                 campaignId: campaign.id,
@@ -147,13 +147,16 @@ export class DailyLeadGenerationJob {
   /**
    * Generate leads for a specific campaign
    */
-  private async generateLeadsForCampaign(campaign: any) {
+  private async generateLeadsForCampaign(campaign: any, userId?: string) {
     logger.info(`[DailyLeadGeneration] Generating leads for campaign: ${campaign.name}`);
+
+    const resolvedUserId = userId || campaign.userId;
 
     // Create batch record first
     const batchName = `${campaign.name} - Daily ${new Date().toLocaleDateString()}`;
     const batch = await db.insert(leadBatches).values({
       name: batchName,
+      userId: resolvedUserId,
       uploadedBy: 'system',
       totalLeads: 0,
       successfulImports: 0,
@@ -253,6 +256,7 @@ export class DailyLeadGenerationJob {
       
       return {
         ...lead,
+        userId: resolvedUserId, // Associate lead with user
         batchId, // Assign batch ID to each lead
         qualityScore,
         digitalMaturityScore,
@@ -272,7 +276,7 @@ export class DailyLeadGenerationJob {
     for (const [source, metrics] of Object.entries(apiMetrics)) {
       try {
         await apiPerformanceService.logAPIUsage({
-          userId: user.id,
+          userId: resolvedUserId,
           apiSource: source,
           leadsGenerated: metrics.leads,
           apiCallsUsed: metrics.calls,

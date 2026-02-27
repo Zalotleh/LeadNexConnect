@@ -1,13 +1,53 @@
 import { Response } from 'express';
+import { eq } from 'drizzle-orm';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
 import { peopleDataLabsService } from '../services/lead-generation/peopledatalabs.service';
 import { enrichmentPipelineService } from '../services/crm/enrichment-pipeline.service';
-import { db, leads } from '@leadnex/database';
+import { db, leadBatches } from '@leadnex/database';
 
 export class ScrapingController {
+  /** Create a lead batch record and return its id */
+  private async _createBatch(
+    userId: string,
+    name: string,
+    meta: Record<string, any>,
+  ): Promise<string> {
+    const [batch] = await db
+      .insert(leadBatches)
+      .values({
+        userId,
+        name,
+        uploadedBy: 'system',
+        totalLeads: 0,
+        successfulImports: 0,
+        failedImports: 0,
+        duplicatesSkipped: 0,
+        importSettings: meta,
+      })
+      .returning();
+    return batch.id;
+  }
+
+  /** Update batch counts after enrichment completes */
+  private async _finaliseBatch(
+    batchId: string,
+    total: number,
+    saved: number,
+  ): Promise<void> {
+    await db
+      .update(leadBatches)
+      .set({
+        totalLeads: total,
+        successfulImports: saved,
+        duplicatesSkipped: total - saved,
+        completedAt: new Date(),
+      })
+      .where(eq(leadBatches.id, batchId));
+  }
+
   /**
    * GET /api/scraping/status - Get scraping job status
    */
@@ -72,37 +112,45 @@ export class ScrapingController {
    */
   async generateFromApollo(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { industry, country, city, maxResults = 50 } = req.body;
 
       logger.info('[ScrapingController] Generating leads from Apollo', {
-        industry,
-        country,
-        city,
-        maxResults,
+        userId, industry, country, city, maxResults,
       });
+
+      // Create batch so leads are trackable
+      const batchId = await this._createBatch(
+        userId,
+        `Apollo – ${industry} – ${new Date().toLocaleDateString()}`,
+        { source: 'apollo', industry, country, city, maxResults },
+      );
 
       // Fetch leads from Apollo
       const apolloLeads = await apolloService.searchLeads({
-        industry,
-        country,
-        city,
-        maxResults,
+        industry, country, city, maxResults,
       });
 
       logger.info(`[ScrapingController] Fetched ${apolloLeads.length} leads from Apollo`);
 
-      // Enrich leads through pipeline (automatically saves to DB)
-      const enrichmentResults = await enrichmentPipelineService.enrichBatch(apolloLeads);
+      // Stamp batchId + userId on every lead before enrichment
+      const leadsWithBatch = apolloLeads.map(l => ({ ...l, batchId, userId }));
+
+      // Enrich leads through pipeline (saves to DB)
+      const enrichmentResults = await enrichmentPipelineService.enrichBatch(leadsWithBatch);
       
       const successful = enrichmentResults.filter(r => r.success).length;
       const duplicates = enrichmentResults.filter(r => r.isDuplicate).length;
 
-      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`);
+      await this._finaliseBatch(batchId, apolloLeads.length, successful);
+
+      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`, { batchId });
 
       res.json({
         success: true,
         message: `Generated ${successful} leads from Apollo (${duplicates} duplicates skipped)`,
         data: {
+          batchId,
           total: apolloLeads.length,
           saved: successful,
           duplicates,
@@ -124,11 +172,19 @@ export class ScrapingController {
    */
   async generateFromGooglePlaces(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { industry, country, city, maxResults = 50 } = req.body;
 
       logger.info('[ScrapingController] Generating leads from Google Places', {
-        industry, country, city, maxResults,
+        userId, industry, country, city, maxResults,
       });
+
+      // Create batch so leads are trackable
+      const batchId = await this._createBatch(
+        userId,
+        `Google Places – ${industry} – ${new Date().toLocaleDateString()}`,
+        { source: 'google_places', industry, country, city, maxResults },
+      );
 
       // Best-effort loop: cycle through keyword variants until the target is met
       const totalVariants = googlePlacesService.getVariantCount(industry);
@@ -160,18 +216,24 @@ export class ScrapingController {
 
       logger.info(`[ScrapingController] Fetched ${allPlacesLeads.length} leads from Google Places`);
 
-      // Enrich leads through pipeline (automatically saves to DB)
-      const enrichmentResults = await enrichmentPipelineService.enrichBatch(allPlacesLeads);
+      // Stamp batchId + userId on every lead before enrichment
+      const leadsWithBatch = allPlacesLeads.map(l => ({ ...l, batchId, userId }));
+
+      // Enrich leads through pipeline (saves to DB)
+      const enrichmentResults = await enrichmentPipelineService.enrichBatch(leadsWithBatch);
       
       const successful = enrichmentResults.filter(r => r.success).length;
       const duplicates = enrichmentResults.filter(r => r.isDuplicate).length;
 
-      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`);
+      await this._finaliseBatch(batchId, allPlacesLeads.length, successful);
+
+      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`, { batchId });
 
       res.json({
         success: true,
         message: `Generated ${successful} leads from Google Places (${duplicates} duplicates skipped)`,
         data: {
+          batchId,
           total: allPlacesLeads.length,
           saved: successful,
           duplicates,
@@ -194,10 +256,11 @@ export class ScrapingController {
    */
   async generateFromPDL(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { emails = [] } = req.body;
 
       logger.info('[ScrapingController] Enriching leads with People Data Labs', {
-        count: emails.length,
+        userId, count: emails.length,
       });
 
       if (!Array.isArray(emails) || emails.length === 0) {
@@ -207,8 +270,15 @@ export class ScrapingController {
         });
       }
 
+      // Create batch so enriched leads are trackable
+      const batchId = await this._createBatch(
+        userId,
+        `PDL Enrichment – ${new Date().toLocaleDateString()}`,
+        { source: 'peopledatalabs', emailCount: emails.length },
+      );
+
       // Enrich each email with PDL
-      const leadsToEnrich = [];
+      const leadsToEnrich: any[] = [];
       for (const email of emails) {
         const enrichedData = await peopleDataLabsService.enrichContact({ email });
         if (enrichedData.found) {
@@ -222,24 +292,29 @@ export class ScrapingController {
             linkedinUrl: enrichedData.linkedin || '',
             source: 'peopledatalabs' as const,
             status: 'new' as const,
+            batchId,
+            userId,
           });
         }
       }
 
       logger.info(`[ScrapingController] Found ${leadsToEnrich.length} enrichable leads from PDL`);
 
-      // Run through enrichment pipeline (automatically saves to DB)
+      // Run through enrichment pipeline (saves to DB)
       const enrichmentResults = await enrichmentPipelineService.enrichBatch(leadsToEnrich);
       
       const successful = enrichmentResults.filter(r => r.success).length;
       const duplicates = enrichmentResults.filter(r => r.isDuplicate).length;
 
-      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`);
+      await this._finaliseBatch(batchId, leadsToEnrich.length, successful);
+
+      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`, { batchId });
 
       res.json({
         success: true,
         message: `Enriched ${successful} leads from People Data Labs (${duplicates} duplicates skipped)`,
         data: {
+          batchId,
           total: emails.length,
           found: leadsToEnrich.length,
           saved: successful,
@@ -260,11 +335,12 @@ export class ScrapingController {
   /**
    * POST /api/scraping/linkedin - Import leads from LinkedIn CSV
    */
-  async importFromLinkedIn(req: Request, res: Response) {
+  async importFromLinkedIn(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const { csvData } = req.body;
 
-      logger.info('[ScrapingController] Importing leads from LinkedIn CSV');
+      logger.info('[ScrapingController] Importing leads from LinkedIn CSV', { userId });
 
       if (!csvData || !Array.isArray(csvData)) {
         return res.status(400).json({
@@ -273,7 +349,14 @@ export class ScrapingController {
         });
       }
 
-      // Transform CSV data to lead format
+      // Create batch so imported leads are trackable
+      const batchId = await this._createBatch(
+        userId,
+        `LinkedIn Import – ${new Date().toLocaleDateString()}`,
+        { source: 'linkedin', rowCount: csvData.length },
+      );
+
+      // Transform CSV data to lead format and stamp batchId + userId
       const linkedInLeads = csvData.map((row: any) => ({
         companyName: row.company || row['Company Name'] || '',
         contactName: row.name || row['Full Name'] || '',
@@ -286,22 +369,27 @@ export class ScrapingController {
         location: row.location || row['Location'] || '',
         source: 'linkedin' as const,
         status: 'new' as const,
+        batchId,
+        userId,
       }));
 
       logger.info(`[ScrapingController] Processing ${linkedInLeads.length} LinkedIn leads`);
 
-      // Enrich leads through pipeline (automatically saves to DB)
+      // Enrich leads through pipeline (saves to DB)
       const enrichmentResults = await enrichmentPipelineService.enrichBatch(linkedInLeads);
       
       const successful = enrichmentResults.filter(r => r.success).length;
       const duplicates = enrichmentResults.filter(r => r.isDuplicate).length;
 
-      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`);
+      await this._finaliseBatch(batchId, csvData.length, successful);
+
+      logger.info(`[ScrapingController] Enrichment complete: ${successful} saved, ${duplicates} duplicates`, { batchId });
 
       res.json({
         success: true,
         message: `Imported ${successful} leads from LinkedIn (${duplicates} duplicates skipped)`,
         data: {
+          batchId,
           total: csvData.length,
           saved: successful,
           duplicates,

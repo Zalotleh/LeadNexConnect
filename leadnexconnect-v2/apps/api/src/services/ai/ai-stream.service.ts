@@ -177,6 +177,13 @@ ${batchesList}${resolvedContext}
 
 SMART DEFAULTS: local service businesses → Google Places; B2B → Apollo; 30 leads/day; follow-ups enabled; schedule daily 09:00.
 
+SCHEDULE TYPE VALUES (only these are valid — never use 'once', 'one-time', 'one_time'):
+- "immediate" → run once right now / one-time run / run today / run once
+- "scheduled" → run once at a specific future date/time
+- "daily" → repeat every day
+- "weekly" → repeat every week
+- "manual" → no schedule, user triggers manually
+
 INDUSTRY MAPPING: spa/salon/wellness/beauty → spa_wellness | clinic/medical/dental → healthcare | gym/fitness/yoga → fitness | restaurant/cafe → hospitality
 
 SPECIAL CASES — output these in the <json> block instead of a campaign draft:

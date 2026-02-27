@@ -1,5 +1,4 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { Request, Response } from 'express';
 import { db } from '@leadnex/database';
 import { campaigns, leads, emails, emailTemplates, campaignLeads, leadBatches } from '@leadnex/database';
 import { eq, desc, and, gte, count, sql } from 'drizzle-orm';
@@ -10,9 +9,7 @@ import { enrichmentPipelineService } from '../services/crm/enrichment-pipeline.s
 import { emailGeneratorService } from '../services/outreach/email-generator.service';
 import { emailQueueService } from '../services/outreach/email-queue.service';
 import { campaignEmailSchedulerService } from '../services/campaign/campaign-email-scheduler.service';
-import { campaignEmailSenderService } from '../services/campaign/campaign-email-sender.service'
-import { settingsService } from '../services/settings.service';
-import { variableResolverService, ResolverContext } from '../services/variable-resolver.service';
+import { campaignEmailSenderService } from '../services/campaign/campaign-email-sender.service';
 
 export class CampaignsController {
   // In-memory lock to prevent duplicate campaign executions
@@ -23,9 +20,8 @@ export class CampaignsController {
    * Query params:
    * - type: 'lead_generation' | 'outreach' | 'fully_automated' (optional - filter by campaign type)
    */
-  async getCampaigns(req: AuthRequest, res: Response) {
+  async getCampaigns(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const { type } = req.query;
       
       logger.info('[CampaignsController] Getting campaigns', { type });
@@ -33,10 +29,9 @@ export class CampaignsController {
       // Build query with optional type filter
       const allCampaigns = type && typeof type === 'string'
         ? await db.select().from(campaigns)
-            .where(and(eq(campaigns.userId, userId), eq(campaigns.campaignType, type as any)))
+            .where(eq(campaigns.campaignType, type as any))
             .orderBy(desc(campaigns.createdAt))
         : await db.select().from(campaigns)
-            .where(eq(campaigns.userId, userId))
             .orderBy(desc(campaigns.createdAt));
 
       // Enrich each campaign with actual counts
@@ -138,15 +133,14 @@ export class CampaignsController {
   /**
    * GET /api/campaigns/:id - Get single campaign
    */
-  async getCampaign(req: AuthRequest, res: Response) {
+  async getCampaign(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
 
       const campaign = await db
         .select()
         .from(campaigns)
-        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
+        .where(eq(campaigns.id, id))
         .limit(1);
 
       if (!campaign[0]) {
@@ -513,9 +507,8 @@ export class CampaignsController {
   /**
    * POST /api/campaigns - Create new campaign
    */
-  async createCampaign(req: AuthRequest, res: Response) {
+  async createCampaign(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const {
         name,
         description,
@@ -603,7 +596,6 @@ export class CampaignsController {
 
       // Prepare campaign data - only include emailTemplateId if it's a valid UUID
       const campaignData: any = {
-        userId,
         name,
         description,
         campaignType: campaignType || 'automated',
@@ -675,7 +667,6 @@ export class CampaignsController {
         // Enroll leads in campaign_leads table
         if (leadsToEnroll.length > 0) {
           const enrollmentData = leadsToEnroll.map(leadId => ({
-            userId,
             campaignId,
             leadId,
           }));
@@ -691,6 +682,17 @@ export class CampaignsController {
             campaignId,
           });
         }
+      }
+
+      // For immediate campaigns, trigger lead generation in the background right away
+      if (scheduleType === 'immediate') {
+        logger.info('[CampaignsController] Triggering immediate lead generation for campaign', { campaignId });
+        this.executeCampaign(campaignId, newCampaign[0]).catch(error => {
+          logger.error('[CampaignsController] Error executing immediate campaign', {
+            campaignId,
+            error: error.message,
+          });
+        });
       }
 
       res.json({
@@ -711,9 +713,8 @@ export class CampaignsController {
   /**
    * POST /api/campaigns/from-batch - Create campaign from a batch
    */
-  async createCampaignFromBatch(req: AuthRequest, res: Response) {
+  async createCampaignFromBatch(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const {
         name,
         description,
@@ -774,7 +775,6 @@ export class CampaignsController {
 
       // Create campaign
       const campaignData: any = {
-        userId, // Add userId
         name: name || `Campaign - ${batchData.name}`,
         description: description || `Campaign created from batch: ${batchData.name}`,
         campaignType: 'manual', // Batch campaigns are manual since leads are pre-generated
@@ -808,7 +808,6 @@ export class CampaignsController {
 
       // Link all batch leads to the campaign
       const campaignLeadRecords = batchLeads.map(lead => ({
-        userId,
         campaignId,
         leadId: lead.id,
       }));
@@ -875,7 +874,6 @@ export class CampaignsController {
 
       // Insert campaign-lead relationships
       const relationships = leadIds.map(leadId => ({
-        userId: campaign.userId,
         campaignId: id,
         leadId,
       }));
@@ -929,24 +927,19 @@ export class CampaignsController {
 
       const campaign = campaignResults[0];
 
-      // Update campaign status to running BEFORE executing
+      // Update campaign status to active BEFORE executing
+      // (so email queue can process jobs immediately)
       await db
         .update(campaigns)
-        .set({ status: 'running', actualStartedAt: new Date(), updatedAt: new Date() })
+        .set({ status: 'active', updatedAt: new Date() })
         .where(eq(campaigns.id, id));
 
       // Small delay to ensure database transaction commits
       // before email queue starts processing jobs
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Execute campaign in the background - do NOT await so HTTP response returns immediately
-      const updatedCampaign = { ...campaign, status: 'running' };
-      this.executeCampaign(id, updatedCampaign).catch((error: any) => {
-        logger.error('[CampaignsController] Background campaign execution failed', {
-          campaignId: id,
-          error: error.message,
-        });
-      });
+      // Execute campaign
+      await this.executeCampaign(id, campaign);
 
       res.json({
         success: true,
@@ -966,16 +959,15 @@ export class CampaignsController {
   /**
    * PUT /api/campaigns/:id - Update campaign
    */
-  async updateCampaign(req: AuthRequest, res: Response) {
+  async updateCampaign(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
       const updateData = req.body;
 
       const updated = await db
         .update(campaigns)
         .set({ ...updateData, updatedAt: new Date() })
-        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
+        .where(eq(campaigns.id, id))
         .returning();
 
       if (!updated[0]) {
@@ -1134,9 +1126,13 @@ export class CampaignsController {
         return;
       }
 
-      // All other types (lead_generation, fully_automated, automated) use executeAutomatedCampaign
-      // - lead_generation: generates leads only, no emails
-      // - fully_automated / automated: generates leads AND sends emails
+      // Check if this is a lead_generation campaign (only generates leads, no emails)
+      if (campaign.campaignType === 'lead_generation') {
+        await this.executeAutomatedCampaign(campaignId, campaign);
+        return;
+      }
+
+      // Otherwise, execute as fully_automated (generates leads AND sends emails)
       await this.executeAutomatedCampaign(campaignId, campaign);
     } catch (error: any) {
       logger.error('[CampaignsController] Fatal error executing campaign', {
@@ -1253,9 +1249,6 @@ export class CampaignsController {
 
     let totalEmailsQueued = 0;
 
-    // Pre-load resolver context once (sender profile + company profile + custom vars)
-    const resolverCtx = await variableResolverService.buildContext(campaign.userId);
-
     // Process each lead
     for (const lead of campaignLeadsList) {
       if (!lead.email) {
@@ -1297,8 +1290,8 @@ export class CampaignsController {
           }
 
           // Replace template variables
-          const subject = variableResolverService.resolve(step.subject || '', resolverCtx, lead);
-          const bodyText = variableResolverService.resolve(step.body || '', resolverCtx, lead);
+          const subject = this.replaceTemplateVariables(step.subject || '', lead);
+          const bodyText = this.replaceTemplateVariables(step.body || '', lead);
 
           // Calculate cumulative delay from campaign start
           // First step sends immediately (cumulativeDelayMinutes = 0)
@@ -1440,9 +1433,6 @@ export class CampaignsController {
     const template = templateResults[0];
     let emailsQueued = 0;
 
-    // Pre-load resolver context once (sender profile + company profile + custom vars)
-    const resolverCtx = await variableResolverService.buildContext(campaign.userId);
-
     // Determine the base time for scheduling
     const baseTime = campaign.startDate ? new Date(campaign.startDate).getTime() : Date.now();
     const now = Date.now();
@@ -1485,11 +1475,11 @@ export class CampaignsController {
         }
 
         // Replace template variables with lead data
-        const subject = variableResolverService.resolve(template.subject, resolverCtx, lead);
-        const bodyText = variableResolverService.resolve(template.bodyText, resolverCtx, lead);
+        const subject = this.replaceTemplateVariables(template.subject, lead);
+        const bodyText = this.replaceTemplateVariables(template.bodyText, lead);
         // Let email sender service handle HTML conversion
         const bodyHtml = template.bodyHtml 
-          ? variableResolverService.resolve(template.bodyHtml, resolverCtx, lead)
+          ? this.replaceTemplateVariables(template.bodyHtml, lead)
           : undefined;
 
         // Queue email for sending - schedule if campaign has future start date
@@ -1562,24 +1552,56 @@ export class CampaignsController {
   }
 
   /**
-   * Replace template variables with lead data.
-   * @deprecated Use variableResolverService.resolve() with a pre-built context instead.
-   * Kept as a thin sync wrapper for any legacy call sites that haven't been migrated.
+   * Replace template variables with lead data
    */
-  private replaceTemplateVariables(text: string, lead: any, _userSignature?: string): string {
-    // Build a minimal sync context — no DB data (use the async path for real sends)
-    const minimalCtx = {
-      senderName: '',
-      senderEmail: '',
-      signatureHtml: _userSignature || '',
-      company: {
-        companyName: '', productName: '', productDescription: '',
-        websiteUrl: '', signUpLink: '', featuresLink: '',
-        pricingLink: '', demoLink: '', integrationsLink: '', supportEmail: '',
-      },
-      customVars: {},
-    };
-    return variableResolverService.resolve(text, minimalCtx, lead);
+  private replaceTemplateVariables(text: string, lead: any): string {
+    // BookNex signature HTML with logo and professional design
+    const signature = `
+<div style="margin: 0; padding: 0; margin-top: 20px;">
+<table cellpadding="0" cellspacing="0" border="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; border-collapse: collapse;">
+  <tr>
+    <td style="padding-right: 15px; vertical-align: top; border-right: 2px solid #2563eb;">
+      <img src="https://booknexsolutions.com/wp-content/uploads/2025/08/Logo-Png-Clean-1.png" alt="BookNex Solutions" width="120" style="display: block; margin: 0; padding: 0;">
+    </td>
+    <td style="padding-left: 15px; vertical-align: top;">
+      <strong style="font-size: 16px; color: #1e293b;">BookNex Solutions</strong><br>
+      <span style="font-size: 12px; color: #64748b;">Smart Booking Management</span><br><br>
+      <a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none; font-size: 13px;">🌐 www.booknexsolutions.com</a><br>
+      <a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none; font-size: 13px;">✉️ support@booknexsolutions.com</a><br>
+      <a href="https://www.linkedin.com/company/booknex-solutions/" style="color: #2563eb; text-decoration: none; font-size: 13px;">💼 Connect on LinkedIn</a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" style="padding-top: 12px;">
+      <span style="font-size: 11px; color: #94a3b8;">Streamline your bookings • Reduce no-shows • Grow your business</span>
+    </td>
+  </tr>
+</table>
+</div>
+    `.trim();
+
+    return text
+      // Lead variables
+      .replace(/\{\{companyName\}\}/g, lead.companyName || 'your company')
+      .replace(/\{\{contactName\}\}/g, lead.contactName || 'there')
+      .replace(/\{\{email\}\}/g, lead.email || '')
+      .replace(/\{\{website\}\}/g, lead.website || '')
+      .replace(/\{\{industry\}\}/g, lead.industry || '')
+      .replace(/\{\{city\}\}/g, lead.city || '')
+      .replace(/\{\{country\}\}/g, lead.country || '')
+      .replace(/\{\{jobTitle\}\}/g, lead.jobTitle || '')
+      .replace(/\{\{companySize\}\}/g, lead.companySize || '')
+      // BookNex company info
+      .replace(/\{\{BookNex\}\}/g, '<a href="https://www.booknexsolutions.com" style="color: #2563eb; text-decoration: none;">www.booknexsolutions.com</a>')
+      .replace(/\{\{ourCompanyName\}\}/g, 'BookNex Solutions')
+      .replace(/\{\{ourEmail\}\}/g, '<a href="mailto:support@booknexsolutions.com" style="color: #2563eb; text-decoration: none;">support@booknexsolutions.com</a>')
+      // BookNex links (as clickable text)
+      .replace(/\{\{featuresLink\}\}/g, '<a href="https://booknexsolutions.com/features/" style="color: #2563eb; text-decoration: underline;">View Our Features</a>')
+      .replace(/\{\{howToStartLink\}\}/g, '<a href="https://booknexsolutions.com/how-to-start/" style="color: #2563eb; text-decoration: underline;">How To Get Started</a>')
+      .replace(/\{\{pricingLink\}\}/g, '<a href="https://booknexsolutions.com/pricing/" style="color: #2563eb; text-decoration: underline;">View Pricing Plans</a>')
+      .replace(/\{\{signUpLink\}\}/g, '<a href="https://booknexsolutions.com/sign-up/" style="color: #2563eb; text-decoration: underline;">Sign Up Now</a>')
+      // Signature
+      .replace(/\{\{signature\}\}/g, signature);
   }
 
   /**
@@ -1594,8 +1616,8 @@ export class CampaignsController {
       const batchName = `${campaign.name} - ${dateStr} ${timeStr}`;
       const batch = await db.insert(leadBatches).values({
         name: batchName,
-        uploadedBy: 'system',
         userId: campaign.userId,
+        uploadedBy: 'system',
         totalLeads: 0,
         successfulImports: 0,
         failedImports: 0,
@@ -1672,44 +1694,19 @@ export class CampaignsController {
           const cityIndex = dayOfYear % targetCities.length;
           const selectedCity = targetCities[cityIndex];
 
-          const runCount = Math.floor((campaign.leadsGenerated || 0) / Math.max(leadsPerSource, 1));
-          const baseVariantIndex = (dayOfYear + cityIndex + runCount);
-          const totalVariants = googlePlacesService.getVariantCount(campaign.industry);
-          const leadTarget = leadsPerSource;
-          const googlePlacesRaw: any[] = [];
+          logger.info('[CampaignsController] Fetching leads from Google Places', {
+            city: selectedCity,
+            dayOfYear,
+            cityIndex,
+          });
 
-          // Best-effort loop: cycle through keyword variants until we reach
-          // the lead target or we've tried all available variants.
-          for (let attempt = 0; attempt < totalVariants; attempt++) {
-            const stillNeeded = leadTarget - googlePlacesRaw.length;
-            if (stillNeeded <= 0) break;
-
-            const queryVariantIndex = baseVariantIndex + attempt;
-
-            logger.info('[CampaignsController] Fetching leads from Google Places', {
-              city: selectedCity,
-              attempt: attempt + 1,
-              totalVariants,
-              queryVariantIndex,
-              stillNeeded,
-            });
-
-            try {
-              const placesLeads = await googlePlacesService.searchLeads({
-                industry: campaign.industry,
-                city: selectedCity,
-                maxResults: stillNeeded,
-                queryVariantIndex,
-              });
-              googlePlacesRaw.push(...placesLeads);
-              logger.info(`[CampaignsController] Variant ${attempt + 1}/${totalVariants}: got ${placesLeads.length} leads (total so far: ${googlePlacesRaw.length}/${leadTarget})`);
-            } catch (variantError: any) {
-              logger.warn(`[CampaignsController] Variant ${attempt + 1} failed, trying next`, { error: variantError.message });
-            }
-          }
-
-          rawLeads.push(...googlePlacesRaw.map(lead => ({ ...lead, source: 'google_places' })));
-          logger.info(`[CampaignsController] Google Places total: ${googlePlacesRaw.length} leads fetched (target was ${leadTarget})`);
+          const placesLeads = await googlePlacesService.searchLeads({
+            industry: campaign.industry,
+            city: selectedCity,
+            maxResults: leadsPerSource,
+          });
+          rawLeads.push(...placesLeads.map(lead => ({ ...lead, source: 'google_places' })));
+          logger.info(`[CampaignsController] Fetched ${placesLeads.length} leads from Google Places`);
         } catch (error: any) {
           logger.error('[CampaignsController] Error fetching from Google Places', { error: error.message });
         }
@@ -1721,42 +1718,36 @@ export class CampaignsController {
       }
 
       // Assign batchId to all raw leads
-      const leadsWithBatch = rawLeads.map(lead => ({ ...lead, batchId }));
+      const leadsWithBatch = rawLeads.map(lead => ({ ...lead, batchId, userId: campaign.userId }));
 
       // 2. Enrich leads through pipeline
       logger.info(`[CampaignsController] Enriching ${leadsWithBatch.length} leads`);
       const enrichmentResults = await enrichmentPipelineService.enrichBatch(leadsWithBatch);
-
-      // Collect ALL valid lead IDs: both newly created AND duplicates already in the DB.
-      // Duplicates are leads that exist in the system but haven't necessarily been
-      // enrolled in THIS campaign yet — they are still valid targets.
-      const allCandidateLeadIds = enrichmentResults
-        .filter(result => result.success && result.leadId)
-        .map(result => result.leadId!);
-
-      const newLeadIds = enrichmentResults
+      
+      // Extract successfully enriched lead IDs
+      const successfulLeadIds = enrichmentResults
         .filter(result => result.success && result.leadId && !result.isDuplicate)
         .map(result => result.leadId!);
+      
+      logger.info(`[CampaignsController] ${successfulLeadIds.length} leads enriched successfully`);
 
-      const duplicateLeadIds = enrichmentResults
-        .filter(result => result.success && result.leadId && result.isDuplicate)
-        .map(result => result.leadId!);
-
-      logger.info(`[CampaignsController] Enrichment summary`, {
-        total: allCandidateLeadIds.length,
-        newLeads: newLeadIds.length,
-        existingLeads: duplicateLeadIds.length,
-        failed: enrichmentResults.filter(r => !r.success).length,
-      });
-
-      if (allCandidateLeadIds.length === 0) {
-        logger.warn('[CampaignsController] No leads available (all failed enrichment)');
+      if (successfulLeadIds.length === 0) {
+        logger.warn('[CampaignsController] No leads passed enrichment pipeline');
         return;
       }
 
-      // 3. Fetch all candidate leads from DB (new + existing duplicates), filter by quality score
+      // 3. Fetch the enriched leads from database
+      const qualifiedLeads = await db
+        .select()
+        .from(leads)
+        .where(and(
+          eq(leads.id, successfulLeadIds[0]),
+          gte(leads.qualityScore, 40)
+        ));
+      
+      // Fetch all qualified leads (workaround for 'in' operator)
       const allQualifiedLeads = [];
-      for (const leadId of allCandidateLeadIds) {
+      for (const leadId of successfulLeadIds) {
         const leadResults = await db
           .select()
           .from(leads)
@@ -1769,66 +1760,46 @@ export class CampaignsController {
         }
       }
 
-      logger.info(`[CampaignsController] ${allQualifiedLeads.length} qualified leads (score >= 40, including existing)`);
+      logger.info(`[CampaignsController] ${allQualifiedLeads.length} qualified leads (score >= 40)`);
 
       if (allQualifiedLeads.length === 0) {
-        logger.warn('[CampaignsController] No qualified leads after quality score filter');
+        logger.warn('[CampaignsController] No qualified leads after filtering');
         await db
           .update(campaigns)
-          .set({ status: 'active', leadsGenerated: (campaign.leadsGenerated || 0) + newLeadIds.length, lastRunAt: new Date() })
+          .set({ leadsGenerated: (campaign.leadsGenerated || 0) + successfulLeadIds.length })
           .where(eq(campaigns.id, campaignId));
         return;
       }
 
-      // For fully_automated AND automated campaigns: enroll leads AND send emails immediately
-      if (campaign.campaignType === 'fully_automated' || campaign.campaignType === 'automated') {
+      // For fully_automated campaigns: enroll leads AND send emails immediately
+      if (campaign.campaignType === 'fully_automated') {
         logger.info('[CampaignsController] Fully automated campaign - enrolling leads and queueing emails', {
           campaignId,
           qualifiedLeads: allQualifiedLeads.length,
         });
 
-        // Filter out leads already enrolled in THIS specific campaign
-        const alreadyEnrolled = await db
-          .select({ leadId: campaignLeads.leadId })
-          .from(campaignLeads)
-          .where(eq(campaignLeads.campaignId, campaignId));
+        // Enroll all qualified leads in campaign_leads table
+        const leadsToEnroll = allQualifiedLeads.map(lead => ({
+          campaignId: campaignId,
+          leadId: lead.id,
+        }));
 
-        const alreadyEnrolledIds = new Set(alreadyEnrolled.map(r => r.leadId));
+        await db.insert(campaignLeads).values(leadsToEnroll);
+        
+        logger.info('[CampaignsController] Enrolled leads in fully_automated campaign', {
+          campaignId,
+          enrolledCount: leadsToEnroll.length,
+        });
 
-        const leadsToEnroll = allQualifiedLeads
-          .filter(lead => !alreadyEnrolledIds.has(lead.id))
-          .map(lead => ({ userId: campaign.userId, campaignId, leadId: lead.id }));
-
-        const leadsAlreadyEnrolledCount = allQualifiedLeads.length - leadsToEnroll.length;
-
-        if (leadsToEnroll.length > 0) {
-          await db.insert(campaignLeads).values(leadsToEnroll);
-          logger.info('[CampaignsController] Enrolled leads in campaign', {
-            campaignId,
-            newlyEnrolled: leadsToEnroll.length,
-            skippedAlreadyEnrolled: leadsAlreadyEnrolledCount,
-          });
+        // Now execute the email sending logic (workflow or template)
+        if (campaign.workflowId) {
+          await this.executeWorkflowSequence(campaignId, campaign, allQualifiedLeads);
+        } else if (campaign.emailTemplateId) {
+          await this.executeSingleTemplate(campaignId, campaign, allQualifiedLeads);
         } else {
-          logger.warn('[CampaignsController] All qualified leads already enrolled in this campaign — no new emails will be sent', {
+          logger.warn('[CampaignsController] Fully automated campaign has no workflow or template configured', {
             campaignId,
-            totalQualified: allQualifiedLeads.length,
           });
-        }
-
-        // Build the list to pass to email sequencer: newly enrolled leads only
-        const leadsForEmailing = allQualifiedLeads.filter(lead => !alreadyEnrolledIds.has(lead.id));
-
-        if (leadsForEmailing.length > 0) {
-          // Now execute the email sending logic (workflow or template)
-          if (campaign.workflowId) {
-            await this.executeWorkflowSequence(campaignId, campaign, leadsForEmailing);
-          } else if (campaign.emailTemplateId) {
-            await this.executeSingleTemplate(campaignId, campaign, leadsForEmailing);
-          } else {
-            logger.warn('[CampaignsController] Fully automated campaign has no workflow or template configured', {
-              campaignId,
-            });
-          }
         }
       } else {
         // For lead_generation campaigns, we ONLY generate and store leads
@@ -1844,35 +1815,46 @@ export class CampaignsController {
       const duplicateCount = enrichmentResults.filter(r => r.isDuplicate).length;
       const failedCount = enrichmentResults.filter(r => !r.success && !r.isDuplicate).length;
 
-
       await db
         .update(leadBatches)
         .set({
           totalLeads: rawLeads.length,
-          successfulImports: newLeadIds.length,
+          successfulImports: successfulLeadIds.length,
           failedImports: failedCount,
           duplicatesSkipped: duplicateCount,
         })
         .where(eq(leadBatches.id, batchId));
 
       // Update campaign metrics and link to batch
-      // Default to 'active' so the campaign can be run again; recurring logic below may override to 'completed'
       const updateData: any = {
-        status: 'active',
         leadsGenerated: (campaign.leadsGenerated || 0) + allQualifiedLeads.length,
         lastRunAt: new Date(),
         batchId, // Link campaign to the batch used
       };
 
-      // If this is a recurring campaign, calculate nextRunAt
-      if (campaign.isRecurring && campaign.recurringInterval && campaign.endDate) {
+      // Determine post-run status based on scheduleType
+      if (campaign.scheduleType === 'immediate') {
+        // One-time run — mark as completed
+        updateData.status = 'completed';
+        logger.info('[CampaignsController] Immediate campaign completed after single run', { campaignId });
+
+      } else if (campaign.scheduleType === 'daily' || campaign.scheduleType === 'weekly') {
+        // Recurring schedule — stay active so DailyLeadGenerationJob picks it up again
+        // Check if there is an endDate and we've passed it
+        if (campaign.endDate && new Date() >= new Date(campaign.endDate)) {
+          updateData.status = 'completed';
+          logger.info('[CampaignsController] Scheduled campaign completed (reached end date)', { campaignId });
+        }
+        // else: remain active, job will run it again on schedule
+
+      } else if (campaign.isRecurring && campaign.recurringInterval && campaign.endDate) {
+        // Legacy recurring logic
         const now = new Date();
         const endDate = new Date(campaign.endDate);
-        
-        // Only set nextRunAt if we haven't reached the end date
+
         if (now < endDate) {
           let nextRun = new Date(now);
-          
+
           switch (campaign.recurringInterval) {
             case 'daily':
               nextRun.setDate(nextRun.getDate() + 1);
@@ -1887,10 +1869,9 @@ export class CampaignsController {
               nextRun.setDate(nextRun.getDate() + 7);
               break;
             default:
-              nextRun.setDate(nextRun.getDate() + 1); // Default to daily
+              nextRun.setDate(nextRun.getDate() + 1);
           }
-          
-          // Only set nextRunAt if it's before the end date
+
           if (nextRun <= endDate) {
             updateData.nextRunAt = nextRun;
             logger.info('[CampaignsController] Set next run for recurring campaign', {
@@ -1899,7 +1880,6 @@ export class CampaignsController {
               interval: campaign.recurringInterval,
             });
           } else {
-            // Campaign has completed all runs, set status to completed
             updateData.status = 'completed';
             updateData.nextRunAt = null;
             logger.info('[CampaignsController] Recurring campaign completed (reached end date)', {
@@ -1908,7 +1888,6 @@ export class CampaignsController {
             });
           }
         } else {
-          // Campaign has already passed end date
           updateData.status = 'completed';
           updateData.nextRunAt = null;
           logger.info('[CampaignsController] Recurring campaign completed (past end date)', {
@@ -1968,9 +1947,8 @@ export class CampaignsController {
   /**
    * POST /api/campaigns/:id/pause - Pause campaign
    */
-  async pauseCampaign(req: AuthRequest, res: Response) {
+  async pauseCampaign(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
 
       // Update campaign status to paused
@@ -1981,7 +1959,7 @@ export class CampaignsController {
           pausedAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
+        .where(eq(campaigns.id, id))
         .returning();
 
       if (!updated[0]) {
@@ -2025,16 +2003,15 @@ export class CampaignsController {
   /**
    * POST /api/campaigns/:id/resume - Resume paused campaign
    */
-  async resumeCampaign(req: AuthRequest, res: Response) {
+  async resumeCampaign(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
 
       // Get campaign details
       const campaignResult = await db
         .select()
         .from(campaigns)
-        .where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)))
+        .where(eq(campaigns.id, id))
         .limit(1);
 
       if (!campaignResult[0]) {
@@ -2273,13 +2250,12 @@ export class CampaignsController {
   /**
    * DELETE /api/campaigns/:id - Delete campaign
    */
-  async deleteCampaign(req: AuthRequest, res: Response) {
+  async deleteCampaign(req: Request, res: Response) {
     try {
-      const userId = req.user!.id;
       const { id } = req.params;
 
       // Delete campaign (emails will cascade or be handled by FK constraints)
-      await db.delete(campaigns).where(and(eq(campaigns.id, id), eq(campaigns.userId, userId)));
+      await db.delete(campaigns).where(eq(campaigns.id, id));
 
       res.json({
         success: true,

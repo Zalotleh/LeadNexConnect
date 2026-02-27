@@ -258,24 +258,19 @@ export default function AICreatePage() {
   const handleCreateLeadBatch = async () => {
     if (!state.currentDraft) return;
     try {
-      const sourceMap: Record<string, string> = {
-        apollo: '/scraping/apollo',
-        google_places: '/scraping/google-places',
-        peopledatalabs: '/scraping/peopledatalabs',
-        hunter: '/scraping/hunter',
-      };
-      const endpoint = sourceMap[state.currentDraft.source] || '/scraping/google-places';
-      const response = await api.post(endpoint, {
+      const res = await api.post('/leads/generate', {
+        batchName: state.currentDraft.name,
         industry: state.currentDraft.industry,
         country: state.currentDraft.country,
         city: state.currentDraft.city,
-        maxResults: state.currentDraft.maxResults,
-        enrichEmail: state.currentDraft.enrichEmail,
-        analyzeWebsite: state.currentDraft.analyzeWebsite,
+        sources: [state.currentDraft.source || 'google_places'],
+        maxResults: state.currentDraft.maxResults || 50,
       });
-      if (response.data.success) {
-        toast.success('Lead generation started!');
+      if (res.data.success) {
+        toast.success('Lead generation started! Leads will appear in your batches.');
         router.push('/leads');
+      } else {
+        toast.error(res.data.error?.message || 'Failed to start lead generation');
       }
     } catch (error: any) {
       toast.error('Failed to start lead generation');

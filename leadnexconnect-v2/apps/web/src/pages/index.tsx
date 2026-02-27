@@ -247,25 +247,23 @@ export default function CommandCenterPage() {
     if (!state.currentDraft) return;
     setIsGeneratingLeads(true);
     try {
-      const sourceMap: Record<string, string> = {
-        apollo: '/scraping/apollo',
-        google_places: '/scraping/google-places',
-        peopledatalabs: '/scraping/peopledatalabs',
-        hunter: '/scraping/hunter',
-      };
-      const endpoint = sourceMap[state.currentDraft.source] || '/scraping/google-places';
-      console.log('[handleCreateLeadBatch] Sending request to:', endpoint, state.currentDraft);
-      const res = await api.post(endpoint, state.currentDraft);
-      console.log('[handleCreateLeadBatch] Response:', res.data);
+      // Use the leads/generate endpoint which creates a proper batch record
+      // and saves all leads linked to it, instead of the raw scraping endpoints.
+      const res = await api.post('/leads/generate', {
+        batchName: state.currentDraft.name,
+        industry: state.currentDraft.industry,
+        country: state.currentDraft.country,
+        city: state.currentDraft.city,
+        sources: [state.currentDraft.source || 'google_places'],
+        maxResults: state.currentDraft.maxResults || 50,
+      });
       if (res.data.success) {
-        toast.success('Lead generation started!');
+        toast.success('Lead generation started! Leads will appear in your batches.');
         router.push('/leads');
       } else {
-        console.error('[handleCreateLeadBatch] API returned success=false:', res.data);
         toast.error(res.data.error?.message || 'Failed to start lead generation');
       }
     } catch (error: any) {
-      console.error('[handleCreateLeadBatch] Error:', error);
       toast.error(error.response?.data?.error?.message || 'Failed to start lead generation');
     } finally {
       setIsGeneratingLeads(false);

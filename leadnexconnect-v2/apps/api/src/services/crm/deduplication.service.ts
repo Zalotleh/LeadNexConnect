@@ -124,6 +124,16 @@ export class DeduplicationService {
         updatedAt: new Date(),
       };
 
+      // Link to batch if not already linked (e.g. lead was saved by ScrapingController without batchId)
+      if ((newData as any).batchId && !existingLead.batchId) {
+        updateData.batchId = (newData as any).batchId;
+      }
+
+      // Set userId if not already set
+      if ((newData as any).userId && !existingLead.userId) {
+        updateData.userId = (newData as any).userId;
+      }
+
       // Keep better email (verified > unverified)
       if (newData.email && !existingLead.email) {
         updateData.email = newData.email;

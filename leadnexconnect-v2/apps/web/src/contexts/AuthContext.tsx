@@ -69,8 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.data.success) {
         setUser(response.data.user);
         
-        // Redirect to dashboard after login
-        router.push('/dashboard');
+        // Redirect to AI Command Center after login
+        router.push('/');
       } else {
         throw new Error(response.data.error?.message || 'Login failed');
       }
