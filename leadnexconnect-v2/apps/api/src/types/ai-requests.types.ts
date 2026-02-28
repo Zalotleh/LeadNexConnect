@@ -7,8 +7,26 @@ export interface AICampaignParseRequest {
 export interface AIWorkflowParseRequest {
   message: string;
   conversationHistory?: ConversationMessage[];
+  resolvedEntities?: ResolvedEntities;
   industry?: string;
   country?: string;
+  availableLeadBatches?: Array<{
+    id: string;
+    name: string;
+    totalLeads: number;
+    createdAt: string;
+    industry?: string;
+    city?: string;
+    country?: string;
+  }>;
+  availableWorkflows?: Array<{
+    id: string;
+    name: string;
+    stepsCount: number;
+    industry?: string;
+    country?: string;
+    createdAt?: string;
+  }>;
 }
 
 export interface AILeadBatchParseRequest {

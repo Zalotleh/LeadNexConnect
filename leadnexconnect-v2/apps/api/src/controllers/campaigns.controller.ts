@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { campaigns, leads, emails, emailTemplates, campaignLeads, leadBatches } from '@leadnex/database';
 import { eq, desc, and, gte, count, sql } from 'drizzle-orm';
@@ -587,6 +588,7 @@ export class CampaignsController {
             industry: industry || null,
             followUpStage: 'initial',
             isActive: true,
+            userId: (req as unknown as AuthRequest).user!.id,
           })
           .returning();
         
@@ -596,6 +598,7 @@ export class CampaignsController {
 
       // Prepare campaign data - only include emailTemplateId if it's a valid UUID
       const campaignData: any = {
+        userId: (req as unknown as AuthRequest).user!.id,
         name,
         description,
         campaignType: campaignType || 'automated',
@@ -669,6 +672,7 @@ export class CampaignsController {
           const enrollmentData = leadsToEnroll.map(leadId => ({
             campaignId,
             leadId,
+            userId: (req as unknown as AuthRequest).user!.id,
           }));
 
           await db.insert(campaignLeads).values(enrollmentData);
@@ -775,6 +779,7 @@ export class CampaignsController {
 
       // Create campaign
       const campaignData: any = {
+        userId: (req as unknown as AuthRequest).user!.id,
         name: name || `Campaign - ${batchData.name}`,
         description: description || `Campaign created from batch: ${batchData.name}`,
         campaignType: 'manual', // Batch campaigns are manual since leads are pre-generated
@@ -810,6 +815,7 @@ export class CampaignsController {
       const campaignLeadRecords = batchLeads.map(lead => ({
         campaignId,
         leadId: lead.id,
+        userId: campaignData.userId,
       }));
 
       await db.insert(campaignLeads).values(campaignLeadRecords);
@@ -876,6 +882,7 @@ export class CampaignsController {
       const relationships = leadIds.map(leadId => ({
         campaignId: id,
         leadId,
+        userId: (req as unknown as AuthRequest).user!.id,
       }));
 
       await db.insert(campaignLeads).values(relationships);
@@ -1782,6 +1789,7 @@ export class CampaignsController {
         const leadsToEnroll = allQualifiedLeads.map(lead => ({
           campaignId: campaignId,
           leadId: lead.id,
+          userId: campaign.userId,
         }));
 
         await db.insert(campaignLeads).values(leadsToEnroll);

@@ -9,6 +9,7 @@ const WORKFLOW_KEYWORDS = [
   'workflow', 'email sequence', 'email series', 'follow-up sequence',
   'write emails', 'create emails', 'generate emails',
   '3-step', '2-step', '5-step', 'multi-step', 'email steps',
+  'sequence for', 'emails for', 'follow-up for', 'nurture sequence',
 ];
 
 const LEAD_GEN_KEYWORDS = [
@@ -35,9 +36,36 @@ const LEAD_GEN_KEYWORDS = [
 export function detectIntent(message: string): IntentType {
   const lower = message.toLowerCase();
 
+  // Check for explicit intent keywords that should override scoring
+  // "create a workflow", "just want to create a workflow", "not a campaign"
+  const explicitlyNotCampaign = lower.includes('not a campaign') || lower.includes('not campaign');
+  const hasWorkflowIntent = 
+    lower.includes('create a workflow') || 
+    lower.includes('create workflow') || 
+    (lower.includes('just want') && lower.includes('workflow')) ||
+    (lower.includes('only') && lower.includes('workflow'));
+
+  if (hasWorkflowIntent || (explicitlyNotCampaign && lower.includes('workflow'))) {
+    return 'workflow';
+  }
+
+  // "for these leads", "for the leads batch", "for existing leads" = not lead generation
+  const isReferringToExistingLeads = 
+    lower.includes('for these leads') ||
+    lower.includes('for the leads') ||
+    lower.includes('for existing leads') ||
+    lower.includes('for those leads') ||
+    (lower.includes('for') && lower.includes('leads batch we created')) ||
+    (lower.includes('for') && lower.includes('leads we'));
+
   const campaignScore = CAMPAIGN_KEYWORDS.filter(k => lower.includes(k)).length;
   const workflowScore = WORKFLOW_KEYWORDS.filter(k => lower.includes(k)).length;
-  const leadScore     = LEAD_GEN_KEYWORDS.filter(k => lower.includes(k)).length;
+  let leadScore = LEAD_GEN_KEYWORDS.filter(k => lower.includes(k)).length;
+
+  // If referring to existing leads, don't count lead keywords
+  if (isReferringToExistingLeads) {
+    leadScore = 0;
+  }
 
   if (leadScore > campaignScore && leadScore > workflowScore) return 'lead_batch';
   if (workflowScore > campaignScore && workflowScore > leadScore) return 'workflow';

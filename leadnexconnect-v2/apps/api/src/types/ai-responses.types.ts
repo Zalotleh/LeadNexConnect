@@ -31,8 +31,8 @@ export interface AICampaignDraft {
 
   // Follow-up config
   followUpEnabled?: boolean;
-  followUp1DelayDays?: number;
-  followUp2DelayDays?: number;
+  followUp1DelayDays?: number | null;
+  followUp2DelayDays?: number | null;
 
   // AI reasoning
   reasoning: string;
@@ -75,12 +75,17 @@ export interface AIContextResponse {
     name: string;
     stepsCount: number;
     industry?: string;
+    country?: string;
+    createdAt?: string;
   }>;
   recentBatches: Array<{
     id: string;
     name: string;
     totalLeads: number;
     createdAt: string;
+    industry?: string;
+    city?: string;
+    country?: string;
   }>;
 }
 

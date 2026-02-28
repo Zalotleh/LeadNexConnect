@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { db, workflows, workflowSteps } from '@leadnex/database';
+import { db, workflows, workflowSteps, emailTemplates } from '@leadnex/database';
 import { eq, desc, and } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import Anthropic from '@anthropic-ai/sdk';
@@ -359,21 +359,24 @@ Format your response as a JSON array with this structure:
   }
 
   /**
-   * Create manual workflow with email template references
+   * Create manual workflow with email template references or AI-generated content
    */
-  async createManualWorkflow(req: Request, res: Response) {
+  async createManualWorkflow(req: AuthRequest, res: Response) {
     try {
+      const userId = req.user!.id;
       const {
         name,
         description,
         industry,
+        country,
+        aiInstructions,
         stepsCount,
         steps,
       } = req.body;
 
       logger.info('[WorkflowsController] Creating manual workflow', {
         name,
-        stepsCount,
+        stepsCount: steps?.length,
       });
 
       // Validate
@@ -384,13 +387,61 @@ Format your response as a JSON array with this structure:
         });
       }
 
-      // Validate each step
-      for (const step of steps) {
-        if (!step.emailTemplateId || typeof step.stepNumber !== 'number') {
-          return res.status(400).json({
-            success: false,
-            error: { message: 'Each step must have emailTemplateId and stepNumber' },
-          });
+      // Check if this is AI-generated (has subject/body) or template-based (has emailTemplateId)
+      const isAIGenerated = steps.some((step: any) => step.subject && step.body);
+      const isTemplateBased = steps.some((step: any) => step.emailTemplateId);
+
+      logger.info('[WorkflowsController] Workflow type', { isAIGenerated, isTemplateBased });
+
+      // Validate based on type
+      if (isTemplateBased) {
+        for (const step of steps) {
+          if (!step.emailTemplateId || typeof step.stepNumber !== 'number') {
+            return res.status(400).json({
+              success: false,
+              error: { message: 'Each step must have emailTemplateId and stepNumber' },
+            });
+          }
+        }
+      } else if (isAIGenerated) {
+        for (const step of steps) {
+          if (!step.subject || !step.body || typeof step.stepNumber !== 'number') {
+            return res.status(400).json({
+              success: false,
+              error: { message: 'Each step must have subject, body, and stepNumber' },
+            });
+          }
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Steps must have either emailTemplateId or (subject and body)' },
+        });
+      }
+
+      // For AI-generated workflows, create email templates first
+      let templateIds: string[] = [];
+      if (isAIGenerated) {
+        logger.info('[WorkflowsController] Creating email templates for AI-generated workflow');
+        
+        for (const step of steps) {
+          const [template] = await db
+            .insert(emailTemplates)
+            .values({
+              userId,
+              name: `${name} - Step ${step.stepNumber}`,
+              subject: step.subject,
+              bodyText: step.body,
+              bodyHtml: step.body, // Could convert to HTML, but keeping simple for now
+              industry: industry || null,
+              category: step.stepNumber === 1 ? 'initial_outreach' : 'follow_up',
+              isActive: true,
+              usageCount: 0,
+            })
+            .returning();
+          
+          templateIds.push(template.id);
+          logger.info(`[WorkflowsController] Created template ${template.id} for step ${step.stepNumber}`);
         }
       }
 
@@ -398,28 +449,29 @@ Format your response as a JSON array with this structure:
       const [newWorkflow] = await db
         .insert(workflows)
         .values({
+          userId,
           name,
           description: description || null,
           stepsCount: steps.length,
           industry: industry || null,
-          country: null,
-          aiInstructions: null,
+          country: country || null,
+          aiInstructions: aiInstructions || null,
           isActive: true,
           usageCount: 0,
         })
         .returning();
 
-      logger.info(`[WorkflowsController] Created manual workflow ${newWorkflow.id}`);
+      logger.info(`[WorkflowsController] Created workflow ${newWorkflow.id}`);
 
-      // Create workflow steps with template references
-      const stepValues = steps.map((step: any) => ({
+      // Create workflow steps
+      const stepValues = steps.map((step: any, index: number) => ({
         workflowId: newWorkflow.id,
         stepNumber: step.stepNumber,
         daysAfterPrevious: step.daysAfterPrevious || 0,
-        emailTemplateId: step.emailTemplateId,
-        // Leave subject and body null for template-based workflows
-        subject: null,
-        body: null,
+        emailTemplateId: isAIGenerated ? templateIds[index] : step.emailTemplateId,
+        // For backward compatibility, also store subject/body if provided
+        subject: step.subject || null,
+        body: step.body || null,
       }));
 
       const createdSteps = await db
@@ -428,7 +480,7 @@ Format your response as a JSON array with this structure:
         .returning();
 
       logger.info(
-        `[WorkflowsController] Created ${createdSteps.length} steps for manual workflow ${newWorkflow.id}`
+        `[WorkflowsController] Created ${createdSteps.length} steps for workflow ${newWorkflow.id}`
       );
 
       res.status(201).json({
@@ -439,11 +491,11 @@ Format your response as a JSON array with this structure:
         },
       });
     } catch (error: any) {
-      logger.error('[WorkflowsController] Error creating manual workflow:', error);
+      logger.error('[WorkflowsController] Error creating workflow:', error);
       res.status(500).json({
         success: false,
         error: {
-          message: 'Failed to create manual workflow',
+          message: 'Failed to create workflow',
           details: error.message,
         },
       });

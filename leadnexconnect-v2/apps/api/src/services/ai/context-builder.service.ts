@@ -16,9 +16,12 @@ export class ContextBuilderService {
           name: workflows.name,
           stepsCount: workflows.stepsCount,
           industry: workflows.industry,
+          country: workflows.country,
+          createdAt: workflows.createdAt,
         })
         .from(workflows)
         .where(eq(workflows.userId, userId))
+        .orderBy(desc(workflows.createdAt))
         .limit(20);
 
       // Fetch recent batches (last 30 days, max 20)
@@ -28,6 +31,7 @@ export class ContextBuilderService {
           name: leadBatches.name,
           totalLeads: leadBatches.totalLeads,
           createdAt: leadBatches.createdAt,
+          importSettings: leadBatches.importSettings,
         })
         .from(leadBatches)
         .where(eq(leadBatches.userId, userId))
@@ -40,13 +44,21 @@ export class ContextBuilderService {
           name: w.name,
           stepsCount: w.stepsCount || 1,
           industry: w.industry || undefined,
+          country: w.country || undefined,
+          createdAt: w.createdAt?.toISOString() || undefined,
         })),
-        recentBatches: recentUserBatches.map(b => ({
-          id: b.id,
-          name: b.name,
-          totalLeads: b.totalLeads || 0,
-          createdAt: b.createdAt?.toISOString() || new Date().toISOString(),
-        })),
+        recentBatches: recentUserBatches.map(b => {
+          const settings = b.importSettings as any;
+          return {
+            id: b.id,
+            name: b.name,
+            totalLeads: b.totalLeads || 0,
+            createdAt: b.createdAt?.toISOString() || new Date().toISOString(),
+            industry: settings?.industry || undefined,
+            city: settings?.city || settings?.cities?.[0] || undefined,
+            country: settings?.country || settings?.countries?.[0] || undefined,
+          };
+        }),
       };
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

@@ -231,7 +231,7 @@ export class AICampaignsController {
   async parseWorkflow(req: AuthRequest, res: Response) {
     try {
       const userId = req.user!.id;
-      const { message, industry, country } = req.body;
+      const { message, industry, country, conversationHistory, resolvedEntities } = req.body;
 
       if (!message || message.trim().length === 0) {
         return res.status(400).json({
@@ -250,10 +250,19 @@ export class AICampaignsController {
         });
       }
 
+      // Fetch user's batches so Claude can resolve batch references (e.g. "the batch we created yesterday")
+      const cached = contextCache.get(userId);
+      const context = cached || await this.contextBuilder.buildContext(userId);
+      if (!cached) contextCache.set(userId, context);
+
       const draft = await this.workflowParser.parseWorkflow({
         message,
         industry,
         country,
+        conversationHistory,
+        resolvedEntities,
+        availableLeadBatches: context.recentBatches,
+        availableWorkflows: context.workflows,
       });
 
       return res.json({
@@ -261,11 +270,11 @@ export class AICampaignsController {
         draft,
       });
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error('[AICampaigns] Error parsing workflow:', msg);
+      const msg = error instanceof Error ? error.message : 'Failed to parse workflow';
+      logger.error('[AICampaigns] Error parsing workflow:', { error: msg });
       return res.status(500).json({
         success: false,
-        error: { message: msg },
+        error: { message: 'Failed to generate workflow. Please try rephrasing your request.' },
       });
     }
   }

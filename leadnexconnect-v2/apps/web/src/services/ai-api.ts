@@ -31,7 +31,7 @@ export const aiAPI = {
   },
 
   // Parse workflow from message
-  parseWorkflow: async (data: { message: string; industry?: string; country?: string }) => {
+  parseWorkflow: async (data: { message: string; industry?: string; country?: string; conversationHistory?: any[]; resolvedEntities?: any }) => {
     const response = await api.post('/ai-campaigns/parse-workflow', data);
     return response.data;
   },

@@ -1,13 +1,14 @@
 import React from 'react';
 import { AIWorkflowDraft } from '@/types/ai-conversation.types';
-import { Workflow, Mail, Clock, Lightbulb, Zap } from 'lucide-react';
+import { Workflow, Mail, Clock, Lightbulb, Zap, Target, MapPin, Loader2 } from 'lucide-react';
 
 interface WorkflowDraftCardProps {
   draft: AIWorkflowDraft;
   onCreate: () => void;
+  isLoading?: boolean;
 }
 
-export default function WorkflowDraftCard({ draft, onCreate }: WorkflowDraftCardProps) {
+export default function WorkflowDraftCard({ draft, onCreate, isLoading }: WorkflowDraftCardProps) {
   return (
     <div className="bg-white border-2 border-purple-200 rounded-xl p-6 shadow-lg">
       {/* Header */}
@@ -35,6 +36,30 @@ export default function WorkflowDraftCard({ draft, onCreate }: WorkflowDraftCard
         )}
       </div>
 
+      {/* Industry & Location */}
+      {(draft.industry || draft.country) && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {draft.industry && (
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <Target className="w-4 h-4 text-gray-500" />
+              <div>
+                <p className="text-xs text-gray-500">Industry</p>
+                <p className="text-sm font-medium text-gray-900">{draft.industry}</p>
+              </div>
+            </div>
+          )}
+          {draft.country && (
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <MapPin className="w-4 h-4 text-gray-500" />
+              <div>
+                <p className="text-xs text-gray-500">Location</p>
+                <p className="text-sm font-medium text-gray-900">{draft.country}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Steps preview */}
       <div className="space-y-3 mb-4">
         <p className="text-xs font-medium text-gray-500">Email Steps</p>
@@ -51,6 +76,12 @@ export default function WorkflowDraftCard({ draft, onCreate }: WorkflowDraftCard
                 <div className="flex items-center gap-1 text-xs text-gray-500">
                   <Clock className="w-3.5 h-3.5" />
                   +{step.daysAfterPrevious} days
+                </div>
+              )}
+              {step.daysAfterPrevious === 0 && step.stepNumber === 1 && (
+                <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                  <Zap className="w-3.5 h-3.5" />
+                  Day 0
                 </div>
               )}
             </div>
@@ -76,10 +107,20 @@ export default function WorkflowDraftCard({ draft, onCreate }: WorkflowDraftCard
       {/* Create button */}
       <button
         onClick={onCreate}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+        disabled={isLoading}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <Zap className="w-4 h-4" />
-        Create Workflow
+        {isLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Creating...
+          </>
+        ) : (
+          <>
+            <Zap className="w-4 h-4" />
+            Create Workflow
+          </>
+        )}
       </button>
     </div>
   );

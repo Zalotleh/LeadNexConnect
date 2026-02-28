@@ -17,7 +17,7 @@ import { detectIntent } from '@/utils/detect-intent';
 import { ResolvedEntities } from '@/types/ai-conversation.types';
 import { toast } from 'react-hot-toast';
 import api from '@/services/api';
-import { Sparkles, Send, X, Loader2 } from 'lucide-react';
+import { Sparkles, Send, X, Loader2, RotateCcw } from 'lucide-react';
 
 const QUICK_STARTS = [
   {
@@ -60,9 +60,12 @@ export default function CommandCenterPage() {
   const [isReasoningVisible, setIsReasoningVisible] = useState(true);
   const [pendingCampaignDraft, setPendingCampaignDraft] = useState<any>(null);
   const [isGeneratingLeads, setIsGeneratingLeads] = useState(false);
+  const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Tracks which parser last asked a clarification so the user's next reply routes back to it
+  const pendingClarificationParser = useRef<'workflow' | 'lead_batch' | 'campaign' | null>(null);
 
-  const { startStream, isStreaming } = useSSEStream({
+  const { startStream, cancelStream, isStreaming } = useSSEStream({
     onReasoning: (step) => {
       setReasoningSteps(prev => [...prev, step]);
     },
@@ -74,13 +77,16 @@ export default function CommandCenterPage() {
       setStreamDone(true);
       setLoading(false);
       if (d.status === 'needs_clarification') {
+        pendingClarificationParser.current = 'campaign';
         addMessage('assistant', d.question);
         return;
       }
       if (d.status === 'off_topic' || d.status === 'policy_violation') {
+        pendingClarificationParser.current = null;
         addMessage('assistant', d.message);
         return;
       }
+      pendingClarificationParser.current = null;
       setDraft(draft, 'campaign');
       addMessage('assistant', `I've prepared a campaign draft. Review it on the right and click "Create & Launch" when ready.`);
       if (d.industry) updateEntities({ lastIndustry: d.industry });
@@ -131,16 +137,24 @@ export default function CommandCenterPage() {
     const MIN_LOADING_TIME = 800; // milliseconds
 
     const intent = detectIntent(msg);
+    console.log('[sendMessage] Intent detected:', intent, 'for message:', msg);
+
+    // overrideParser from a pending clarification takes ABSOLUTE precedence over intent detection
+    const overrideParser = pendingClarificationParser.current;
+    pendingClarificationParser.current = null; // clear before routing
+    const effectiveIntent = overrideParser || intent;
+
     const historyForAPI = state.messages.map(m => ({
       role: m.role, content: m.content, timestamp: m.timestamp.toISOString(),
     }));
 
-    if (intent === 'lead_batch') {
+    if (effectiveIntent === 'lead_batch') {
       try {
         const result = await parseLeadBatch.mutateAsync({ message: msg, currentDraft: state.currentDraft || undefined });
         if (result.success && result.draft) {
           const draft = result.draft;
           if (draft.status === 'needs_clarification') {
+            pendingClarificationParser.current = 'lead_batch';
             addMessage('assistant', draft.question);
           } else if (draft.status === 'off_topic' || draft.status === 'policy_violation') {
             addMessage('assistant', draft.message);
@@ -163,16 +177,19 @@ export default function CommandCenterPage() {
       return;
     }
 
-    if (intent === 'workflow') {
+    if (effectiveIntent === 'workflow') {
       try {
         const result = await parseWorkflow.mutateAsync({
           message: msg,
           industry: state.resolvedEntities.lastIndustry,
-          country: state.resolvedEntities.lastCountry,
+          country: state.resolvedEntities.lastCountry || state.resolvedEntities.lastLocation,
+          conversationHistory: historyForAPI,
+          resolvedEntities: state.resolvedEntities,
         });
         if (result.success && result.draft) {
           const draft = result.draft;
           if (draft.status === 'needs_clarification') {
+            pendingClarificationParser.current = 'workflow';
             addMessage('assistant', draft.question);
           } else if (draft.status === 'off_topic' || draft.status === 'policy_violation') {
             addMessage('assistant', draft.message);
@@ -221,6 +238,7 @@ export default function CommandCenterPage() {
 
   const handleCreateWorkflow = async () => {
     if (!state.currentDraft) return;
+    setIsCreatingWorkflow(true);
     try {
       const res = await api.post('/workflows/manual', {
         name: state.currentDraft.name,
@@ -239,8 +257,14 @@ export default function CommandCenterPage() {
           addMessage('assistant', `Workflow created and linked to your campaign. Click "Create & Launch" when ready.`);
           toast.success('Workflow created and linked!');
         } else { toast.success('Workflow created!'); router.push('/workflows'); }
+      } else {
+        toast.error(res.data.error?.message || 'Failed to create workflow');
       }
-    } catch { toast.error('Failed to create workflow'); }
+    } catch (error: any) {
+      toast.error(error.response?.data?.error?.message || 'Failed to create workflow');
+    } finally {
+      setIsCreatingWorkflow(false);
+    }
   };
 
   const handleCreateLeadBatch = async () => {
@@ -290,6 +314,18 @@ export default function CommandCenterPage() {
   };
 
   const hasDraft = !!state.currentDraft;
+
+  const handleNewConversation = () => {
+    cancelStream();
+    reset();
+    setIsSplit(false);
+    setReasoningSteps([]);
+    setStreamDone(false);
+    setIsReasoningVisible(true);
+    setPendingCampaignDraft(null);
+    pendingClarificationParser.current = null;
+    setInput('');
+  };
 
   return (
     <Layout>
@@ -360,6 +396,21 @@ export default function CommandCenterPage() {
 
             {/* Left panel — conversation thread */}
             <div className={`flex flex-col transition-all duration-300 ease-in-out ${hasDraft ? 'w-full lg:w-[58%]' : 'w-full'} border-r border-gray-200 bg-white`}>
+
+              {/* Chat header with New Conversation button */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+                <span className="text-sm font-medium text-gray-500">
+                  {state.messages.length} message{state.messages.length !== 1 ? 's' : ''}
+                </span>
+                <button
+                  onClick={handleNewConversation}
+                  className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors"
+                  title="Clear chat and start fresh"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  New conversation
+                </button>
+              </div>
 
               {/* Context chips */}
               {Object.values(state.resolvedEntities).some(Boolean) && (
@@ -465,7 +516,7 @@ export default function CommandCenterPage() {
                   />
                 )}
                 {hasDraft && state.currentIntent === 'workflow' && (
-                  <WorkflowDraftCard draft={state.currentDraft} onCreate={handleCreateWorkflow} />
+                  <WorkflowDraftCard draft={state.currentDraft} onCreate={handleCreateWorkflow} isLoading={isCreatingWorkflow} />
                 )}
                 {hasDraft && state.currentIntent === 'lead_batch' && (
                   <LeadBatchDraftCard
