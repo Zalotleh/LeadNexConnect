@@ -53,15 +53,14 @@ export function useLeadsData({
     },
   })
 
-  // Fetch ALL batches for accurate counts
+  // Fetch ALL batches for accurate counts — always enabled so badge count shows on first load
   const { data: allBatchesData, isLoading: allBatchesLoading, refetch: refetchAllBatches } = useQuery({
     queryKey: ['all-batches'],
     queryFn: async () => {
       const result = await leadsAPI.getBatches()
       return result.data
     },
-    enabled: viewMode === 'batches' || generating,
-    staleTime: 0,
+    staleTime: 30000,
   })
 
   // Fetch batches for batch view

@@ -35,7 +35,7 @@ function Leads() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [activeTab, setActiveTab] = useState<'all' | 'imported' | 'generated'>('all')
-  const [viewMode, setViewMode] = useState<'table' | 'batches'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'batches'>('batches')
   
   // Check if URL has view=batches query parameter
   useEffect(() => {
@@ -907,6 +907,8 @@ function Leads() {
 
         {/* ── Smart Stat Strip ───────────────────────────────────────────────── */}
         <div className="flex items-center gap-2 flex-wrap">
+          {viewMode !== 'batches' && (
+            <>
           <button
             onClick={() => setTierFilter('all')}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
@@ -964,6 +966,8 @@ function Leads() {
             </span>
           </button>
           <div className="w-px h-6 bg-gray-200 mx-1" />
+            </>
+          )}
           <button
             onClick={() => setViewMode('batches')}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-all ${
@@ -983,8 +987,8 @@ function Leads() {
               onClick={() => { setViewMode('table'); setTierFilter('all') }}
               className="flex items-center gap-1 px-3 py-2 text-xs text-gray-500 hover:text-gray-700"
             >
-              <X className="w-3 h-3" />
-              Back to leads
+              <List className="w-3 h-3" />
+              All Leads
             </button>
           )}
 

@@ -188,8 +188,8 @@ export const BatchesView: React.FC<BatchesViewProps> = ({
                   </div>
                 )}
 
-                {/* Import stats bar (for CSV imports) */}
-                {batch.totalLeads && batch.totalLeads > 0 && (
+                {/* Import stats — only show when duplicates were skipped (meaningful breakdown) */}
+                {(batch.duplicatesSkipped || 0) > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-100">
                     <div className="flex items-center gap-3 text-[10px] text-gray-500">
                       {(batch.successfulImports || 0) > 0 && (

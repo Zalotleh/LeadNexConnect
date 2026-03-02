@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
-import { campaigns, leads, emails, emailTemplates, campaignLeads, leadBatches } from '@leadnex/database';
-import { eq, desc, and, gte, count, sql } from 'drizzle-orm';
+import { campaigns, leads, emails, emailTemplates, campaignLeads, leadBatches, workflows } from '@leadnex/database';
+import { eq, desc, and, gte, count, sql, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { apolloService } from '../services/lead-generation/apollo.service';
 import { googlePlacesService } from '../services/lead-generation/google-places.service';
@@ -118,9 +118,27 @@ export class CampaignsController {
         })
       );
 
+      // Resolve workflow names for all campaigns in one query
+      const wfIds = enrichedCampaigns
+        .map((c) => c.workflowId)
+        .filter((id): id is string => !!id);
+      const workflowNameMap = new Map<string, string>();
+      if (wfIds.length > 0) {
+        const wfRows = await db
+          .select({ id: workflows.id, name: workflows.name })
+          .from(workflows)
+          .where(inArray(workflows.id, wfIds));
+        wfRows.forEach((w) => workflowNameMap.set(w.id, w.name));
+      }
+
+      const finalCampaigns = enrichedCampaigns.map((c) => ({
+        ...c,
+        workflowName: c.workflowId ? (workflowNameMap.get(c.workflowId) ?? null) : null,
+      }));
+
       res.json({
         success: true,
-        data: enrichedCampaigns,
+        data: finalCampaigns,
       });
     } catch (error: any) {
       logger.error('[CampaignsController] Error getting campaigns', { error: error.message });

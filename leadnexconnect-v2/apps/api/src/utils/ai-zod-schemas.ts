@@ -10,7 +10,7 @@ export const campaignDraftSchema = z.object({
   companySize: z.string().optional(),
   leadSources: z.array(z.string()).optional(),
   maxResultsPerRun: z.number().min(1).max(1000).optional(),
-  batchIds: z.array(z.string()).optional(),
+  batchIds: z.preprocess(val => (val === null ? undefined : val), z.array(z.string()).optional()),
   workflowId: z.string().nullable().optional(),
   useWorkflow: z.boolean().optional(),
   leadsPerDay: z.number().min(1).max(500).default(30),
@@ -30,6 +30,7 @@ export const campaignDraftSchema = z.object({
   followUpEnabled: z.boolean().default(true),
   followUp1DelayDays: z.preprocess(val => (val === null || val === undefined) ? null : typeof val === 'string' ? parseInt(val, 10) : val, z.number().min(0).nullable()).default(null),
   followUp2DelayDays: z.preprocess(val => (val === null || val === undefined) ? null : typeof val === 'string' ? parseInt(val, 10) : val, z.number().min(0).nullable()).default(null),
+  language: z.string().optional(),
   reasoning: z.string().default(''),
   suggestedWorkflowInstructions: z.string().optional(),
 });
@@ -45,7 +46,8 @@ export const workflowDraftSchema = z.object({
     daysAfterPrevious: z.preprocess(val => typeof val === 'string' ? parseInt(val, 10) : val, z.number().min(0)),
     subject: z.string().min(1),
     body: z.string().min(1),
-  })),
+  })).min(1, 'Workflow must have at least one email step'),
+  status: z.string().optional(), // allow but ignore — Zod strips it before returning the draft
   aiInstructions: z.string().optional(),
   reasoning: z.string().default(''),
 });

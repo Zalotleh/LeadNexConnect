@@ -26,6 +26,10 @@ export default function AICreatePage() {
   // to show the workflow draft for user approval. We park the active campaign draft here
   // so we can restore it (with the new workflowId linked) after the user approves.
   const [pendingCampaignDraft, setPendingCampaignDraft] = useState<any>(null);
+  const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
+  // Temporarily store newly created workflow so it appears in the dropdown immediately
+  // (before the context refetch completes)
+  const [justCreatedWorkflow, setJustCreatedWorkflow] = useState<{ id: string; name: string; stepsCount: number } | null>(null);
 
   useEffect(() => {
     fetchContext.mutate();
@@ -125,7 +129,11 @@ export default function AICreatePage() {
           } else if (draft.status === 'off_topic' || draft.status === 'policy_violation') {
             addMessage('assistant', draft.message);
           } else {
-            addMessage('assistant', `I've prepared a campaign draft for "${draft.name}". Review it on the right.`);
+            const needsWorkflow = draft.campaignType === 'outreach' && !draft.workflowId;
+            const workflowNote = needsWorkflow
+              ? ' **A workflow is required** — select an existing one from the dropdown or click "Or generate new workflow with AI" to create one now.'
+              : '';
+            addMessage('assistant', `I've prepared a campaign draft. Review it on the right and click "Create & Launch" when ready.${workflowNote}`);
             setDraft(draft, 'campaign');
 
             if (draft.workflowId && context?.workflows) {
@@ -201,6 +209,13 @@ export default function AICreatePage() {
 
   const handleCreateCampaign = async () => {
     if (!state.currentDraft) return;
+
+    // Block creation if outreach campaign has no workflow selected
+    if (state.currentDraft.campaignType === 'outreach' && !state.currentDraft.workflowId) {
+      toast.error('Please select or generate an email workflow before creating the campaign.');
+      return;
+    }
+
     try {
       const response = await api.post('/campaigns', state.currentDraft);
       if (response.data.success) {
@@ -215,6 +230,7 @@ export default function AICreatePage() {
 
   const handleCreateWorkflow = async () => {
     if (!state.currentDraft) return;
+    setIsCreatingWorkflow(true);
     try {
       const response = await api.post('/workflows/manual', {
         name: state.currentDraft.name,
@@ -239,6 +255,14 @@ export default function AICreatePage() {
           setDraft(linkedCampaign, 'campaign');
           setPendingCampaignDraft(null);
           updateEntities({ lastWorkflowId: newWorkflowId, lastWorkflowName: workflowName });
+
+          // Inject new workflow immediately so dropdown shows it before context refetch completes
+          const wfStepsCount = state.currentDraft?.stepsCount ?? (state.currentDraft?.steps?.length ?? 1);
+          setJustCreatedWorkflow({ id: newWorkflowId, name: workflowName, stepsCount: wfStepsCount });
+
+          // Refetch context in background so the workflow list stays fresh
+          fetchContext.mutate();
+
           addMessage('assistant',
             `Workflow "${workflowName}" created and linked to your campaign. ` +
             "Review the updated campaign on the right, then click 'Create & Launch' when ready."
@@ -252,6 +276,8 @@ export default function AICreatePage() {
     } catch (error: any) {
       toast.error('Failed to create workflow');
       console.error('Workflow creation error:', error);
+    } finally {
+      setIsCreatingWorkflow(false);
     }
   };
 
@@ -282,29 +308,71 @@ export default function AICreatePage() {
     if (!state.currentDraft) return;
     setLoading(true);
     try {
+      const d = state.currentDraft;
+
+      // Derive step count from follow-up settings
+      const hasFollowUp1 = d.followUpEnabled && d.followUp1DelayDays != null;
+      const hasFollowUp2 = d.followUpEnabled && d.followUp2DelayDays != null;
+      const stepsCount = 1 + (hasFollowUp1 ? 1 : 0) + (hasFollowUp2 ? 1 : 0);
+
+      // Build comprehensive instructions from all campaign draft data so Claude
+      // has everything it needs and never needs to ask for clarification.
+      const location = [d.targetCities?.[0], d.targetCountries?.[0]].filter(Boolean).join(', ') || 'target region';
+      const industry = d.industry || 'service businesses';
+      const delayDesc = hasFollowUp1
+        ? `${d.followUp1DelayDays} day(s) between step 1 and step 2${hasFollowUp2 ? `, ${d.followUp2DelayDays} day(s) between step 2 and step 3` : ''}`
+        : 'no delays (send all immediately)';
+
+      const builtInstructions = [
+        d.suggestedWorkflowInstructions,
+        `Generate a complete ${stepsCount}-step email workflow ready to send — do NOT ask for more information.`,
+        `Industry: ${industry}. Location: ${location}.`,
+        `Language: write ALL email subjects and bodies in ${d.language || 'English'}.`,
+        `Steps: ${stepsCount} total. Step 1: intro / initial outreach. ${hasFollowUp1 ? `Step 2: follow-up (${d.followUp1DelayDays} day(s) after step 1). ` : ''}${hasFollowUp2 ? `Step 3: final email (${d.followUp2DelayDays} day(s) after step 2). ` : ''}`,
+        `Delays: ${delayDesc}.`,
+        `Tone: professional, friendly, concise. Each email body should be 3–5 sentences max.`,
+      ].filter(Boolean).join('\n');
+
       const result = await generateWorkflow.mutateAsync({
-        industry: state.currentDraft.industry,
-        country: state.currentDraft.targetCountries?.[0],
-        instructions: state.currentDraft.suggestedWorkflowInstructions
-          || `Email workflow for ${state.currentDraft.industry || 'service businesses'} in ${
-            state.currentDraft.targetCities?.[0]
-            || state.currentDraft.targetCountries?.[0]
-            || 'target region'
-          }`,
+        industry: d.industry,
+        country: d.targetCountries?.[0],
+        instructions: builtInstructions,
       });
 
       if (result.success && result.draft) {
+        const wfDraft = result.draft;
+
+        // If Claude needs clarification or rejected the request, show it in chat — don't render WorkflowDraftCard
+        if (wfDraft.status === 'needs_clarification') {
+          addMessage('assistant', wfDraft.question || 'Could you provide more details about the workflow you want?');
+          return;
+        }
+        if (wfDraft.status === 'off_topic' || wfDraft.status === 'policy_violation') {
+          addMessage('assistant', wfDraft.message || 'I can only help with email workflows.');
+          return;
+        }
+
+        // Defensive check — ensure we got real workflow data back
+        console.log('[AI Create] generateWorkflow raw result:', JSON.stringify(wfDraft).substring(0, 400));
+        if (!wfDraft.name || !wfDraft.stepsCount || !wfDraft.steps?.length) {
+          console.error('[AI Create] Workflow draft is missing required fields:', wfDraft);
+          addMessage('assistant',
+            "I couldn't generate the workflow correctly. Please try again, or provide more detail about the campaign."
+          );
+          return;
+        }
+
         // Fix #3: DO NOT write to DB here. Show draft card for user approval first.
         setPendingCampaignDraft(state.currentDraft);
-        setDraft(result.draft, 'workflow');
+        setDraft(wfDraft, 'workflow');
         addMessage('assistant',
-          `I've drafted a "${result.draft.name}" email workflow. ` +
-          "Review the steps on the right — click 'Create Workflow' to approve it and I'll link it to your campaign automatically."
+          `I've drafted a "${wfDraft.name}" email workflow with ${wfDraft.stepsCount} step${wfDraft.stepsCount !== 1 ? 's' : ''}. ` +
+          "Review each email below — click 'Create Workflow' when ready and I'll link it to your campaign automatically."
         );
       }
     } catch (error: any) {
+      console.error('[AI Create] Workflow generation error:', error);
       toast.error('Failed to generate workflow. Please try again.');
-      console.error('Workflow generation error:', error);
     } finally {
       setLoading(false);
     }
@@ -369,7 +437,13 @@ export default function AICreatePage() {
               {state.currentDraft && state.currentIntent === 'campaign' && (
                 <CampaignDraftCard
                   draft={state.currentDraft}
-                  workflows={context?.workflows || []}
+                  workflows={(() => {
+                    const base = context?.workflows || [];
+                    if (!justCreatedWorkflow) return base;
+                    // Merge newly created workflow; dedupe in case context already has it
+                    const exists = base.some((w: any) => w.id === justCreatedWorkflow.id);
+                    return exists ? base : [justCreatedWorkflow, ...base];
+                  })()}
                   onEdit={(updated) => setDraft(updated, 'campaign')}
                   onCreate={handleCreateCampaign}
                   onGenerateWorkflow={handleGenerateWorkflow}
@@ -381,6 +455,7 @@ export default function AICreatePage() {
                 <WorkflowDraftCard
                   draft={state.currentDraft}
                   onCreate={handleCreateWorkflow}
+                  isLoading={isCreatingWorkflow}
                 />
               )}
 

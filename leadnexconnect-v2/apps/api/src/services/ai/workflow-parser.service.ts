@@ -12,6 +12,74 @@ const anthropic = new Anthropic({
 
 export class WorkflowParserService {
   /**
+   * Direct, non-conversational workflow generation from structured campaign context.
+   * Used by the "Generate with AI" button — always generates immediately, never asks questions.
+   */
+  async generateWorkflow(instructions: string, industry?: string, country?: string): Promise<AIWorkflowDraft> {
+    const systemPrompt = `You are an email workflow generator for a B2B outreach platform.
+Your ONLY job is to return a complete, ready-to-send email workflow as a JSON object.
+
+RULES:
+- ALWAYS generate immediately — NEVER ask clarifying questions.
+- ALL information you need is in the instructions below.
+- Return ONLY the JSON object. No markdown, no explanation, no extra text.
+- Write all email subjects and bodies in the language specified in the instructions.
+- Use {{companyName}}, {{contactName}}, {{city}} as placeholders where appropriate.
+- Each email body must be 3–5 sentences: professional, friendly, concise.
+
+REQUIRED JSON FORMAT:
+{
+  "name": "<descriptive workflow name>",
+  "description": "<one-sentence description>",
+  "industry": "<industry>",
+  "country": "<country or region>",
+  "stepsCount": <integer, number of steps>,
+  "steps": [
+    { "stepNumber": 1, "daysAfterPrevious": 0, "subject": "<subject>", "body": "<full email body>" },
+    { "stepNumber": 2, "daysAfterPrevious": <days>, "subject": "<subject>", "body": "<full email body>" }
+  ],
+  "aiInstructions": "<optional notes about the sequence strategy>",
+  "reasoning": "<brief strategy explanation>"
+}
+
+IMPORTANT: stepsCount must equal the length of the steps array. daysAfterPrevious for step 1 is always 0.`;
+
+    const userPrompt = `Generate a complete email workflow now based on these campaign details:
+
+${instructions}${industry ? `\nIndustry: ${industry}` : ''}${country ? `\nCountry: ${country}` : ''}`;
+
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const content = response.content[0];
+      if (content.type !== 'text') throw new Error('Unexpected response type from Claude API');
+
+      console.log('[WorkflowParser.generate] Raw Claude response:', content.text.substring(0, 300));
+
+      let rawJson: unknown;
+      try {
+        rawJson = extractJSON(content.text);
+      } catch {
+        throw new Error('Claude did not return valid JSON for workflow generation.');
+      }
+
+      console.log('[WorkflowParser.generate] Parsed JSON:', JSON.stringify(rawJson).substring(0, 300));
+
+      const draft = workflowDraftSchema.parse(rawJson) as AIWorkflowDraft;
+      return draft;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[WorkflowParser.generate] Error:', msg);
+      throw new Error(`Failed to generate workflow: ${msg}`);
+    }
+  }
+
+  /**
    * Parse user message or generate workflow from campaign context
    */
   async parseWorkflow(request: AIWorkflowParseRequest): Promise<AIWorkflowDraft> {
@@ -167,6 +235,9 @@ STEP 4 — GENERATE WHEN YOU HAVE EVERYTHING
   - steps=1: Generate as soon as you know industry, location, and steps=1. No timing needed.
   - steps>1: Generate as soon as you know industry, location, steps, and timing.
   Do not ask anything else. Generate immediately.
+
+CRITICAL OVERRIDE RULE:
+  If the user's message (or the system instructions) ALREADY explicitly specifies the number of steps, language, delays, industry, and location — DO NOT ask any clarifying questions. Generate the complete workflow immediately.
 
 ═══════════════════════════════════════════════
 WHAT YOU MUST NEVER DO

@@ -202,13 +202,18 @@ export class AICampaignsController {
     try {
       const { industry, country, instructions } = req.body;
 
-      const message = instructions || `Generate a 3-step email workflow for ${industry} businesses${country ? ` in ${country}` : ''}.`;
+      if (!instructions && !industry) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Instructions or industry is required to generate a workflow.' },
+        });
+      }
 
-      const draft = await this.workflowParser.parseWorkflow({
-        message,
-        industry,
-        country,
-      });
+      const builtInstructions = instructions ||
+        `Generate a 3-step email workflow for ${industry} businesses${country ? ` in ${country}` : ''}.`;
+
+      // Use the dedicated generateWorkflow method (direct generation, never asks questions)
+      const draft = await this.workflowParser.generateWorkflow(builtInstructions, industry, country);
 
       return res.json({
         success: true,

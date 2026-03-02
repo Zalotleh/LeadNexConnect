@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
 import EnhancedEmailEditor from '@/components/EmailEditor/EnhancedEmailEditor'
@@ -17,6 +18,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
+  Megaphone,
 } from 'lucide-react'
 
 interface WorkflowStep {
@@ -41,6 +44,13 @@ interface Workflow {
   createdAt: string
   updatedAt: string
   steps: WorkflowStep[]
+  linkedCampaigns?: Array<{
+    id: string
+    name: string
+    campaignType: string
+    status: string
+    createdAt: string
+  }>
 }
 
 export default function WorkflowDetail() {
@@ -359,6 +369,52 @@ export default function WorkflowDetail() {
             </div>
           </div>
         </div>
+
+        {/* Used by Campaigns */}
+        {workflow.linkedCampaigns && workflow.linkedCampaigns.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Megaphone className="w-5 h-5 text-primary-600" />
+              <h2 className="text-xl font-bold text-gray-900">Used by Campaigns</h2>
+              <span className="ml-auto text-sm font-medium text-primary-700 bg-primary-50 px-2.5 py-0.5 rounded-full">
+                {workflow.linkedCampaigns.length} campaign{workflow.linkedCampaigns.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {workflow.linkedCampaigns.map((c) => (
+                <div key={c.id} className="flex items-center justify-between py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+                      <Megaphone className="w-4 h-4 text-primary-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{c.name}</p>
+                      <p className="text-xs text-gray-500 capitalize">
+                        {c.campaignType.replace('_', ' ')} &middot; Created {new Date(c.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                      c.status === 'active' ? 'bg-green-100 text-green-800'
+                        : c.status === 'paused' ? 'bg-yellow-100 text-yellow-800'
+                        : c.status === 'completed' ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {c.status}
+                    </span>
+                    <Link
+                      href={`/campaigns/${c.id}`}
+                      className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 font-medium"
+                    >
+                      View <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Email Steps */}
         <div className="bg-white rounded-lg shadow p-6">

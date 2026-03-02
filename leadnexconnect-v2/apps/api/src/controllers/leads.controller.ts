@@ -306,9 +306,9 @@ export class LeadsController {
       await db
         .update(leadBatches)
         .set({
-          totalLeads: allLeads.length,
+          totalLeads: saved.length,
           successfulImports: saved.length,
-          duplicatesSkipped: allLeads.length - saved.length,
+          duplicatesSkipped: allLeads.length - deduped.length,
           completedAt: new Date(),
         })
         .where(eq(leadBatches.id, batchId));
@@ -393,6 +393,8 @@ export class LeadsController {
 
           return {
             ...batch,
+            totalLeads: totalLeads.length,       // Actual linked lead count (overrides stale DB column)
+            successfulImports: totalLeads.length, // Actual linked lead count (overrides stale DB column)
             leadCount: totalLeads.length,
             sampleLeads: batchLeads,
             campaignCount: batchCampaigns.length,
@@ -509,7 +511,7 @@ export class LeadsController {
           },
           metrics: {
             totalLeads,
-            successfulImports: batchData.successfulImports,
+            successfulImports: totalLeads, // Use actual linked lead count, not stale DB column
             failedImports: batchData.failedImports,
             duplicatesSkipped: batchData.duplicatesSkipped,
             emailsSent,

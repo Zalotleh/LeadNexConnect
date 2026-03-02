@@ -220,6 +220,7 @@ Before generating a campaign, you MUST have ALL of the following from the user:
 4. SCHEDULE TIME   — what time of day to run (e.g. "09:00", "morning", "afternoon")
 5. LEADS PER DAY   — how many leads to process per run (e.g. 20, 30, 50)
 6. FOLLOW-UPS      — whether to send follow-up emails, and how many steps (1 follow-up = 2-step campaign, 2 follow-ups = 3-step campaign) with delay in days between each. "2 steps, 1 day apart" = followUpEnabled:true, followUp1DelayDays:1, followUp2DelayDays:null
+7. LANGUAGE        — language for email content (default: "English"). If user says "in Spanish" → language:"Spanish". Always capture and include in the JSON.
 
 RULES:
 - If ANY of the above are missing → ask for ALL missing ones in a single question. Do NOT generate the campaign.
@@ -239,6 +240,17 @@ SCHEDULE TYPE VALUES (only these are valid):
 - "manual" → user triggers manually
 
 INDUSTRY MAPPING: spa/salon/wellness/beauty → spa_wellness | clinic/medical/dental → healthcare | gym/fitness/yoga → fitness | restaurant/cafe → hospitality
+
+CAMPAIGN TYPE VALUES (only these are valid — NEVER use "batch_based"):
+- "outreach"        → user wants to send emails to an existing list of leads OR a specific batch they already have
+- "lead_generation" → user wants to scrape/find new leads only (no emails yet)
+- "fully_automated" → user wants to scrape new leads AND send emails automatically
+
+BATCH SELECTION RULES:
+- If the user mentions a specific batch (by name, keyword, or description) → set campaignType to "outreach" and populate batchIds with the matching batch ID from AVAILABLE LEAD BATCHES above.
+- "batch_based" is NOT a valid campaignType — always use "outreach" when the user wants to use an existing batch.
+- If multiple batches match, pick the one whose name/industry/city best matches the user's description.
+- The batch lead count shown in AVAILABLE LEAD BATCHES is the exact count — do NOT guess or invent a different number.
 
 ═══════════════════════════════════════════════
 CONVERSATIONAL RULES
@@ -267,6 +279,8 @@ Intent detected: [Campaign creation / Lead generation / Fully automated]
 Industry: [extracted industry]
 Location: [extracted city, country — MUST be explicitly stated by user]
 Lead source: [chosen source + reason]
+Campaign type: [outreach (batch selected) / lead_generation / fully_automated — NEVER batch_based]
+Batch selected: [batch name + ID if user referenced a batch, else "none"]
 Workflow: [resolved name+ID OR needs selection]
 Schedule: [schedule decision]
 </thinking>
@@ -274,7 +288,7 @@ Schedule: [schedule decision]
 {
   "name": "<campaign name — REQUIRED>",
   "description": "<brief description>",
-  "campaignType": "fully_automated",
+  "campaignType": "outreach",
   "industry": "<industry>",
   "targetCountries": ["<country>"],
   "targetCities": ["<city>"],
@@ -283,16 +297,19 @@ Schedule: [schedule decision]
   "leadsPerDay": 30,
   "scheduleType": "daily",
   "scheduleTime": "09:00",
+  "batchIds": ["<batch-uuid>"],
   "followUpEnabled": true,
   "followUp1DelayDays": 3,
   "followUp2DelayDays": null,
+  "language": "English",
   "reasoning": "<your reasoning>",
   "workflowId": null,
   "suggestedWorkflowInstructions": "<prompt for email workflow>"
 }
 </json>
 
-CRITICAL: "name" is REQUIRED. Include ALL fields. No markdown inside <json> tags.`;
+CRITICAL: "name" is REQUIRED. Include ALL fields. No markdown inside <json> tags.
+NOTE: If no batch was selected by the user, omit "batchIds" from the JSON entirely. Only include "batchIds" when the user explicitly referenced an existing batch.`;
   }
 
   private buildUserPrompt(

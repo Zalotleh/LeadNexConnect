@@ -161,7 +161,7 @@ export default function CampaignDraftCard({
             workflows={workflows}
             selectedWorkflowId={editedDraft.workflowId || null}
             onSelect={(id) => setEditedDraft({ ...editedDraft, workflowId: id })}
-            onGenerateWorkflow={onGenerateWorkflow}
+            onGenerateNew={onGenerateWorkflow}
             isGenerating={isGeneratingWorkflow}
           />
         )}
@@ -192,7 +192,9 @@ export default function CampaignDraftCard({
         )}
         <button
           onClick={onCreate}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+          disabled={draft.campaignType === 'outreach' && !editedDraft.workflowId}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          title={draft.campaignType === 'outreach' && !editedDraft.workflowId ? 'Select or generate an email workflow first' : undefined}
         >
           <Zap className="w-4 h-4" />
           Create &amp; Launch Campaign

@@ -1,11 +1,68 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AIWorkflowDraft } from '@/types/ai-conversation.types';
-import { Workflow, Mail, Clock, Lightbulb, Zap, Target, MapPin, Loader2 } from 'lucide-react';
+import { Workflow, Mail, Clock, Lightbulb, Zap, Target, MapPin, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 
 interface WorkflowDraftCardProps {
   draft: AIWorkflowDraft;
   onCreate: () => void;
   isLoading?: boolean;
+}
+
+function EmailStepCard({ step }: { step: AIWorkflowDraft['steps'][number] }) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      {/* Step header — always visible */}
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-purple-600" />
+          <span className="text-xs font-semibold text-gray-900">Step {step.stepNumber}</span>
+          {step.daysAfterPrevious > 0 ? (
+            <span className="flex items-center gap-1 text-xs text-gray-500">
+              <Clock className="w-3 h-3" />
+              +{step.daysAfterPrevious} day{step.daysAfterPrevious !== 1 ? 's' : ''}
+            </span>
+          ) : step.stepNumber === 1 ? (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+              <Zap className="w-3 h-3" />
+              Day 0
+            </span>
+          ) : null}
+        </div>
+        <button
+          onClick={() => setCollapsed(c => !c)}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+          title={collapsed ? 'Show email body' : 'Collapse'}
+        >
+          {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* Full email content */}
+      {!collapsed && (
+        <div className="p-3 bg-white space-y-2">
+          {/* Subject line */}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">Subject</p>
+            <p className="text-sm font-semibold text-gray-900">{step.subject}</p>
+          </div>
+          {/* Full body */}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">Body</p>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{step.body}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Collapsed preview */}
+      {collapsed && (
+        <div className="px-3 py-2">
+          <p className="text-xs text-gray-500 italic truncate">{step.subject}</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function WorkflowDraftCard({ draft, onCreate, isLoading }: WorkflowDraftCardProps) {
@@ -60,34 +117,14 @@ export default function WorkflowDraftCard({ draft, onCreate, isLoading }: Workfl
         </div>
       )}
 
-      {/* Steps preview */}
+      {/* Email steps — full body visible, collapsible per step */}
       <div className="space-y-3 mb-4">
-        <p className="text-xs font-medium text-gray-500">Email Steps</p>
-        {draft.steps.map((step) => (
-          <div key={step.stepNumber} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-purple-600" />
-                <span className="text-xs font-medium text-gray-900">
-                  Step {step.stepNumber}
-                </span>
-              </div>
-              {step.daysAfterPrevious > 0 && (
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <Clock className="w-3.5 h-3.5" />
-                  +{step.daysAfterPrevious} days
-                </div>
-              )}
-              {step.daysAfterPrevious === 0 && step.stepNumber === 1 && (
-                <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                  <Zap className="w-3.5 h-3.5" />
-                  Day 0
-                </div>
-              )}
-            </div>
-            <p className="text-sm font-medium text-gray-900 mb-1">{step.subject}</p>
-            <p className="text-xs text-gray-600 line-clamp-2">{step.body}</p>
-          </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-gray-500">Email Steps</p>
+          <p className="text-xs text-gray-400">Review each email before creating</p>
+        </div>
+        {(draft.steps ?? []).map((step) => (
+          <EmailStepCard key={step.stepNumber} step={step} />
         ))}
       </div>
 
@@ -113,7 +150,7 @@ export default function WorkflowDraftCard({ draft, onCreate, isLoading }: Workfl
         {isLoading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Creating...
+            Creating Workflow...
           </>
         ) : (
           <>

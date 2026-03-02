@@ -48,6 +48,7 @@ export interface AICampaignDraft {
   followUpEnabled?: boolean;
   followUp1DelayDays?: number;
   followUp2DelayDays?: number;
+  language?: string;
   reasoning: string;
   suggestedWorkflowInstructions?: string;
 }

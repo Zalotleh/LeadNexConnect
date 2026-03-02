@@ -1,6 +1,6 @@
 import { db } from '@leadnex/database';
-import { workflows, leadBatches } from '@leadnex/database/src/schema';
-import { eq, desc } from 'drizzle-orm';
+import { workflows, leadBatches, leads } from '@leadnex/database/src/schema';
+import { eq, desc, count } from 'drizzle-orm';
 import { AIContextResponse } from '../../types/ai-responses.types';
 
 export class ContextBuilderService {
@@ -24,17 +24,19 @@ export class ContextBuilderService {
         .orderBy(desc(workflows.createdAt))
         .limit(20);
 
-      // Fetch recent batches (last 30 days, max 20)
+      // Fetch recent batches with accurate lead counts from the leads table
       const recentUserBatches = await db
         .select({
           id: leadBatches.id,
           name: leadBatches.name,
-          totalLeads: leadBatches.totalLeads,
+          actualLeadCount: count(leads.id),
           createdAt: leadBatches.createdAt,
           importSettings: leadBatches.importSettings,
         })
         .from(leadBatches)
+        .leftJoin(leads, eq(leads.batchId, leadBatches.id))
         .where(eq(leadBatches.userId, userId))
+        .groupBy(leadBatches.id, leadBatches.name, leadBatches.createdAt, leadBatches.importSettings)
         .orderBy(desc(leadBatches.createdAt))
         .limit(20);
 
@@ -52,7 +54,7 @@ export class ContextBuilderService {
           return {
             id: b.id,
             name: b.name,
-            totalLeads: b.totalLeads || 0,
+            totalLeads: Number(b.actualLeadCount) || 0,
             createdAt: b.createdAt?.toISOString() || new Date().toISOString(),
             industry: settings?.industry || undefined,
             city: settings?.city || settings?.cities?.[0] || undefined,

@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { db, workflows, workflowSteps, emailTemplates } from '@leadnex/database';
-import { eq, desc, and } from 'drizzle-orm';
+import { db, workflows, workflowSteps, emailTemplates, campaigns } from '@leadnex/database';
+import { eq, desc, and, count, inArray } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -20,6 +20,20 @@ export class WorkflowsController {
         .where(eq(workflows.userId, userId))
         .orderBy(desc(workflows.createdAt));
 
+      // Compute real campaign counts from campaigns table (usageCount column is never auto-updated)
+      const workflowIds = allWorkflows.map((w) => w.id);
+      let campaignCountMap = new Map<string, number>();
+      if (workflowIds.length > 0) {
+        const counts = await db
+          .select({ workflowId: campaigns.workflowId, total: count() })
+          .from(campaigns)
+          .where(inArray(campaigns.workflowId, workflowIds))
+          .groupBy(campaigns.workflowId);
+        counts.forEach((r) => {
+          if (r.workflowId) campaignCountMap.set(r.workflowId, Number(r.total));
+        });
+      }
+
       // Get steps for each workflow
       const workflowsWithSteps = await Promise.all(
         allWorkflows.map(async (workflow) => {
@@ -32,7 +46,8 @@ export class WorkflowsController {
           return {
             ...workflow,
             steps,
-            stepsCount: steps.length, // Add stepsCount field
+            stepsCount: steps.length,
+            usageCount: campaignCountMap.get(workflow.id) ?? 0,
           };
         })
       );
@@ -82,12 +97,33 @@ export class WorkflowsController {
         .where(eq(workflowSteps.workflowId, id))
         .orderBy(workflowSteps.stepNumber);
 
+      // Compute real campaign count from campaigns table
+      const [{ campaignCount }] = await db
+        .select({ campaignCount: count() })
+        .from(campaigns)
+        .where(eq(campaigns.workflowId, id));
+
+      // Fetch linked campaigns so the detail page can show which ones use this workflow
+      const linkedCampaigns = await db
+        .select({
+          id: campaigns.id,
+          name: campaigns.name,
+          campaignType: campaigns.campaignType,
+          status: campaigns.status,
+          createdAt: campaigns.createdAt,
+        })
+        .from(campaigns)
+        .where(eq(campaigns.workflowId, id))
+        .orderBy(desc(campaigns.createdAt));
+
       res.json({
         success: true,
         data: {
           ...workflow,
           steps,
-          stepsCount: steps.length, // Add stepsCount field
+          stepsCount: steps.length,
+          usageCount: Number(campaignCount),
+          linkedCampaigns,
         },
       });
     } catch (error: any) {

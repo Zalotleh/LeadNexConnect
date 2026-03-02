@@ -791,6 +791,19 @@ export const auditLog = pgTable('audit_log', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Sender Profiles - per-user sender identity + email signature
+// Table created by migration 0010_sender_profiles_and_company_profile.sql
+export const senderProfiles = pgTable('sender_profiles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  senderName: varchar('sender_name', { length: 255 }),
+  senderEmail: varchar('sender_email', { length: 255 }),
+  replyTo: varchar('reply_to', { length: 255 }),
+  signatureHtml: text('signature_html'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Relations
 export const leadsRelations = relations(leads, ({ many, one }) => ({
   emails: many(emails),
