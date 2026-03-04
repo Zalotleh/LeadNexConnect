@@ -2,7 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
 import { emailTemplates } from '@leadnex/database/src/schema';
-import { eq, desc, ilike, or, and } from 'drizzle-orm';
+import { eq, desc, ilike, or, and, SQL } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
 class TemplatesController {
@@ -15,25 +15,22 @@ class TemplatesController {
       let query = db.select().from(emailTemplates);
 
       // Build where conditions
-      const conditions = [eq(emailTemplates.userId, userId)];
+      const conditions: SQL<unknown>[] = [eq(emailTemplates.userId, userId)];
       
       if (category) {
         conditions.push(eq(emailTemplates.category, category as any));
       }
 
       if (search) {
-        conditions.push(
-          or(
-            ilike(emailTemplates.name, `%${search}%`),
-            ilike(emailTemplates.description, `%${search}%`)
-          )
+        const searchClause = or(
+          ilike(emailTemplates.name, `%${search}%`),
+          ilike(emailTemplates.description, `%${search}%`)
         );
+        if (searchClause) conditions.push(searchClause);
       }
 
       // Apply filters
-      if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
-      }
+      query = query.where(and(...conditions)) as any;
 
       const templates = await query.orderBy(desc(emailTemplates.updatedAt));
 

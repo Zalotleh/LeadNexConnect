@@ -68,14 +68,16 @@ export class CampaignEmailSchedulerService {
         scheduledCount = await this.scheduleWorkflowEmails(
           campaignId,
           campaignData.workflowId,
-          campaignLeadsList
+          campaignLeadsList,
+          campaignData.userId
         );
       } else if (campaignData.emailTemplateId) {
         // Schedule single template email for each lead
         scheduledCount = await this.scheduleSingleTemplateEmails(
           campaignId,
           campaignData.emailTemplateId,
-          campaignLeadsList
+          campaignLeadsList,
+          campaignData.userId
         );
       } else {
         throw new Error('Campaign has no email template or workflow configured');
@@ -185,7 +187,8 @@ export class CampaignEmailSchedulerService {
   private async scheduleSingleTemplateEmails(
     campaignId: string,
     templateId: string,
-    leadsList: any[]
+    leadsList: any[],
+    userId: string
   ): Promise<number> {
     try {
       logger.info('[CampaignEmailScheduler] Scheduling single template emails', {
@@ -207,6 +210,7 @@ export class CampaignEmailSchedulerService {
 
       // Schedule one email per lead
       const scheduledEmailsData = leadsList.map(lead => ({
+        userId,
         campaignId,
         leadId: lead.id,
         templateId,
@@ -244,7 +248,8 @@ export class CampaignEmailSchedulerService {
   private async scheduleWorkflowEmails(
     campaignId: string,
     workflowId: string,
-    leadsList: any[]
+    leadsList: any[],
+    userId: string
   ): Promise<number> {
     try {
       logger.info('[CampaignEmailScheduler] Scheduling workflow emails', {
@@ -283,6 +288,7 @@ export class CampaignEmailSchedulerService {
           scheduledFor.setDate(scheduledFor.getDate() + cumulativeDelayDays);
 
           scheduledEmailsData.push({
+            userId,
             campaignId,
             leadId: lead.id,
             templateId: step.emailTemplateId,

@@ -682,7 +682,6 @@ export const customVariables = pgTable('custom_variables', {
 // API Configuration (User-defined API keys, limits, and costs)
 export const apiConfig = pgTable('api_config', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull(),
   apiSource: varchar('api_source', { length: 50 }).notNull(), // apollo, hunter, google_places, peopledatalabs
   
   // API Credentials
@@ -710,7 +709,6 @@ export const apiConfig = pgTable('api_config', {
 // SMTP Configuration (User-defined SMTP providers)
 export const smtpConfig = pgTable('smtp_config', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull(),
   
   // Provider Info
   provider: varchar('provider', { length: 100 }).notNull(), // gmail, outlook, sendgrid, mailgun, ses, custom

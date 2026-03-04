@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ReasoningPanel from '@/components/ai/ReasoningPanel';
@@ -49,6 +50,7 @@ const QUICK_STARTS = [
 
 export default function CommandCenterPage() {
   const router = useRouter();
+  const { isAdmin } = useAuth();
   const { state, addMessage, updateEntities, setDraft, setLoading, reset } = useConversationState();
   const { context, fetchContext, generateWorkflow } = useAICampaignCreation();
   const { parseWorkflow } = useAIWorkflowCreation();
@@ -65,6 +67,13 @@ export default function CommandCenterPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Tracks which parser last asked a clarification so the user's next reply routes back to it
   const pendingClarificationParser = useRef<'workflow' | 'lead_batch' | 'campaign' | null>(null);
+
+  // Admins have their own dashboard — redirect them away from AI Create
+  useEffect(() => {
+    if (isAdmin) router.replace('/dashboard');
+  }, [isAdmin, router]);
+
+  if (isAdmin) return null;
 
   const { startStream, cancelStream, isStreaming } = useSSEStream({
     onReasoning: (step) => {

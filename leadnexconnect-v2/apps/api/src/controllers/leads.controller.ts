@@ -627,6 +627,7 @@ export class LeadsController {
           if (leadData.website) qualityScore += 10;
 
           const [savedLead] = await db.insert(leads).values({
+            userId,
             companyName: leadData.companyName,
             contactName: leadData.contactName,
             email: leadData.email,

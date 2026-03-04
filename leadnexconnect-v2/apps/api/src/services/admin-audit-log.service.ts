@@ -232,14 +232,14 @@ class AdminAuditLogService {
     const [log] = await db
       .insert(auditLog)
       .values({
-        userId: data.userId || null,
+        userId: data.userId || undefined,
         action: data.action,
         entity: data.entity,
-        entityId: data.entityId || null,
+        entityId: data.entityId || undefined,
         changes: data.changes || null,
-        ipAddress: data.ipAddress || null,
-        userAgent: data.userAgent || null,
-      })
+        ipAddress: data.ipAddress || undefined,
+        userAgent: data.userAgent || undefined,
+      } as any)
       .returning();
 
     return log;

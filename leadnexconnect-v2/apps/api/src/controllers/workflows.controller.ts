@@ -274,6 +274,7 @@ Format your response as a JSON array with this structure:
 
       // Create workflow steps
       const stepValues = emailSteps.slice(0, stepsCount).map((step, index) => ({
+        userId,
         workflowId: newWorkflow.id,
         stepNumber: index + 1,
         daysAfterPrevious: index === 0 ? 0 : daysBetween || 3,
@@ -283,7 +284,7 @@ Format your response as a JSON array with this structure:
 
       const createdSteps = await db
         .insert(workflowSteps)
-        .values(stepValues)
+        .values(stepValues as any[])
         .returning();
 
       logger.info(
@@ -501,6 +502,7 @@ Format your response as a JSON array with this structure:
 
       // Create workflow steps
       const stepValues = steps.map((step: any, index: number) => ({
+        userId,
         workflowId: newWorkflow.id,
         stepNumber: step.stepNumber,
         daysAfterPrevious: step.daysAfterPrevious || 0,
@@ -512,7 +514,7 @@ Format your response as a JSON array with this structure:
 
       const createdSteps = await db
         .insert(workflowSteps)
-        .values(stepValues)
+        .values(stepValues as any[])
         .returning();
 
       logger.info(

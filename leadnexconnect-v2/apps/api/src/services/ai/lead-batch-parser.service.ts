@@ -43,28 +43,29 @@ export class LeadBatchParserService {
       }
 
       // Extract JSON
-      const rawJson = extractJSON(content.text);
+      const rawJson = extractJSON(content.text) as Record<string, any> | null;
       
       // Check for special status responses (needs_clarification, off_topic, etc.)
-      if (rawJson && (rawJson.status === 'needs_clarification' || rawJson.status === 'off_topic' || rawJson.status === 'policy_violation')) {
+      if (rawJson && (rawJson['status'] === 'needs_clarification' || rawJson['status'] === 'off_topic' || rawJson['status'] === 'policy_violation')) {
         // Return special status as-is, don't merge
-        return rawJson as AILeadBatchDraft;
+        return rawJson as unknown as AILeadBatchDraft;
       }
       
       // If modifying existing draft, merge with current draft as fallback
-      let mergedJson = rawJson;
+      let mergedJson: Record<string, any> | null = rawJson;
       if (request.currentDraft && rawJson) {
+        const d = request.currentDraft as Record<string, any>;
         // Preserve all existing fields, only override what AI explicitly changed
         mergedJson = {
-          ...request.currentDraft,
+          ...d,
           ...rawJson,
           // Ensure we don't lose required fields
-          name: rawJson.name || request.currentDraft.name,
-          source: rawJson.source || request.currentDraft.source,
-          industry: rawJson.industry || request.currentDraft.industry,
-          maxResults: rawJson.maxResults !== undefined ? rawJson.maxResults : request.currentDraft.maxResults,
-          enrichEmail: rawJson.enrichEmail !== undefined ? rawJson.enrichEmail : request.currentDraft.enrichEmail,
-          analyzeWebsite: rawJson.analyzeWebsite !== undefined ? rawJson.analyzeWebsite : request.currentDraft.analyzeWebsite,
+          name: rawJson['name'] || d['name'],
+          source: rawJson['source'] || d['source'],
+          industry: rawJson['industry'] || d['industry'],
+          maxResults: rawJson['maxResults'] !== undefined ? rawJson['maxResults'] : d['maxResults'],
+          enrichEmail: rawJson['enrichEmail'] !== undefined ? rawJson['enrichEmail'] : d['enrichEmail'],
+          analyzeWebsite: rawJson['analyzeWebsite'] !== undefined ? rawJson['analyzeWebsite'] : d['analyzeWebsite'],
         };
       }
       

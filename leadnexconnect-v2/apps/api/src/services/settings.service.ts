@@ -32,6 +32,12 @@ interface SettingsData {
   // Email Settings
   emailsPerHour?: number;
   dailyEmailLimit?: number;
+
+  // Email Signature
+  emailSignature?: string;
+
+  // Company Profile (admin-managed)
+  company_profile?: Record<string, any>;
 }
 
 export class SettingsService {
