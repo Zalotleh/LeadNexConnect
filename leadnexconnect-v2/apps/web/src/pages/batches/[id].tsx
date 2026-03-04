@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import CreateOutreachForm from '@/components/campaigns/CreateOutreachForm'
 import { leadsAPI, campaignsAPI } from '@/services/api'
 import {
@@ -216,6 +217,7 @@ export default function BatchDetailPage() {
   }
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -620,6 +622,7 @@ export default function BatchDetailPage() {
         )}
       </div>
     </Layout>
+    </ProtectedRoute>
   )
 }
 

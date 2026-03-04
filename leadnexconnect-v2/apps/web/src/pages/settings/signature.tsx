@@ -1,4 +1,5 @@
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useState, useEffect } from 'react';
 import {
   Save, Eye, Pen, Info, CheckCircle, AlertCircle,
@@ -127,6 +128,7 @@ export default function SignaturePage() {
   const isComplete = filled === total;
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="max-w-4xl mx-auto">
 
@@ -386,5 +388,6 @@ export default function SignaturePage() {
 
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }

@@ -1,5 +1,6 @@
 // @ts-nocheck – full rewrite, types validated below
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useState, useEffect } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Save, AlertCircle, CheckCircle,
@@ -168,6 +169,7 @@ export default function VariablesPage() {
   const cats        = [...new Set(variables.map(v => v.category))].length;
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="max-w-7xl mx-auto">
 
@@ -600,5 +602,6 @@ export default function VariablesPage() {
         </div>
       )}
     </Layout>
+    </ProtectedRoute>
   );
 }

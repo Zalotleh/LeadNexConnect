@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import ReasoningPanel from '@/components/ai/ReasoningPanel';
 import CampaignDraftCard from '@/components/ai/CampaignDraftCard';
 import WorkflowDraftCard from '@/components/ai/WorkflowDraftCard';
@@ -328,6 +329,7 @@ export default function CommandCenterPage() {
   };
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="flex flex-col h-[calc(100vh-4rem)] bg-gray-50">
 
@@ -531,5 +533,6 @@ export default function CommandCenterPage() {
         )}
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }

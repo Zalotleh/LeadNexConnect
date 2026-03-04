@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import EnhancedEmailEditor from '@/components/EmailEditor/EnhancedEmailEditor'
 import api from '@/services/api'
 import { toast } from 'react-hot-toast'
@@ -203,6 +204,7 @@ export default function WorkflowDetail() {
   }
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="space-y-6">
         {/* Header */}
@@ -545,5 +547,6 @@ export default function WorkflowDetail() {
         </div>
       </div>
     </Layout>
+    </ProtectedRoute>
   )
 }

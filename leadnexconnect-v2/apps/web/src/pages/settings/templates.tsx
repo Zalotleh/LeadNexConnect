@@ -1,4 +1,5 @@
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useState, useEffect } from 'react';
 import {
   Search,
@@ -355,6 +356,7 @@ function extractVariablesFromContent(content: string): string[] {
 
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="space-y-5 max-w-full overflow-x-hidden">
 
@@ -739,5 +741,6 @@ function extractVariablesFromContent(content: string): string[] {
         )}
       </div>
     </Layout>
+    </ProtectedRoute>
   )
 }

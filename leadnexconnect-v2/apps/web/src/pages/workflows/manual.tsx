@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import api from '@/services/api'
 import { toast } from 'react-hot-toast'
 import {
@@ -184,6 +185,7 @@ export default function ManualWorkflowBuilder() {
   }
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="space-y-6 max-w-4xl mx-auto">
         {/* Header */}
@@ -437,5 +439,6 @@ export default function ManualWorkflowBuilder() {
         </div>
       </div>
     </Layout>
+    </ProtectedRoute>
   )
 }

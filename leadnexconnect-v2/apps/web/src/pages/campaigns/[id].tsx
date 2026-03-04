@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Layout from '@/components/Layout'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import WorkflowSelector from '@/components/WorkflowSelector'
 import api from '@/services/api'
 import { toast } from 'react-hot-toast'
@@ -363,6 +364,7 @@ export default function CampaignDetail() {
   }
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="space-y-6">
         {/* Header */}
@@ -1655,5 +1657,6 @@ export default function CampaignDetail() {
       </div>
       </div>
     </Layout>
+    </ProtectedRoute>
   )
 }

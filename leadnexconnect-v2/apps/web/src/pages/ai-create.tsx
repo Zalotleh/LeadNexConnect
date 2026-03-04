@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import ChatInterface from '@/components/ai/ChatInterface';
 import CampaignDraftCard from '@/components/ai/CampaignDraftCard';
 import WorkflowDraftCard from '@/components/ai/WorkflowDraftCard';
@@ -379,6 +380,7 @@ export default function AICreatePage() {
   };
 
   return (
+    <ProtectedRoute>
     <Layout>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
@@ -495,5 +497,6 @@ export default function AICreatePage() {
         </div>
       </div>
     </Layout>
+    </ProtectedRoute>
   );
 }
