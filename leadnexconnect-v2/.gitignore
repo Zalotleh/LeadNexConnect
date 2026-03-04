@@ -1,2 +1,5 @@
 apps/web/public/tinymce/
 backups/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
