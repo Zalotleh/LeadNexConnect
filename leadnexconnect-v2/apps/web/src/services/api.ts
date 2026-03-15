@@ -6,9 +6,16 @@ const api = axios.create({
   withCredentials: true, // Include cookies in requests
 })
 
-// Request interceptor - no longer needed for token since we use cookies
+// Attach token from localStorage as Bearer header on every request
 api.interceptors.request.use((config) => {
-  return config
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers = config.headers ?? {};
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return config;
 })
 
 // Response interceptor

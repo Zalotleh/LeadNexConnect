@@ -419,9 +419,10 @@ export class EmailSenderService {
     bodyHtml?: string;
     followUpStage: string;
   }): Promise<void> {
+    let lead: { id: string; userId: string; email: string | null; [key: string]: any }[] = [];
     try {
       // Get lead info first
-      const lead = await db
+      lead = await db
         .select()
         .from(leads)
         .where(eq(leads.id, params.leadId))
@@ -446,6 +447,7 @@ export class EmailSenderService {
 
       // Create email record first to get the ID for tracking
       const emailRecord = await db.insert(emails).values({
+        userId: lead[0].userId,
         leadId: params.leadId,
         campaignId: params.campaignId,
         subject: params.subject,
@@ -551,16 +553,19 @@ export class EmailSenderService {
 
       // Record failed email
       try {
-        await db.insert(emails).values({
-          leadId: params.leadId,
-          campaignId: params.campaignId,
-          subject: params.subject,
-          bodyText: params.bodyText,
-          bodyHtml: params.bodyHtml,
-          followUpStage: params.followUpStage,
-          status: 'failed',
-          errorMessage: error.message,
-        });
+        if (lead?.[0]) {
+          await db.insert(emails).values({
+            userId: lead[0].userId,
+            leadId: params.leadId,
+            campaignId: params.campaignId,
+            subject: params.subject,
+            bodyText: params.bodyText,
+            bodyHtml: params.bodyHtml,
+            followUpStage: params.followUpStage,
+            status: 'failed',
+            errorMessage: error.message,
+          });
+        }
       } catch (dbError) {
         logger.error('[EmailSender] Failed to record email error', {
           error: dbError,

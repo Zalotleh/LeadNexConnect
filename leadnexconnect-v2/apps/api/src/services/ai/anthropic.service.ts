@@ -15,16 +15,19 @@ interface EmailGenerationParams {
 }
 
 class AnthropicService {
-  private client: Anthropic
+  private _client: Anthropic | null = null
   private readonly maxRetries = 2
   private readonly timeout = 30000
 
-  constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is required')
+  private get client(): Anthropic {
+    if (!this._client) {
+      const apiKey = process.env.ANTHROPIC_API_KEY
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY environment variable is required')
+      }
+      this._client = new Anthropic({ apiKey })
     }
-    this.client = new Anthropic({ apiKey })
+    return this._client
   }
 
   async generateEmailContent(params: EmailGenerationParams): Promise<{ subject: string; body: string }> {

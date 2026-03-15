@@ -1,31 +1,25 @@
 [Unit]
 Description=LeadNexConnect Web Frontend (Next.js)
-Documentation=https://github.com/your-org/leadnexconnect
 After=network.target leadnex-api.service
 Wants=leadnex-api.service
 
 [Service]
 Type=simple
-User=leadnex
-Group=leadnex
+User=abu-lukas
+Group=abu-lukas
 
-WorkingDirectory=/opt/leadnexconnect/apps/web
+WorkingDirectory=/home/abu-lukas/LeadNexConnect/leadnexconnect-v2/apps/web
 
-# Load shared environment variables
-EnvironmentFile=/opt/leadnexconnect/.env
+# Load environment variables
+EnvironmentFile=/home/abu-lukas/LeadNexConnect/leadnexconnect-v2/apps/web/.env.local
 
-# Next.js standalone server environment
+# Next.js environment
 Environment=NODE_ENV=production
-
-# Port the Next.js server listens on
 Environment=PORT=3000
-
-# Hostname (0.0.0.0 so Nginx can reach it)
 Environment=HOSTNAME=0.0.0.0
 
-# Start the standalone Next.js server (produced by `output: 'standalone'` in next.config.js)
-# This file is self-contained: no node_modules lookup path issues
-ExecStart=/usr/bin/node /opt/leadnexconnect/apps/web/.next/standalone/server.js
+# Start Next.js production server
+ExecStart=/home/abu-lukas/LeadNexConnect/leadnexconnect-v2/node_modules/.bin/next start
 
 # Gracefully stop
 KillSignal=SIGTERM

@@ -17,7 +17,7 @@
  */
 
 import { db, campaigns, leads, scheduledEmails, emails, emailTemplates, users } from '@leadnex/database';
-import { eq, and, lte, or } from 'drizzle-orm';
+import { eq, and, lte, or, sql } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 import { emailSenderService } from '../outreach/email-sender.service';
 import { emailGeneratorService } from '../outreach/email-generator.service';
@@ -209,6 +209,9 @@ export class CampaignEmailSenderService {
       }
 
       // Get email template
+      if (!scheduled.templateId) {
+        throw new Error('Template ID not set for scheduled email');
+      }
       const template = await db
         .select()
         .from(emailTemplates)
@@ -220,20 +223,25 @@ export class CampaignEmailSenderService {
       }
 
       // Generate personalized email content
-      const generatedEmail = await emailGeneratorService.generateEmail(
-        lead[0],
-        template[0],
-        scheduled.workflowStepNumber === 1 ? 'initial' : `follow_up_${scheduled.workflowStepNumber - 1}`
-      );
+      const workflowStepNumber = scheduled.workflowStepNumber ?? 1;
+      const followUpStage = workflowStepNumber === 1 ? 'initial' : `follow_up_${workflowStepNumber - 1}`;
+      const generatedEmail = await emailGeneratorService.generateEmail({
+        companyName: lead[0].companyName,
+        contactName: lead[0].contactName || undefined,
+        industry: lead[0].industry,
+        city: lead[0].city || undefined,
+        country: lead[0].country || undefined,
+        followUpStage,
+      });
 
       // Send the email
-      const sendResult = await emailSenderService.sendEmail({
+      await emailSenderService.sendEmail({
         leadId: lead[0].id,
         campaignId: scheduled.campaignId,
         subject: generatedEmail.subject,
         bodyText: generatedEmail.bodyText,
         bodyHtml: generatedEmail.bodyHtml,
-        followUpStage: scheduled.workflowStepNumber === 1 ? 'initial' : `follow_up_${scheduled.workflowStepNumber - 1}`,
+        followUpStage,
       });
 
       // Update scheduled email as sent
@@ -242,7 +250,6 @@ export class CampaignEmailSenderService {
         .set({
           status: 'sent',
           sentAt: new Date(),
-          emailId: sendResult.emailId,
           updatedAt: new Date(),
         })
         .where(eq(scheduledEmails.id, scheduledEmailId));
@@ -252,13 +259,11 @@ export class CampaignEmailSenderService {
 
       logger.info('[CampaignEmailSender] Email sent successfully', {
         scheduledEmailId,
-        emailId: sendResult.emailId,
         to: lead[0].email,
       });
 
       return {
         success: true,
-        emailId: sendResult.emailId,
       };
 
     } catch (error: any) {
@@ -275,7 +280,7 @@ export class CampaignEmailSenderService {
           status: 'failed',
           failedAt: new Date(),
           failureReason: error.message,
-          retryCount: db.$count(scheduledEmails.retryCount) + 1,
+          retryCount: sql`COALESCE(retry_count, 0) + 1`,
           updatedAt: new Date(),
         })
         .where(eq(scheduledEmails.id, scheduledEmailId))

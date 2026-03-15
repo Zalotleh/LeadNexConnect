@@ -1,26 +1,25 @@
 [Unit]
 Description=LeadNexConnect API Server (Express/Node.js)
-Documentation=https://github.com/your-org/leadnexconnect
-After=network.target postgresql.service redis.service
+After=network.target postgresql.service
 Wants=postgresql.service
 
 [Service]
 Type=simple
-User=leadnex
-Group=leadnex
+User=abu-lukas
+Group=abu-lukas
 
-WorkingDirectory=/opt/leadnexconnect
+WorkingDirectory=/home/abu-lukas/LeadNexConnect/leadnexconnect-v2/apps/api
 
-# Load all environment variables from the .env file
-EnvironmentFile=/opt/leadnexconnect/.env
+# Load environment variables from the .env file
+EnvironmentFile=/home/abu-lukas/LeadNexConnect/leadnexconnect-v2/apps/api/.env
 
 # Always force production mode
 Environment=NODE_ENV=production
 
-# Start the compiled API bundle directly with Node.js
-ExecStart=/usr/bin/node /opt/leadnexconnect/apps/api/dist/index.js
+# Start the compiled API bundle
+ExecStart=/usr/bin/node /home/abu-lukas/LeadNexConnect/leadnexconnect-v2/apps/api/dist/index.js
 
-# Gracefully stop: send SIGTERM, wait 30 s, then SIGKILL
+# Gracefully stop
 KillSignal=SIGTERM
 TimeoutStopSec=30
 KillMode=mixed

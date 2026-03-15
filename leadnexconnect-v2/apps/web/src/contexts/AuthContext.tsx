@@ -42,8 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check authentication status
   const checkAuth = async () => {
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
       const response = await axios.get(`${API_BASE_URL}/auth/me`, {
-        withCredentials: true, // Include cookies
+        withCredentials: true,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (response.data.success) {
@@ -68,7 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (response.data.success) {
         setUser(response.data.user);
-        
+        // Store token for Bearer auth (works cross-origin without cookie restrictions)
+        if (response.data.token && typeof window !== 'undefined') {
+          localStorage.setItem('auth_token', response.data.token);
+        }
         // Redirect to AI Command Center after login
         router.push('/');
       } else {
@@ -91,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
       setUser(null);
       router.push('/login');
     }

@@ -140,13 +140,13 @@ export class APIPerformanceService {
       } else {
         // Create new record with limit from config
         await db.insert(apiPerformance).values({
+          userId: log.userId || undefined,
           apiSource: log.apiSource,
           leadsGenerated: 0, // Will be calculated from leads table
           apiCallsUsed: log.apiCallsUsed,
           apiCallsLimit: this.apiLimitsCache[log.apiSource] || 0,
           periodStart: periodStart.toISOString().split('T')[0],
           periodEnd: periodEnd.toISOString().split('T')[0],
-          ...(log.userId ? { userId: log.userId } : {}),
         });
       }
 

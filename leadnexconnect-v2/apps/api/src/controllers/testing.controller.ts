@@ -24,6 +24,7 @@ class TestingController {
 
       // Create a test batch
       const batch = await db.insert(leadBatches).values({
+        userId,
         name: `🧪 TEST BATCH - ${new Date().toLocaleString()}`,
         uploadedBy: 'system-test',
         totalLeads: count,
@@ -57,6 +58,7 @@ class TestingController {
         const company = testCompanies[Math.floor(Math.random() * testCompanies.length)];
         
         testLeads.push({
+          userId,
           batchId,
           companyName: company,
           contactName: `${firstName} ${lastName}`,

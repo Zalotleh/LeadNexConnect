@@ -1,5 +1,5 @@
 import { db } from '@leadnex/database';
-import { workflows, leadBatches, leads } from '@leadnex/database/src/schema';
+import { workflows, leadBatches, leads } from '@leadnex/database';
 import { eq, desc, count } from 'drizzle-orm';
 import { AIContextResponse } from '../../types/ai-responses.types';
 

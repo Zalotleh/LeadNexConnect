@@ -429,7 +429,7 @@ export const scrapingJobs = pgTable('scraping_jobs', {
 
 export const apiUsage = pgTable('api_usage', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull(),
+  userId: uuid('user_id'),
 
   // Service Info
   service: varchar('service', { length: 50 }).notNull(),
@@ -473,7 +473,7 @@ export const activityLog = pgTable('activity_log', {
 // API Performance Tracking
 export const apiPerformance = pgTable('api_performance', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull(),
+  userId: uuid('user_id'),
   apiSource: varchar('api_source', { length: 50 }).notNull(), // apollo, hunter, google_places, linkedin
   
   // Metrics
@@ -507,7 +507,7 @@ export const apiPerformance = pgTable('api_performance', {
 // Lead Source ROI Tracking
 export const leadSourceRoi = pgTable('lead_source_roi', {
   id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').notNull(),
+  userId: uuid('user_id'),
   leadId: uuid('lead_id').notNull().references(() => leads.id, { onDelete: 'cascade' }),
   source: varchar('source', { length: 50 }).notNull(),
   

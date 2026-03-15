@@ -23,13 +23,12 @@ interface DomainSearchResult {
 }
 
 export class HunterService {
-  private apiKey: string;
-
-  constructor() {
-    if (!HUNTER_API_KEY) {
+  private get apiKey(): string {
+    const key = process.env.HUNTER_API_KEY;
+    if (!key) {
       throw new Error('HUNTER_API_KEY is not set in environment variables');
     }
-    this.apiKey = HUNTER_API_KEY;
+    return key;
   }
 
   /**

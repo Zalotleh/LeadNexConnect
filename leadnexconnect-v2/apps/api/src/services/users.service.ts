@@ -93,7 +93,6 @@ export class UsersService {
           lockedUntil: true,
           createdAt: true,
           updatedAt: true,
-          createdBy: true,
         },
       });
 
@@ -148,7 +147,6 @@ export class UsersService {
         lastName: data.lastName,
         role: data.role || 'user',
         status: data.status || 'active',
-        createdBy: adminId,
       }).returning({
         id: users.id,
         email: users.email,

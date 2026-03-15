@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { db } from '@leadnex/database';
-import { emailTemplates } from '@leadnex/database/src/schema';
+import { emailTemplates } from '@leadnex/database';
 import { eq, desc, ilike, or, and, SQL } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 
